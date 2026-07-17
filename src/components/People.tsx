@@ -111,7 +111,7 @@ export function People({
         </div>
       )}
 
-      <div className="bg-white border border-rule rounded-md divide-y divide-rule mt-2">
+      <div className="bg-surface border border-rule rounded-md divide-y divide-rule mt-2">
         {stats.map(({ cat, isCustom, count, total }) => (
           <div key={cat} className="px-3 py-2">
             <div className="flex items-center justify-between gap-2">

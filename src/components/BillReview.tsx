@@ -237,7 +237,7 @@ export function BillReview({
             {draft.items.map((it, i) => (
               <div
                 key={i}
-                className="bg-white border border-rule rounded-md p-2 space-y-1.5"
+                className="bg-surface border border-rule rounded-md p-2 space-y-1.5"
               >
                 <div className="flex gap-1.5">
                   <input

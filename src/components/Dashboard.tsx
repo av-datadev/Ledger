@@ -44,7 +44,7 @@ export function Dashboard({
 
   return (
     <div>
-      <div className="sticky top-12 z-20 bg-ink text-paper px-4 pb-4 pt-1 border-b-2 border-crimson">
+      <div className="sticky top-12 z-20 bg-header text-onhead px-4 pb-4 pt-1 border-b-2 border-crimson">
         <div className="text-[10px] uppercase tracking-[0.2em] text-[#8fa1b0]">
           Total spent · {entries.length} transactions
         </div>
@@ -89,7 +89,7 @@ export function Dashboard({
         <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
           Paid by <span className="normal-case tracking-normal">(tap for details)</span>
         </h2>
-        <div className="bg-white border border-rule rounded-md divide-y divide-rule">
+        <div className="bg-surface border border-rule rounded-md divide-y divide-rule">
           {byPayer.map(({ payer, total: t }) => (
             <button
               key={payer}
@@ -108,7 +108,7 @@ export function Dashboard({
           <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
             Stock in hand ({openStock.length} materials)
           </h2>
-          <div className="bg-white border border-rule rounded-md divide-y divide-rule">
+          <div className="bg-surface border border-rule rounded-md divide-y divide-rule">
             {openStock
               .filter((s) => s.balance !== 0)
               .sort((a, b) => a.category.localeCompare(b.category))

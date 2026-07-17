@@ -169,7 +169,7 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
         </div>
       </div>
 
-      <div className="bg-white border border-rule rounded-md divide-y divide-rule">
+      <div className="bg-surface border border-rule rounded-md divide-y divide-rule">
         {visible.map((e) => (
           <div key={e.id} className="px-3 py-2.5">
             <div className="flex items-start justify-between gap-2">

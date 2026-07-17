@@ -7,9 +7,11 @@ import { Stock } from "./components/Stock";
 import { People } from "./components/People";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { TabBar, type Tab } from "./components/TabBar";
+import { useTheme } from "./hooks/useTheme";
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("dashboard");
+  const { theme, toggle } = useTheme();
   // Cross-tab hand-offs: "open the Ledger filtered to X" (dashboard drill-down,
   // People tab) and "open Entry with category Y preselected" (People tab).
   const [ledgerPreset, setLedgerPreset] = useState<LedgerPreset | null>(null);
@@ -65,10 +67,36 @@ export default function App() {
 
   return (
     <div className="min-h-dvh flex flex-col bg-paper">
-      <header className="bg-ink text-paper sticky top-0 z-30 px-4 h-12 flex items-center border-b border-black/30">
+      <header className="bg-header text-onhead sticky top-0 z-30 px-4 h-12 flex items-center justify-between border-b border-black/30">
         <h1 className="text-sm font-semibold tracking-[0.18em]">
           HOUSE LEDGER
         </h1>
+        <button
+          onClick={toggle}
+          className="text-onhead/90 active:text-onhead p-1 -mr-1"
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to night mode"}
+          title={theme === "dark" ? "Light mode" : "Night mode"}
+        >
+          {theme === "dark" ? (
+            // Sun
+            <svg
+              viewBox="0 0 24 24"
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+            >
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v3m0 14v3M4.2 4.2l2.1 2.1m11.4 11.4 2.1 2.1M2 12h3m14 0h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+            </svg>
+          ) : (
+            // Moon
+            <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
+              <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+            </svg>
+          )}
+        </button>
       </header>
 
       <main className="flex-1 pb-20">

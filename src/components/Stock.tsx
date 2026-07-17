@@ -141,7 +141,7 @@ export function Stock() {
       </div>
 
       {adding && (
-        <div className="bg-white border border-rule rounded-md p-2.5 mb-3 space-y-1.5">
+        <div className="bg-surface border border-rule rounded-md p-2.5 mb-3 space-y-1.5">
           <input
             className="input !py-2 !text-[14px]"
             placeholder="Material name — e.g. Apex Ultima White 20L"
@@ -196,7 +196,7 @@ export function Stock() {
         {rows.map((it) => (
           <div
             key={it.id}
-            className={`bg-white border border-rule rounded-md px-3 py-2.5 ${it.done ? "opacity-55" : ""}`}
+            className={`bg-surface border border-rule rounded-md px-3 py-2.5 ${it.done ? "opacity-55" : ""}`}
           >
             <div className="flex items-start gap-2.5">
               <input

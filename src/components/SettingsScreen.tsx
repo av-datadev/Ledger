@@ -117,7 +117,7 @@ export function SettingsScreen() {
     <div className="px-4 py-4 max-w-lg mx-auto space-y-5">
       <section
         className={`border rounded-md px-3 py-3 ${
-          backupStale ? "border-crimson bg-crimson/5" : "border-rule bg-white"
+          backupStale ? "border-crimson bg-crimson/5" : "border-rule bg-surface"
         }`}
       >
         <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">

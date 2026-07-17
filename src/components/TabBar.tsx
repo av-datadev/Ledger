@@ -27,7 +27,7 @@ export function TabBar({
 }) {
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-30 bg-ink border-t border-black/40"
+      className="fixed bottom-0 inset-x-0 z-30 bg-header border-t border-black/40"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="flex">
@@ -38,7 +38,7 @@ export function TabBar({
               key={t.id}
               onClick={() => onChange(t.id)}
               className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[9.5px] tracking-wide ${
-                active ? "text-paper" : "text-[#8fa1b0]"
+                active ? "text-onhead" : "text-[#8fa1b0]"
               }`}
               aria-current={active ? "page" : undefined}
             >

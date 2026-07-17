@@ -7,3 +7,5 @@ dev-dist/
 !.env.example
 .DS_Store
 *.log
+.vercel
+.env*
