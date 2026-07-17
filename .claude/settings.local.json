@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(cp files/seed-entries.json files/seed-boq.json .)",
+      "Bash(mkdir -p src/components src/lib src/hooks api/_lib server scripts shared public/icons)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(npx tsx -e ' *)",
+      "Bash(pip install *)",
+      "Bash(python3 -c \"import reportlab; print\\(reportlab.Version\\)\")",
+      "Bash(pip --version)",
+      "Bash(/opt/homebrew/bin/python3.11 -c \"import reportlab; print\\('ok', reportlab.Version\\)\")",
+      "Bash(/opt/homebrew/bin/python3.11 scripts/build-user-guide.py)",
+      "Bash(/opt/homebrew/bin/python3.11 -c ' *)",
+      "Bash(/opt/homebrew/bin/python3.11 -m pip install --quiet pypdf)",
+      "Bash(/opt/homebrew/bin/python3.11 -m pip install --quiet pdf2image)",
+      "Bash(brew list *)",
+      "Bash(mkdir -p /tmp/guide-preview)",
+      "Bash(/opt/homebrew/bin/python3.11 -m pip install --quiet pypdfium2)"
+    ]
+  }
+}
