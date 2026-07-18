@@ -135,6 +135,7 @@ export function BillReview({
         paidBy: ledgerPayer,
         notes: "Created from BOQ bill",
         createdAt: Date.now(),
+        updatedAt: Date.now(),
       });
     }
     if (addToStock) {

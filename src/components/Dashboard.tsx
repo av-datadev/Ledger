@@ -4,6 +4,7 @@ import { PAYERS } from "../../shared/constants";
 import { useCategories } from "../hooks/useCategories";
 import { inr, num } from "../lib/format";
 import { withBalances } from "../lib/stock";
+import { BudgetCard } from "./BudgetCard";
 
 export function Dashboard({
   onOpenCategory,
@@ -50,6 +51,8 @@ export function Dashboard({
         </div>
         <div className="money text-4xl font-bold mt-1">{inr(total)}</div>
       </div>
+
+      <BudgetCard spent={total} />
 
       <section className="px-4 pt-5">
         <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-1">

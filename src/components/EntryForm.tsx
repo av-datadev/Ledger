@@ -60,6 +60,7 @@ export function EntryForm({
       mode: form.mode,
       paidBy: form.paidBy,
       notes: form.notes.trim(),
+      updatedAt: Date.now(),
     };
 
     if (editing) {

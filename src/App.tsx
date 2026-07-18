@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Dashboard } from "./components/Dashboard";
 import { EntryForm } from "./components/EntryForm";
 import { Ledger, type LedgerPreset } from "./components/Ledger";
+import { Recent } from "./components/Recent";
 import { Boq } from "./components/Boq";
 import { Stock } from "./components/Stock";
 import { People } from "./components/People";
@@ -110,6 +111,7 @@ export default function App() {
           <EntryForm key={entryPreset ?? "new"} presetCategory={entryPreset} />
         )}
         {tab === "ledger" && <Ledger preset={ledgerPreset} />}
+        {tab === "recent" && <Recent />}
         {tab === "boq" && <Boq />}
         {tab === "stock" && <Stock />}
         {tab === "people" && (

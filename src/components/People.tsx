@@ -4,8 +4,19 @@ import { db } from "../db";
 import { CATEGORIES } from "../../shared/constants";
 import { useCategories } from "../hooks/useCategories";
 import { inr } from "../lib/format";
+import { PersonDetailsForm } from "./PersonDetailsForm";
+import type { PersonDetails } from "../types";
 
 const BUILTIN = new Set<string>(CATEGORIES);
+
+/** One-line preview of the saved contact/contract details, if any. */
+function detailSummary(d: PersonDetails): string {
+  const bits: string[] = [];
+  if (d.role) bits.push(d.role);
+  if (d.phone) bits.push(d.phone);
+  if (d.contractAmount != null) bits.push(inr(d.contractAmount));
+  return bits.join(" · ");
+}
 
 export function People({
   onOpenLedger,
@@ -19,11 +30,17 @@ export function People({
   const boqItems = useLiveQuery(() => db.boqItems.toArray(), []);
   const stockItems = useLiveQuery(() => db.stockItems.toArray(), []);
   const custom = useLiveQuery(() => db.categories.toArray(), []);
+  const people = useLiveQuery(() => db.people.toArray(), []);
   const [name, setName] = useState("");
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
     null,
   );
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  // Name whose contact/contract details overlay is open.
+  const [openDetails, setOpenDetails] = useState<string | null>(null);
+
+  const detailsFor = (cat: string): PersonDetails | undefined =>
+    people?.find((p) => p.name === cat);
 
   const add = async () => {
     const trimmed = name.trim().replace(/\s+/g, " ");
@@ -50,6 +67,8 @@ export function People({
       kind: "ok",
       text: `"${trimmed}" added — it now appears in every category dropdown (Entry, Ledger, BOQ, Stock).`,
     });
+    // Prompt for contact/contract details straight away for a new person.
+    setOpenDetails(trimmed);
   };
 
   const usageCount = (cat: string): number =>
@@ -112,7 +131,9 @@ export function People({
       )}
 
       <div className="bg-surface border border-rule rounded-md divide-y divide-rule mt-2">
-        {stats.map(({ cat, isCustom, count, total }) => (
+        {stats.map(({ cat, isCustom, count, total }) => {
+          const details = detailsFor(cat);
+          return (
           <div key={cat} className="px-3 py-2">
             <div className="flex items-center justify-between gap-2">
               <button
@@ -136,8 +157,20 @@ export function People({
                     "no payments yet"
                   )}
                 </div>
+                {details && detailSummary(details) && (
+                  <div className="text-[11px] text-ink-soft truncate mt-0.5">
+                    📇 {detailSummary(details)}
+                  </div>
+                )}
               </button>
               <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  className="btn !py-1 !px-2.5 !text-[12px]"
+                  onClick={() => setOpenDetails(cat)}
+                  title="Contact & contract details"
+                >
+                  {details ? "Details" : "+ Details"}
+                </button>
                 <button
                   className="btn !py-1 !px-2.5 !text-[12px]"
                   onClick={() => onNewPayment(cat)}
@@ -179,13 +212,22 @@ export function People({
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="text-[11px] text-ink-soft mt-3 pb-4">
-        Tap a name to see its full payment list. Built-in categories can't be
-        removed; ones you added can be removed only while nothing uses them.
+        Tap a name to see its full payment list, or <b>Details</b> to record a
+        person's phone, ID and contract. Built-in categories can't be removed;
+        ones you added can be removed only while nothing uses them.
       </div>
+
+      {openDetails && (
+        <PersonDetailsForm
+          name={openDetails}
+          onClose={() => setOpenDetails(null)}
+        />
+      )}
     </div>
   );
 }
