@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
-import { CATEGORIES } from "../../shared/constants";
 import { useCategories } from "../hooks/useCategories";
 import { inr } from "../lib/format";
 import { PersonDetailsForm } from "./PersonDetailsForm";
 import type { PersonDetails } from "../types";
 
-const BUILTIN = new Set<string>(CATEGORIES);
+// Custom categories sort after every built-in (mirrors CUSTOM_ORDER in db.ts).
+const CUSTOM_ORDER = 1000;
 
 /** One-line preview of the saved contact/contract details, if any. */
 function detailSummary(d: PersonDetails): string {
@@ -27,16 +27,12 @@ export function People({
 }) {
   const categories = useCategories();
   const entries = useLiveQuery(() => db.entries.toArray(), []);
-  const boqItems = useLiveQuery(() => db.boqItems.toArray(), []);
-  const stockItems = useLiveQuery(() => db.stockItems.toArray(), []);
-  const custom = useLiveQuery(() => db.categories.toArray(), []);
   const people = useLiveQuery(() => db.people.toArray(), []);
   const [name, setName] = useState("");
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
     null,
   );
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  // Name whose contact/contract details overlay is open.
+  // Name whose editor overlay is open.
   const [openDetails, setOpenDetails] = useState<string | null>(null);
 
   const detailsFor = (cat: string): PersonDetails | undefined =>
@@ -49,8 +45,8 @@ export function People({
       setMsg({ kind: "err", text: "Enter a name first." });
       return;
     }
-    if (trimmed.length > 30) {
-      setMsg({ kind: "err", text: "Keep the name under 30 characters." });
+    if (trimmed.length > 40) {
+      setMsg({ kind: "err", text: "Keep the name under 40 characters." });
       return;
     }
     if (categories.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
@@ -60,6 +56,7 @@ export function People({
     await db.categories.add({
       id: crypto.randomUUID(),
       name: trimmed,
+      order: CUSTOM_ORDER,
       createdAt: Date.now(),
     });
     setName("");
@@ -67,24 +64,12 @@ export function People({
       kind: "ok",
       text: `"${trimmed}" added — it now appears in every category dropdown (Entry, Ledger, BOQ, Stock).`,
     });
-    // Prompt for contact/contract details straight away for a new person.
+    // Prompt for contact/contract/bank details straight away for a new person.
     setOpenDetails(trimmed);
-  };
-
-  const usageCount = (cat: string): number =>
-    (entries?.filter((e) => e.category === cat).length ?? 0) +
-    (boqItems?.filter((b) => b.category === cat).length ?? 0) +
-    (stockItems?.filter((s) => s.category === cat).length ?? 0);
-
-  const removeCustom = async (cat: string) => {
-    const row = custom?.find((c) => c.name === cat);
-    if (row) await db.categories.delete(row.id);
-    setConfirmDelete(null);
   };
 
   const stats = categories.map((cat) => ({
     cat,
-    isCustom: !BUILTIN.has(cat as never),
     count: entries?.filter((e) => e.category === cat).length ?? 0,
     total:
       entries
@@ -131,95 +116,58 @@ export function People({
       )}
 
       <div className="bg-surface border border-rule rounded-md divide-y divide-rule mt-2">
-        {stats.map(({ cat, isCustom, count, total }) => {
+        {stats.map(({ cat, count, total }) => {
           const details = detailsFor(cat);
           return (
-          <div key={cat} className="px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <button
-                className="min-w-0 flex-1 text-left active:bg-ink/5 rounded"
-                onClick={() => onOpenLedger(cat)}
-                title="Show all payments in this category"
-              >
-                <div className="text-sm font-medium truncate">
-                  {cat}
-                  {isCustom && (
-                    <span className="badge ml-1.5 !text-[9px]">added by you</span>
-                  )}
-                </div>
-                <div className="text-[11px] text-ink-soft">
-                  {count > 0 ? (
-                    <>
-                      {count} payment{count === 1 ? "" : "s"} ·{" "}
-                      <span className="money">{inr(total)}</span>
-                    </>
-                  ) : (
-                    "no payments yet"
-                  )}
-                </div>
-                {details && detailSummary(details) && (
-                  <div className="text-[11px] text-ink-soft truncate mt-0.5">
-                    📇 {detailSummary(details)}
+            <div key={cat} className="px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  className="min-w-0 flex-1 text-left active:bg-ink/5 rounded"
+                  onClick={() => onOpenLedger(cat)}
+                  title="Show all payments in this category"
+                >
+                  <div className="text-sm font-medium truncate">{cat}</div>
+                  <div className="text-[11px] text-ink-soft">
+                    {count > 0 ? (
+                      <>
+                        {count} payment{count === 1 ? "" : "s"} ·{" "}
+                        <span className="money">{inr(total)}</span>
+                      </>
+                    ) : (
+                      "no payments yet"
+                    )}
                   </div>
-                )}
-              </button>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  className="btn !py-1 !px-2.5 !text-[12px]"
-                  onClick={() => setOpenDetails(cat)}
-                  title="Contact & contract details"
-                >
-                  {details ? "Details" : "+ Details"}
+                  {details && detailSummary(details) && (
+                    <div className="text-[11px] text-ink-soft truncate mt-0.5">
+                      📇 {detailSummary(details)}
+                    </div>
+                  )}
                 </button>
-                <button
-                  className="btn !py-1 !px-2.5 !text-[12px]"
-                  onClick={() => onNewPayment(cat)}
-                >
-                  + Payment
-                </button>
-                {isCustom &&
-                  (confirmDelete === cat ? (
-                    <span className="flex gap-1">
-                      {usageCount(cat) === 0 ? (
-                        <button
-                          className="text-[11px] text-white bg-crimson rounded px-2 py-1"
-                          onClick={() => void removeCustom(cat)}
-                        >
-                          Remove
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-crimson max-w-24">
-                          In use by {usageCount(cat)} record
-                          {usageCount(cat) === 1 ? "" : "s"} — can't remove
-                        </span>
-                      )}
-                      <button
-                        className="text-[11px] border border-rule rounded px-2 py-1"
-                        onClick={() => setConfirmDelete(null)}
-                      >
-                        Keep
-                      </button>
-                    </span>
-                  ) : (
-                    <button
-                      className="text-crimson text-base px-1"
-                      aria-label={`Remove ${cat}`}
-                      onClick={() => setConfirmDelete(cat)}
-                    >
-                      ×
-                    </button>
-                  ))}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    className="btn !py-1 !px-2.5 !text-[12px]"
+                    onClick={() => setOpenDetails(cat)}
+                    title="Edit name, details and bank info"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="btn !py-1 !px-2.5 !text-[12px]"
+                    onClick={() => onNewPayment(cat)}
+                  >
+                    + Payment
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
           );
         })}
       </div>
 
       <div className="text-[11px] text-ink-soft mt-3 pb-4">
-        Tap a name to see its full payment list, or <b>Details</b> to record a
-        person's phone, ID and contract. Built-in categories can't be removed;
-        ones you added can be removed only while nothing uses them.
+        Tap a name to see its full payment list, or <b>Edit</b> to rename it and
+        record a person's phone, ID, contract and bank details. Deleting is in
+        the editor — a category can be removed only once nothing uses it.
       </div>
 
       {openDetails && (

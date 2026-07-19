@@ -35,10 +35,14 @@ export interface Settings {
   budget: number | null; // total project budget (₹); null = not set
 }
 
-/** A user-added category/payee (e.g. "Electrician", "Painter"). */
+/**
+ * A category/person row (e.g. "Sharik", "Paint", "Electrician"). Built-in
+ * categories are seeded as rows too, so every one can be renamed or removed.
+ */
 export interface CustomCategory {
   id: string;
   name: string;
+  order: number; // display position; lower = higher in the list
   createdAt: number;
 }
 
@@ -55,6 +59,12 @@ export interface PersonDetails {
   idNumber: string; // Aadhaar / PAN / any ID number
   contractAmount: number | null; // agreed final price (₹)
   contractDetails: string; // scope / terms / anything else
+  // Bank details for paying this person.
+  bankName: string;
+  accountHolder: string;
+  accountNumber: string;
+  ifsc: string;
+  upi: string;
   createdAt: number;
   updatedAt: number;
 }

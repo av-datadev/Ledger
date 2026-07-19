@@ -10,9 +10,12 @@ import type {
 import { CATEGORIES } from "../../shared/constants";
 import { downloadFile, timestampSlug } from "./csv";
 
+// Custom categories sort after every built-in (mirrors CUSTOM_ORDER in db.ts).
+const CUSTOM_ORDER = 1000;
+
 interface BackupFile {
   app: "house-ledger";
-  version: 1 | 2 | 3 | 4;
+  version: 1 | 2 | 3 | 4 | 5;
   exportedAt: string;
   entries: Entry[];
   boqItems: BoqItem[];
@@ -38,7 +41,7 @@ export async function exportBackup(): Promise<void> {
     ]);
   const payload: BackupFile = {
     app: "house-ledger",
-    version: 4,
+    version: 5,
     exportedAt: new Date().toISOString(),
     entries,
     boqItems,
@@ -56,6 +59,7 @@ export async function exportBackup(): Promise<void> {
 }
 
 export interface ParsedBackup {
+  version: number;
   entries: Entry[];
   boqItems: BoqItem[];
   stockItems: StockItem[];
@@ -89,6 +93,7 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
     }
   }
   return {
+    version: typeof data.version === "number" ? data.version : 1,
     // Older backups (v1–v3) have no updatedAt — seed it from createdAt so
     // restored entries sort correctly in the Recent tab.
     entries: data.entries.map((e) => ({
@@ -98,30 +103,58 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
     boqItems: data.boqItems,
     stockItems: Array.isArray(data.stockItems) ? data.stockItems : [],
     stockMoves: Array.isArray(data.stockMoves) ? data.stockMoves : [],
-    categories: Array.isArray(data.categories) ? data.categories : [],
-    people: Array.isArray(data.people) ? data.people : [],
+    // Pre-v5 category rows have no `order` — slot them after the built-ins.
+    categories: (Array.isArray(data.categories) ? data.categories : []).map(
+      (c) => ({ ...c, order: c.order ?? CUSTOM_ORDER }),
+    ),
+    // Pre-v5 people rows have no bank fields — default them to empty.
+    people: (Array.isArray(data.people) ? data.people : []).map((p) => ({
+      ...p,
+      bankName: p.bankName ?? "",
+      accountHolder: p.accountHolder ?? "",
+      accountNumber: p.accountNumber ?? "",
+      ifsc: p.ifsc ?? "",
+      upi: p.upi ?? "",
+      updatedAt: p.updatedAt ?? p.createdAt,
+    })),
   };
 }
 
 /** Overwrite the database with backup contents (single transaction). */
 export async function applyBackup(backup: ParsedBackup): Promise<void> {
-  // Older backups have no categories table — recover any custom category
-  // names referenced by the data so dropdowns and the dashboard stay complete.
-  const builtin = new Set<string>(
-    CATEGORIES.map((c) => c.toLowerCase()),
-  );
+  // Pre-v5 backups predate categories-as-rows: the built-ins weren't stored.
+  const isLegacy = backup.version < 5;
+  const builtin = new Set<string>(CATEGORIES.map((c) => c.toLowerCase()));
   const restored = new Set(backup.categories.map((c) => c.name.toLowerCase()));
+  const now = Date.now();
+
+  // Recover any category referenced by the data but missing from the file
+  // (skip built-ins for legacy files — they're re-seeded in full below).
   const derived: CustomCategory[] = [];
   for (const cat of new Set([
     ...backup.entries.map((e) => e.category),
     ...backup.boqItems.map((b) => b.category),
     ...backup.stockItems.map((s) => s.category),
   ])) {
-    if (cat && !builtin.has(cat.toLowerCase()) && !restored.has(cat.toLowerCase())) {
-      derived.push({ id: crypto.randomUUID(), name: cat, createdAt: Date.now() });
+    if (
+      cat &&
+      !restored.has(cat.toLowerCase()) &&
+      !(isLegacy && builtin.has(cat.toLowerCase()))
+    ) {
+      derived.push({ id: crypto.randomUUID(), name: cat, order: CUSTOM_ORDER, createdAt: now });
       restored.add(cat.toLowerCase());
     }
   }
+
+  // Legacy files: re-seed every built-in category that isn't already present.
+  const builtinRows: CustomCategory[] = isLegacy
+    ? CATEGORIES.map((name, i) => ({
+        id: crypto.randomUUID(),
+        name,
+        order: i,
+        createdAt: now,
+      })).filter((c) => !restored.has(c.name.toLowerCase()))
+    : [];
 
   await db.transaction(
     "rw",
@@ -144,7 +177,11 @@ export async function applyBackup(backup: ParsedBackup): Promise<void> {
       await db.boqItems.bulkAdd(backup.boqItems);
       await db.stockItems.bulkAdd(backup.stockItems);
       await db.stockMoves.bulkAdd(backup.stockMoves);
-      await db.categories.bulkAdd([...backup.categories, ...derived]);
+      await db.categories.bulkAdd([
+        ...backup.categories,
+        ...derived,
+        ...builtinRows,
+      ]);
       await db.people.bulkAdd(backup.people);
     },
   );

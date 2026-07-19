@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { db } from "../db";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db, renameCategory, deleteCategory } from "../db";
 import { useBackClose } from "../hooks/useBackClose";
 import type { PersonDetails } from "../types";
 
@@ -24,20 +25,58 @@ function Fields({
   existing: PersonDetails | null;
   requestClose: () => void;
 }) {
+  const categories = useLiveQuery(() => db.categories.toArray(), []);
+  // How many records reference this category — deleting it would orphan them.
+  const usage = useLiveQuery(async () => {
+    const [e, b, s] = await Promise.all([
+      db.entries.where("category").equals(name).count(),
+      db.boqItems.where("category").equals(name).count(),
+      db.stockItems.where("category").equals(name).count(),
+    ]);
+    return e + b + s;
+  }, [name]);
+
   const [form, setForm] = useState(() => ({
+    name,
     role: existing?.role ?? "",
     phone: existing?.phone ?? "",
     idNumber: existing?.idNumber ?? "",
     contractAmount:
       existing?.contractAmount != null ? String(existing.contractAmount) : "",
     contractDetails: existing?.contractDetails ?? "",
+    bankName: existing?.bankName ?? "",
+    accountHolder: existing?.accountHolder ?? "",
+    accountNumber: existing?.accountNumber ?? "",
+    ifsc: existing?.ifsc ?? "",
+    upi: existing?.upi ?? "",
   }));
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const set = (k: keyof typeof form, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   const save = async () => {
+    setError(null);
+    const nextName = form.name.trim().replace(/\s+/g, " ");
+    if (!nextName) {
+      setError("Name can't be empty.");
+      return;
+    }
+    if (nextName.length > 40) {
+      setError("Keep the name under 40 characters.");
+      return;
+    }
+    const clash = (categories ?? []).some(
+      (c) =>
+        c.name.toLowerCase() === nextName.toLowerCase() &&
+        c.name.toLowerCase() !== name.toLowerCase(),
+    );
+    if (clash) {
+      setError(`"${nextName}" already exists.`);
+      return;
+    }
+
     const raw = form.contractAmount.trim();
     let amount: number | null = null;
     if (raw !== "") {
@@ -47,6 +86,10 @@ function Fields({
         return;
       }
     }
+
+    // Rename the category everywhere first, so details attach to the new name.
+    if (nextName !== name) await renameCategory(name, nextName);
+
     const now = Date.now();
     const fields = {
       role: form.role.trim(),
@@ -54,23 +97,35 @@ function Fields({
       idNumber: form.idNumber.trim(),
       contractAmount: amount,
       contractDetails: form.contractDetails.trim(),
+      bankName: form.bankName.trim(),
+      accountHolder: form.accountHolder.trim(),
+      accountNumber: form.accountNumber.trim(),
+      ifsc: form.ifsc.trim().toUpperCase(),
+      upi: form.upi.trim(),
       updatedAt: now,
     };
-    // Nothing filled in — don't leave an empty record around (keeps the
-    // "+ Details" vs "Details" button honest).
     const isEmpty =
       !fields.role &&
       !fields.phone &&
       !fields.idNumber &&
       fields.contractAmount == null &&
-      !fields.contractDetails;
-    if (existing) {
-      if (isEmpty) await db.people.delete(existing.id);
-      else await db.people.update(existing.id, fields);
+      !fields.contractDetails &&
+      !fields.bankName &&
+      !fields.accountHolder &&
+      !fields.accountNumber &&
+      !fields.ifsc &&
+      !fields.upi;
+
+    // After a rename, renameCategory has already moved any existing details row
+    // to the new name — look it up fresh.
+    const current = await db.people.where("name").equals(nextName).first();
+    if (current) {
+      if (isEmpty) await db.people.delete(current.id);
+      else await db.people.update(current.id, fields);
     } else if (!isEmpty) {
       await db.people.add({
         id: crypto.randomUUID(),
-        name,
+        name: nextName,
         ...fields,
         createdAt: now,
       });
@@ -78,12 +133,16 @@ function Fields({
     requestClose();
   };
 
+  const remove = async () => {
+    if (usage && usage > 0) return; // guarded by the message below
+    await deleteCategory(name);
+    requestClose();
+  };
+
   return (
     <div className="px-4 py-4 max-w-lg mx-auto">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-semibold truncate">
-          {name} — details
-        </h2>
+        <h2 className="text-base font-semibold truncate">Edit</h2>
         <button
           className="btn !py-1.5 !px-3 !text-[13px]"
           onClick={requestClose}
@@ -93,6 +152,18 @@ function Fields({
       </div>
 
       <div className="space-y-3">
+        <div>
+          <label className="field-label" htmlFor="p-name">
+            Name
+          </label>
+          <input
+            id="p-name"
+            className="input"
+            value={form.name}
+            onChange={(e) => set("name", e.target.value)}
+          />
+        </div>
+
         <div>
           <label className="field-label" htmlFor="p-role">
             Role / type
@@ -104,7 +175,6 @@ function Fields({
             onChange={(e) => set("role", e.target.value)}
           >
             <option value="">— select —</option>
-            {/* Keep a saved custom role visible even if it's not in the list. */}
             {form.role && !ROLES.includes(form.role) && (
               <option value={form.role}>{form.role}</option>
             )}
@@ -173,22 +243,130 @@ function Fields({
           />
         </div>
 
+        <div className="pt-1">
+          <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
+            Bank details
+          </div>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="field-label" htmlFor="p-bank">
+                  Bank name
+                </label>
+                <input
+                  id="p-bank"
+                  className="input"
+                  placeholder="e.g. SBI"
+                  value={form.bankName}
+                  onChange={(e) => set("bankName", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="field-label" htmlFor="p-holder">
+                  Account holder
+                </label>
+                <input
+                  id="p-holder"
+                  className="input"
+                  placeholder="name on account"
+                  value={form.accountHolder}
+                  onChange={(e) => set("accountHolder", e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="field-label" htmlFor="p-acct">
+                Account number
+              </label>
+              <input
+                id="p-acct"
+                inputMode="numeric"
+                className="input"
+                placeholder="account number"
+                value={form.accountNumber}
+                onChange={(e) => set("accountNumber", e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="field-label" htmlFor="p-ifsc">
+                  IFSC code
+                </label>
+                <input
+                  id="p-ifsc"
+                  className="input uppercase"
+                  placeholder="e.g. SBIN0001234"
+                  value={form.ifsc}
+                  onChange={(e) => set("ifsc", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="field-label" htmlFor="p-upi">
+                  UPI ID
+                </label>
+                <input
+                  id="p-upi"
+                  className="input"
+                  placeholder="name@upi"
+                  value={form.upi}
+                  onChange={(e) => set("upi", e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {error && <div className="text-[13px] text-crimson">{error}</div>}
 
         <button
           className="btn btn-primary w-full !py-3 !text-base"
           onClick={() => void save()}
         >
-          Save details
+          Save
         </button>
+
+        {/* Delete lives here now instead of an inline × on the list. */}
+        <div className="pt-2 border-t border-rule mt-2">
+          {usage && usage > 0 ? (
+            <div className="text-[12px] text-ink-soft">
+              In use by {usage} record{usage === 1 ? "" : "s"} — rename it or
+              reassign those payments before it can be deleted.
+            </div>
+          ) : confirmDelete ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] text-crimson flex-1">
+                Delete "{name}"?
+              </span>
+              <button
+                className="text-[13px] text-white bg-crimson rounded px-3 py-1.5"
+                onClick={() => void remove()}
+              >
+                Delete
+              </button>
+              <button
+                className="text-[13px] border border-rule rounded px-3 py-1.5"
+                onClick={() => setConfirmDelete(false)}
+              >
+                Keep
+              </button>
+            </div>
+          ) : (
+            <button
+              className="text-[13px] text-crimson"
+              onClick={() => setConfirmDelete(true)}
+            >
+              Delete this category
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 /**
- * Full-screen overlay to view/edit contact & contract details for a person.
- * Loads any existing row (by name) once, then renders the form.
+ * Full-screen editor for a category/person: rename, contact & contract details,
+ * bank details, and delete. Loads any existing details row (by name) once.
  */
 export function PersonDetailsForm({
   name,
