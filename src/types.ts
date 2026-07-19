@@ -12,8 +12,20 @@ export interface Entry {
   updatedAt: number; // bumped on every edit — powers the Recent tab
 }
 
+/**
+ * How a BOQ line's / contract's quantity was measured.
+ *   qty  — a plain count (pcs, bags, L…)
+ *   rft  — running feet: a length × a rate-per-foot
+ *   sqft — square feet: length × width × a rate-per-sqft
+ *   sqm  — square metre: length × width × a rate-per-sqm
+ */
+export type MeasureBasis = "qty" | "rft" | "sqft" | "sqm";
+
 export interface BoqItem {
   id: string;
+  // Stable id shared by every row of one bill — survives edits to the
+  // vendor/invoice number and is what Stock receipts link back to.
+  billId: string;
   date: string;
   category: string;
   vendor: string;
@@ -22,6 +34,12 @@ export interface BoqItem {
   item: string;
   hsn: string | null;
   gstPct: number | null;
+  // For area/length bases, `qty` holds the derived measure (length, or
+  // length×width) so every existing consumer keeps working; `unit` mirrors the
+  // basis. `length`/`width` retain the raw inputs so the calculator can reopen.
+  basis: MeasureBasis;
+  length: number | null;
+  width: number | null;
   qty: number | null;
   unit: string | null;
   rate: number | null;
@@ -61,6 +79,12 @@ export interface PersonDetails {
   role: string; // Contractor, Labour, Mason, Electrician…
   phone: string;
   idNumber: string; // Aadhaar / PAN / any ID number
+  // Contract pricing. "lumpsum" = a flat agreed price in contractAmount.
+  // Otherwise contractAmount = contractArea × contractRate (e.g. 2000 sqft
+  // @ ₹1200), with the basis giving the unit.
+  contractBasis: "lumpsum" | MeasureBasis;
+  contractArea: number | null; // measured quantity (running ft or area)
+  contractRate: number | null; // rate per unit (₹)
   contractAmount: number | null; // agreed final price (₹)
   contractDetails: string; // scope / terms / anything else
   // Bank details for paying this person.
@@ -91,5 +115,8 @@ export interface StockMove {
   kind: "in" | "out";
   qty: number;
   note: string; // e.g. "Bill #2310 Gopal Jee" or "Given to painter"
+  // When this receipt came from a BOQ bill, the bill's stable id — the hard
+  // link that powers the two-way BOQ↔Stock views. null for manual movements.
+  billId: string | null;
   createdAt: number;
 }

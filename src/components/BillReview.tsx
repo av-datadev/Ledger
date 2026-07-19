@@ -4,12 +4,17 @@ import { MODES, PAYERS } from "../../shared/constants";
 import { useCategories } from "../hooks/useCategories";
 import { inr, todayStr } from "../lib/format";
 import { addBillRowsToStock } from "../lib/stock";
+import { BASIS, MEASURE_BASES, deriveMeasure, amountFrom } from "../lib/measure";
 import { useBackClose } from "../hooks/useBackClose";
+import type { MeasureBasis } from "../types";
 
 export interface DraftItem {
   item: string;
   hsn: string;
   gstPct: string;
+  basis: MeasureBasis;
+  length: string;
+  width: string;
   qty: string;
   unit: string;
   rate: string;
@@ -18,6 +23,7 @@ export interface DraftItem {
 }
 
 export interface DraftBill {
+  billId: string;
   vendor: string;
   invoiceNo: string;
   date: string;
@@ -30,6 +36,9 @@ export const blankItem = (): DraftItem => ({
   item: "",
   hsn: "",
   gstPct: "",
+  basis: "qty",
+  length: "",
+  width: "",
   qty: "",
   unit: "",
   rate: "",
@@ -38,6 +47,7 @@ export const blankItem = (): DraftItem => ({
 });
 
 export const emptyDraft = (): DraftBill => ({
+  billId: crypto.randomUUID(),
   vendor: "",
   invoiceNo: "",
   date: todayStr(),
@@ -51,21 +61,28 @@ const toNum = (s: string): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+// Units the calculator sets automatically — cleared when a line reverts to a
+// plain quantity so the user isn't left with a stale "sqft".
+const AUTO_UNITS = new Set(MEASURE_BASES.filter((b) => b !== "qty").map((b) => BASIS[b].unit));
+
 export function BillReview({
   draft,
   scanned = false,
+  editing = false,
   onChange,
   onClose,
 }: {
   draft: DraftBill;
   scanned?: boolean;
+  /** Editing an existing bill: replace its rows and skip the create-only helpers. */
+  editing?: boolean;
   onChange: (d: DraftBill) => void;
   onClose: () => void;
 }) {
   const categories = useCategories();
   const [ackMismatch, setAckMismatch] = useState(false);
   const [alsoLedger, setAlsoLedger] = useState(false);
-  const [addToStock, setAddToStock] = useState(true);
+  const [addToStock, setAddToStock] = useState(!editing);
   const [ledgerMode, setLedgerMode] = useState<string>("Cash");
   const [ledgerPayer, setLedgerPayer] = useState<string>(PAYERS[0]);
   const [errors, setErrors] = useState<string[]>([]);
@@ -73,9 +90,31 @@ export function BillReview({
   const requestClose = useBackClose(true, onClose);
 
   const set = (patch: Partial<DraftBill>) => onChange({ ...draft, ...patch });
+
+  // Merge a patch into a line, then recompute the derived measure (into qty for
+  // area/length bases) and the amount — unless the amount itself was edited.
   const setItem = (i: number, patch: Partial<DraftItem>) => {
     const items = draft.items.slice();
-    items[i] = { ...items[i], ...patch };
+    const it: DraftItem = { ...items[i], ...patch };
+    if (!("amount" in patch)) {
+      if (it.basis === "qty") {
+        if (AUTO_UNITS.has(it.unit)) it.unit = "";
+        const amt = amountFrom(toNum(it.qty), toNum(it.rate));
+        if (amt != null) it.amount = String(amt);
+      } else {
+        it.unit = BASIS[it.basis].unit;
+        const measure = deriveMeasure(
+          it.basis,
+          toNum(it.length),
+          toNum(it.width),
+          null,
+        );
+        it.qty = measure != null ? String(measure) : "";
+        const amt = amountFrom(measure, toNum(it.rate));
+        if (amt != null) it.amount = String(amt);
+      }
+    }
+    items[i] = it;
     set({ items });
   };
 
@@ -105,24 +144,35 @@ export function BillReview({
     if (errs.length) return;
 
     const date = draft.date || todayStr();
-    await db.boqItems.bulkAdd(
-      validItems.map((it) => ({
-        id: crypto.randomUUID(),
-        date,
-        category: draft.category,
-        vendor: draft.vendor.trim(),
-        invoiceNo: draft.invoiceNo.trim(),
-        invoiceTotal: total,
-        item: it.item.trim(),
-        hsn: it.hsn.trim() || null,
-        gstPct: toNum(it.gstPct),
-        qty: toNum(it.qty),
-        unit: it.unit.trim() || null,
-        rate: toNum(it.rate),
-        discPct: toNum(it.discPct),
-        amount: toNum(it.amount) ?? 0,
-      })),
-    );
+    const rows = validItems.map((it) => ({
+      id: crypto.randomUUID(),
+      billId: draft.billId,
+      date,
+      category: draft.category,
+      vendor: draft.vendor.trim(),
+      invoiceNo: draft.invoiceNo.trim(),
+      invoiceTotal: total,
+      item: it.item.trim(),
+      hsn: it.hsn.trim() || null,
+      gstPct: toNum(it.gstPct),
+      basis: it.basis,
+      length: it.basis === "qty" ? null : toNum(it.length),
+      width: BASIS[it.basis].area ? toNum(it.width) : null,
+      qty: toNum(it.qty),
+      unit: it.unit.trim() || null,
+      rate: toNum(it.rate),
+      discPct: toNum(it.discPct),
+      amount: toNum(it.amount) ?? 0,
+    }));
+
+    // Editing replaces the bill's rows in place, keeping billId (and therefore
+    // any linked stock receipts) intact.
+    await db.transaction("rw", db.boqItems, async () => {
+      if (editing)
+        await db.boqItems.where("billId").equals(draft.billId).delete();
+      await db.boqItems.bulkAdd(rows);
+    });
+
     if (alsoLedger) {
       await db.entries.add({
         id: crypto.randomUUID(),
@@ -148,6 +198,7 @@ export function BillReview({
         draft.category,
         date,
         `Bill #${draft.invoiceNo.trim()} ${draft.vendor.trim()}`.trim(),
+        draft.billId,
       );
     }
     requestClose();
@@ -156,7 +207,9 @@ export function BillReview({
   return (
     <div className="px-4 py-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base font-semibold">Review bill</h2>
+        <h2 className="text-base font-semibold">
+          {editing ? "Edit bill" : "Review bill"}
+        </h2>
         <button
           className="btn !py-1.5 !px-3 !text-[13px]"
           onClick={requestClose}
@@ -236,57 +289,14 @@ export function BillReview({
           </div>
           <div className="space-y-2">
             {draft.items.map((it, i) => (
-              <div
+              <LineItem
                 key={i}
-                className="bg-surface border border-rule rounded-md p-2 space-y-1.5"
-              >
-                <div className="flex gap-1.5">
-                  <input
-                    className="input !py-1.5 !text-[13px] flex-1"
-                    placeholder="Description (or SGST / CGST / Freight / Rounding)"
-                    value={it.item}
-                    onChange={(e) => setItem(i, { item: e.target.value })}
-                  />
-                  <button
-                    className="text-crimson text-lg px-1.5 leading-none"
-                    aria-label="Remove row"
-                    onClick={() =>
-                      set({ items: draft.items.filter((_, j) => j !== i) })
-                    }
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="grid grid-cols-4 gap-1.5">
-                  <input
-                    className="input !py-1.5 !text-[13px] money"
-                    placeholder="Qty"
-                    inputMode="decimal"
-                    value={it.qty}
-                    onChange={(e) => setItem(i, { qty: e.target.value })}
-                  />
-                  <input
-                    className="input !py-1.5 !text-[13px]"
-                    placeholder="Unit"
-                    value={it.unit}
-                    onChange={(e) => setItem(i, { unit: e.target.value })}
-                  />
-                  <input
-                    className="input !py-1.5 !text-[13px] money"
-                    placeholder="Rate"
-                    inputMode="decimal"
-                    value={it.rate}
-                    onChange={(e) => setItem(i, { rate: e.target.value })}
-                  />
-                  <input
-                    className="input !py-1.5 !text-[13px] money !font-semibold"
-                    placeholder="Amount"
-                    inputMode="decimal"
-                    value={it.amount}
-                    onChange={(e) => setItem(i, { amount: e.target.value })}
-                  />
-                </div>
-              </div>
+                it={it}
+                onField={(patch) => setItem(i, patch)}
+                onRemove={() =>
+                  set({ items: draft.items.filter((_, j) => j !== i) })
+                }
+              />
             ))}
           </div>
         </div>
@@ -315,27 +325,38 @@ export function BillReview({
           </label>
         )}
 
-        <label className="flex items-start gap-2 text-[13px]">
-          <input
-            type="checkbox"
-            className="mt-0.5 accent-[#2F6D4F]"
-            checked={addToStock}
-            onChange={(e) => setAddToStock(e.target.checked)}
-          />
-          Add the material rows (with quantities) to <b>Stock</b> so you can
-          track how much is given to labour and what's left.
-        </label>
+        {!editing && (
+          <label className="flex items-start gap-2 text-[13px]">
+            <input
+              type="checkbox"
+              className="mt-0.5 accent-[#2F6D4F]"
+              checked={addToStock}
+              onChange={(e) => setAddToStock(e.target.checked)}
+            />
+            Add the material rows (with quantities) to <b>Stock</b> so you can
+            track how much is given to labour and what's left.
+          </label>
+        )}
 
-        <label className="flex items-start gap-2 text-[13px]">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={alsoLedger}
-            onChange={(e) => setAlsoLedger(e.target.checked)}
-          />
-          Also create a ledger entry for this bill's total (leave unchecked if
-          the payment is already in the ledger).
-        </label>
+        {!editing && (
+          <label className="flex items-start gap-2 text-[13px]">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={alsoLedger}
+              onChange={(e) => setAlsoLedger(e.target.checked)}
+            />
+            Also create a ledger entry for this bill's total (leave unchecked if
+            the payment is already in the ledger).
+          </label>
+        )}
+
+        {editing && (
+          <div className="text-[12px] text-ink-soft">
+            Editing replaces this bill's rows. Stock already received from it,
+            and any ledger entry, stay as they are.
+          </div>
+        )}
 
         {alsoLedger && (
           <div className="grid grid-cols-2 gap-3 pl-6">
@@ -378,9 +399,137 @@ export function BillReview({
           className="btn btn-primary w-full !py-3 !text-base"
           onClick={() => void save()}
         >
-          Save bill
+          {editing ? "Save changes" : "Save bill"}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** One editable bill line, with the measure-basis calculator. */
+function LineItem({
+  it,
+  onField,
+  onRemove,
+}: {
+  it: DraftItem;
+  onField: (patch: Partial<DraftItem>) => void;
+  onRemove: () => void;
+}) {
+  const area = BASIS[it.basis].area;
+  const measureHint =
+    it.basis !== "qty" && it.qty
+      ? `${it.qty} ${BASIS[it.basis].unit}${it.rate ? ` × ₹${it.rate}` : ""}`
+      : "";
+
+  return (
+    <div className="bg-surface border border-rule rounded-md p-2 space-y-1.5">
+      <div className="flex gap-1.5">
+        <input
+          className="input !py-1.5 !text-[13px] flex-1"
+          placeholder="Description (or SGST / CGST / Freight / Rounding)"
+          value={it.item}
+          onChange={(e) => onField({ item: e.target.value })}
+        />
+        <button
+          className="text-crimson text-lg px-1.5 leading-none"
+          aria-label="Remove row"
+          onClick={onRemove}
+        >
+          ×
+        </button>
+      </div>
+
+      <div className="flex gap-1.5 flex-wrap">
+        {MEASURE_BASES.map((b) => (
+          <button
+            key={b}
+            type="button"
+            className={`text-[11px] rounded px-2 py-1 border ${
+              it.basis === b
+                ? "bg-ink text-paper border-ink"
+                : "border-rule text-ink-soft"
+            }`}
+            onClick={() => onField({ basis: b })}
+          >
+            {BASIS[b].label}
+          </button>
+        ))}
+      </div>
+
+      {it.basis === "qty" ? (
+        <div className="grid grid-cols-4 gap-1.5">
+          <input
+            className="input !py-1.5 !text-[13px] money"
+            placeholder="Qty"
+            inputMode="decimal"
+            value={it.qty}
+            onChange={(e) => onField({ qty: e.target.value })}
+          />
+          <input
+            className="input !py-1.5 !text-[13px]"
+            placeholder="Unit"
+            value={it.unit}
+            onChange={(e) => onField({ unit: e.target.value })}
+          />
+          <input
+            className="input !py-1.5 !text-[13px] money"
+            placeholder="Rate"
+            inputMode="decimal"
+            value={it.rate}
+            onChange={(e) => onField({ rate: e.target.value })}
+          />
+          <input
+            className="input !py-1.5 !text-[13px] money !font-semibold"
+            placeholder="Amount"
+            inputMode="decimal"
+            value={it.amount}
+            onChange={(e) => onField({ amount: e.target.value })}
+          />
+        </div>
+      ) : (
+        <>
+          <div className={`grid ${area ? "grid-cols-3" : "grid-cols-2"} gap-1.5`}>
+            <input
+              className="input !py-1.5 !text-[13px] money"
+              placeholder={area ? "Length" : `Length (${BASIS[it.basis].unit})`}
+              inputMode="decimal"
+              value={it.length}
+              onChange={(e) => onField({ length: e.target.value })}
+            />
+            {area && (
+              <input
+                className="input !py-1.5 !text-[13px] money"
+                placeholder="Width"
+                inputMode="decimal"
+                value={it.width}
+                onChange={(e) => onField({ width: e.target.value })}
+              />
+            )}
+            <input
+              className="input !py-1.5 !text-[13px] money"
+              placeholder={`Rate / ${BASIS[it.basis].unit}`}
+              inputMode="decimal"
+              value={it.rate}
+              onChange={(e) => onField({ rate: e.target.value })}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            {measureHint && (
+              <span className="text-[11px] text-ink-soft money">
+                = {measureHint}
+              </span>
+            )}
+            <input
+              className="input !py-1.5 !text-[13px] money !font-semibold ml-auto !w-32"
+              placeholder="Amount"
+              inputMode="decimal"
+              value={it.amount}
+              onChange={(e) => onField({ amount: e.target.value })}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

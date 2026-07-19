@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../db";
+import { db, deleteBill } from "../db";
 import { useCategories } from "../hooks/useCategories";
 import { inr, num, todayStr, formatDate } from "../lib/format";
 import { fileToOcrImage } from "../lib/scanImage";
@@ -8,6 +8,8 @@ import { recognizeText } from "../lib/ocr";
 import { pdfToText } from "../lib/pdf";
 import { parseScannedBill } from "../lib/scanParse";
 import { BillReview, type DraftBill, emptyDraft, blankItem } from "./BillReview";
+import { BillStockPanel } from "./BillStockPanel";
+import type { BoqItem } from "../types";
 
 export function Boq() {
   const items = useLiveQuery(() => db.boqItems.toArray(), []);
@@ -15,12 +17,41 @@ export function Boq() {
   const categories = useCategories();
   const [draft, setDraft] = useState<DraftBill | null>(null);
   const [scanned, setScanned] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+
+  const editBill = (rows: BoqItem[]) => {
+    const head = rows[0];
+    setError(null);
+    setScanned(false);
+    setEditing(true);
+    setDraft({
+      billId: head.billId,
+      vendor: head.vendor,
+      invoiceNo: head.invoiceNo,
+      date: head.date,
+      category: head.category,
+      invoiceTotal: String(head.invoiceTotal),
+      items: rows.map((r) => ({
+        item: r.item,
+        hsn: r.hsn ?? "",
+        gstPct: r.gstPct != null ? String(r.gstPct) : "",
+        basis: r.basis,
+        length: r.length != null ? String(r.length) : "",
+        width: r.width != null ? String(r.width) : "",
+        qty: r.qty != null ? String(r.qty) : "",
+        unit: r.unit ?? "",
+        rate: r.rate != null ? String(r.rate) : "",
+        discPct: r.discPct != null ? String(r.discPct) : "",
+        amount: String(r.amount),
+      })),
+    });
+  };
 
   const onScanFile = async (file: File) => {
     setError(null);
@@ -40,7 +71,9 @@ export function Boq() {
       }
       const scan = parseScannedBill(text);
       setScanned(true);
+      setEditing(false);
       setDraft({
+        billId: crypto.randomUUID(),
         vendor: scan.vendor,
         invoiceNo: scan.invoiceNo,
         date: scan.date || todayStr(),
@@ -51,6 +84,9 @@ export function Boq() {
               item: it.item,
               hsn: "",
               gstPct: "",
+              basis: "qty" as const,
+              length: "",
+              width: "",
               qty: it.qty,
               unit: it.unit,
               rate: it.rate,
@@ -72,12 +108,11 @@ export function Boq() {
 
   const groups = useMemo(() => {
     if (!items) return [];
-    const map = new Map<string, typeof items>();
+    const map = new Map<string, BoqItem[]>();
     for (const it of items) {
-      const key = `${it.vendor}|${it.invoiceNo}`;
-      const arr = map.get(key) ?? [];
+      const arr = map.get(it.billId) ?? [];
       arr.push(it);
-      map.set(key, arr);
+      map.set(it.billId, arr);
     }
     return [...map.entries()]
       .map(([key, rows]) => ({ key, rows }))
@@ -87,11 +122,10 @@ export function Boq() {
   const recon = useMemo(() => {
     if (!items || !entries) return [];
     return categories.map((cat) => {
-      // BOQ coverage per category: count each invoice's printed total once.
+      // BOQ coverage per category: count each bill's printed total once.
       const invoices = new Map<string, number>();
       for (const it of items) {
-        if (it.category === cat)
-          invoices.set(`${it.vendor}|${it.invoiceNo}`, it.invoiceTotal);
+        if (it.category === cat) invoices.set(it.billId, it.invoiceTotal);
       }
       const boqTotal = [...invoices.values()].reduce((s, v) => s + v, 0);
       const ledgerTotal = entries
@@ -106,10 +140,12 @@ export function Boq() {
       <BillReview
         draft={draft}
         scanned={scanned}
+        editing={editing}
         onChange={setDraft}
         onClose={() => {
           setDraft(null);
           setScanned(false);
+          setEditing(false);
         }}
       />
     );
@@ -140,6 +176,7 @@ export function Boq() {
           onClick={() => {
             setError(null);
             setScanned(false);
+            setEditing(false);
             setDraft(emptyDraft());
           }}
         >
@@ -248,29 +285,24 @@ export function Boq() {
                 </button>
                 {open && (
                   <div className="border-t border-rule">
-                    <table className="w-full text-[11px]">
-                      <tbody className="divide-y divide-rule/60">
-                        {rows.map((r) => (
-                          <tr key={r.id}>
-                            <td className="px-2 py-1">{r.item}</td>
-                            <td className="px-2 py-1 text-right text-ink-soft whitespace-nowrap">
-                              {r.qty !== null &&
-                                `${num(r.qty)} ${r.unit ?? ""} × ${r.rate !== null ? num(r.rate) : "?"}`}
-                            </td>
-                            <td className="px-2 py-1 text-right money whitespace-nowrap">
-                              {num(r.amount)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className="px-3 py-2 border-t border-rule flex justify-end">
+                    <BillStockPanel
+                      billId={key}
+                      billLabel={`Bill #${head.invoiceNo} ${head.vendor}`.trim()}
+                    />
+
+                    <div className="px-3 py-2 border-t border-rule flex items-center justify-between gap-2">
+                      <button
+                        className="text-[12px] btn !py-1 !px-3"
+                        onClick={() => editBill(rows)}
+                      >
+                        Edit bill
+                      </button>
                       {confirmKey === key ? (
                         <div className="flex gap-2">
                           <button
                             className="text-[12px] text-white bg-crimson rounded px-3 py-1"
                             onClick={() => {
-                              void db.boqItems.bulkDelete(rows.map((r) => r.id));
+                              void deleteBill(key);
                               setConfirmKey(null);
                               setExpanded(null);
                             }}

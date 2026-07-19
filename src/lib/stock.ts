@@ -29,7 +29,13 @@ export function withBalances(
   });
 }
 
-const TAX_ROW = /\b(sgst|cgst|igst|gst|freight|packing|round|discount|cartage)\b/i;
+const TAX_ROW =
+  /\b(sgst|cgst|igst|gst|freight|packing|round\w*|discount|cartage)\b/i;
+
+/** A real material line (not a tax/freight/rounding row) worth stocking. */
+export function isMaterialRow(name: string): boolean {
+  return !TAX_ROW.test(name) && name.trim().length >= 2;
+}
 
 export interface BillStockRow {
   name: string;
@@ -39,13 +45,15 @@ export interface BillStockRow {
 
 /**
  * Feed a saved bill's quantity rows into inventory: reuse an existing stock
- * item with the same name+category, else create one, and record an "in" move.
+ * item with the same name+category, else create one, and record an "in" move
+ * hard-linked to the source bill (billId) so the two-way BOQ↔Stock views work.
  */
 export async function addBillRowsToStock(
   rows: BillStockRow[],
   category: string,
   date: string,
   note: string,
+  billId: string,
 ): Promise<number> {
   const usable = rows.filter(
     (r) => r.qty > 0 && !TAX_ROW.test(r.name) && r.name.trim().length >= 2,
@@ -80,9 +88,41 @@ export async function addBillRowsToStock(
         kind: "in",
         qty: row.qty,
         note,
+        billId,
         createdAt: Date.now(),
       });
     }
   });
   return usable.length;
+}
+
+/**
+ * Add a single stock item under a category, reusing an existing item with the
+ * same name+category. Returns the item id — used when adding stock straight
+ * from a BOQ bill's linked-stock panel.
+ */
+export async function findOrCreateStockItem(
+  name: string,
+  category: string,
+  unit: string,
+): Promise<string> {
+  const trimmed = name.trim();
+  const existing = await db.stockItems
+    .where("category")
+    .equals(category)
+    .toArray();
+  const match = existing.find(
+    (s) => s.name.toLowerCase() === trimmed.toLowerCase(),
+  );
+  if (match) return match.id;
+  const id = crypto.randomUUID();
+  await db.stockItems.add({
+    id,
+    name: trimmed,
+    category,
+    unit: unit.trim(),
+    done: false,
+    createdAt: Date.now(),
+  });
+  return id;
 }

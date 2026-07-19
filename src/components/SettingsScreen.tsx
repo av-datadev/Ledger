@@ -65,7 +65,7 @@ export function SettingsScreen() {
     downloadFile(
       `house-ledger-boq-${timestampSlug()}.csv`,
       toCsv(
-        ["date", "category", "vendor", "invoiceNo", "invoiceTotal", "item", "hsn", "gstPct", "qty", "unit", "rate", "discPct", "amount"],
+        ["date", "category", "vendor", "invoiceNo", "invoiceTotal", "item", "hsn", "gstPct", "basis", "length", "width", "qty", "unit", "rate", "discPct", "amount"],
         rows as unknown as Record<string, unknown>[],
       ),
       "text/csv",

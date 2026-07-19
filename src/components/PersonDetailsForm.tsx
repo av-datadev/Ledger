@@ -2,7 +2,20 @@ import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, renameCategory, deleteCategory } from "../db";
 import { useBackClose } from "../hooks/useBackClose";
+import { inr } from "../lib/format";
+import {
+  CONTRACT_BASES,
+  basisLabel,
+  basisUnit,
+  amountFrom,
+  type ContractBasis,
+} from "../lib/measure";
 import type { PersonDetails } from "../types";
+
+const toNum = (s: string): number | null => {
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : null;
+};
 
 const ROLES = [
   "Contractor",
@@ -41,6 +54,11 @@ function Fields({
     role: existing?.role ?? "",
     phone: existing?.phone ?? "",
     idNumber: existing?.idNumber ?? "",
+    contractBasis: (existing?.contractBasis ?? "lumpsum") as string,
+    contractArea:
+      existing?.contractArea != null ? String(existing.contractArea) : "",
+    contractRate:
+      existing?.contractRate != null ? String(existing.contractRate) : "",
     contractAmount:
       existing?.contractAmount != null ? String(existing.contractAmount) : "",
     contractDetails: existing?.contractDetails ?? "",
@@ -77,14 +95,27 @@ function Fields({
       return;
     }
 
-    const raw = form.contractAmount.trim();
+    const basis = form.contractBasis as ContractBasis;
+    let area: number | null = null;
+    let rate: number | null = null;
     let amount: number | null = null;
-    if (raw !== "") {
-      amount = parseFloat(raw);
-      if (!(amount >= 0)) {
-        setError("Contract amount must be a number (or leave it blank).");
+    if (basis === "lumpsum") {
+      const raw = form.contractAmount.trim();
+      if (raw !== "") {
+        amount = parseFloat(raw);
+        if (!(amount >= 0)) {
+          setError("Contract amount must be a number (or leave it blank).");
+          return;
+        }
+      }
+    } else {
+      area = toNum(form.contractArea);
+      rate = toNum(form.contractRate);
+      if ((area != null && area < 0) || (rate != null && rate < 0)) {
+        setError("Area and rate must be positive numbers.");
         return;
       }
+      amount = amountFrom(area, rate);
     }
 
     // Rename the category everywhere first, so details attach to the new name.
@@ -95,6 +126,9 @@ function Fields({
       role: form.role.trim(),
       phone: form.phone.trim(),
       idNumber: form.idNumber.trim(),
+      contractBasis: basis,
+      contractArea: area,
+      contractRate: rate,
       contractAmount: amount,
       contractDetails: form.contractDetails.trim(),
       bankName: form.bankName.trim(),
@@ -213,20 +247,82 @@ function Fields({
         </div>
 
         <div>
-          <label className="field-label" htmlFor="p-amount">
-            Contract amount (₹)
-          </label>
-          <input
-            id="p-amount"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="any"
-            className="input money"
-            placeholder="agreed final price"
-            value={form.contractAmount}
-            onChange={(e) => set("contractAmount", e.target.value)}
-          />
+          <label className="field-label">Contract pricing</label>
+          <div className="flex gap-1.5 flex-wrap mb-2">
+            {CONTRACT_BASES.map((b) => (
+              <button
+                key={b}
+                type="button"
+                className={`text-[12px] rounded px-2.5 py-1 border ${
+                  form.contractBasis === b
+                    ? "bg-ink text-paper border-ink"
+                    : "border-rule text-ink-soft"
+                }`}
+                onClick={() => set("contractBasis", b)}
+              >
+                {basisLabel(b)}
+              </button>
+            ))}
+          </div>
+          {form.contractBasis === "lumpsum" ? (
+            <input
+              id="p-amount"
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="any"
+              className="input money"
+              placeholder="agreed final price (₹)"
+              value={form.contractAmount}
+              onChange={(e) => set("contractAmount", e.target.value)}
+            />
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="field-label" htmlFor="p-area">
+                    Area / length ({basisUnit(form.contractBasis as ContractBasis)})
+                  </label>
+                  <input
+                    id="p-area"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="any"
+                    className="input money"
+                    placeholder="e.g. 2000"
+                    value={form.contractArea}
+                    onChange={(e) => set("contractArea", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="p-rate">
+                    Rate / {basisUnit(form.contractBasis as ContractBasis)} (₹)
+                  </label>
+                  <input
+                    id="p-rate"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="any"
+                    className="input money"
+                    placeholder="e.g. 1200"
+                    value={form.contractRate}
+                    onChange={(e) => set("contractRate", e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="text-[13px] text-ink-soft money mt-1.5">
+                Contract ={" "}
+                <span className="font-semibold text-ink">
+                  {inr(
+                    amountFrom(toNum(form.contractArea), toNum(form.contractRate)) ??
+                      0,
+                  )}
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         <div>

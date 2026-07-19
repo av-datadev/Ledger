@@ -17,7 +17,25 @@ import seedBoqJson from "../seed-boq.json";
 const seedEntries = (
   seedEntriesJson as unknown as Omit<Entry, "updatedAt">[]
 ).map((e) => ({ ...e, updatedAt: e.createdAt })) as Entry[];
-const seedBoq = seedBoqJson as unknown as BoqItem[];
+
+// Seed BOQ rows predate billId + the measure-basis fields. Assign one shared
+// billId per (vendor|invoiceNo) group and default the new columns on load.
+const seedBoq: BoqItem[] = (() => {
+  const raw = seedBoqJson as unknown as Omit<
+    BoqItem,
+    "billId" | "basis" | "length" | "width"
+  >[];
+  const billIds = new Map<string, string>();
+  return raw.map((b) => {
+    const key = `${b.vendor}|${b.invoiceNo}`;
+    let billId = billIds.get(key);
+    if (!billId) {
+      billId = crypto.randomUUID();
+      billIds.set(key, billId);
+    }
+    return { ...b, billId, basis: "qty", length: null, width: null };
+  });
+})();
 
 export const db = new Dexie("house-ledger") as Dexie & {
   entries: EntityTable<Entry, "id">;
@@ -98,6 +116,52 @@ db.version(5)
     await seedBuiltinCategories(table);
   });
 
+// v6 adds the stable billId on BOQ rows (grouping each bill and letting Stock
+// receipts hard-link back to it), the measure-basis columns on BOQ bills, the
+// bill link on stock moves, and contract-pricing fields on people. Existing
+// data is backfilled in the upgrade below.
+db.version(6)
+  .stores({
+    entries: "id, date, category, paidBy, createdAt, updatedAt",
+    boqItems: "id, invoiceNo, category, date, vendor, billId",
+    settings: "id",
+    stockItems: "id, category, name, createdAt",
+    stockMoves: "id, stockId, date, createdAt, billId",
+    categories: "id, name",
+    people: "id, name",
+  })
+  .upgrade(async (tx) => {
+    // Give every existing bill a stable id, shared across its rows.
+    const boq = tx.table("boqItems");
+    const rows = (await boq.toArray()) as BoqItem[];
+    const billIds = new Map<string, string>();
+    for (const r of rows) {
+      const key = `${r.vendor}|${r.invoiceNo}`;
+      if (!billIds.has(key)) billIds.set(key, crypto.randomUUID());
+    }
+    await boq.toCollection().modify((r: BoqItem) => {
+      if (r.billId == null)
+        r.billId = billIds.get(`${r.vendor}|${r.invoiceNo}`)!;
+      if (r.basis == null) r.basis = "qty";
+      if (r.length === undefined) r.length = null;
+      if (r.width === undefined) r.width = null;
+    });
+    await tx
+      .table("stockMoves")
+      .toCollection()
+      .modify((m: StockMove) => {
+        if (m.billId === undefined) m.billId = null;
+      });
+    await tx
+      .table("people")
+      .toCollection()
+      .modify((p: PersonDetails) => {
+        if (p.contractBasis == null) p.contractBasis = "lumpsum";
+        if (p.contractArea === undefined) p.contractArea = null;
+        if (p.contractRate === undefined) p.contractRate = null;
+      });
+  });
+
 const SETTINGS_ID = "app";
 
 // Custom categories sort after every built-in (which occupy 0..N-1).
@@ -150,6 +214,21 @@ export async function renameCategory(
       if (pd) await db.people.update(pd.id, { name: next });
     },
   );
+}
+
+/**
+ * Delete a whole BOQ bill (every row sharing the billId). Stock received from
+ * it is kept — you physically have those materials — but the now-dangling bill
+ * link on those receipts is cleared.
+ */
+export async function deleteBill(billId: string): Promise<void> {
+  await db.transaction("rw", [db.boqItems, db.stockMoves], async () => {
+    await db.boqItems.where("billId").equals(billId).delete();
+    await db.stockMoves
+      .where("billId")
+      .equals(billId)
+      .modify({ billId: null });
+  });
 }
 
 /** Remove a category row and any attached person details. */

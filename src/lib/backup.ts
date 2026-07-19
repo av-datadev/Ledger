@@ -15,7 +15,7 @@ const CUSTOM_ORDER = 1000;
 
 interface BackupFile {
   app: "house-ledger";
-  version: 1 | 2 | 3 | 4 | 5;
+  version: 1 | 2 | 3 | 4 | 5 | 6;
   exportedAt: string;
   entries: Entry[];
   boqItems: BoqItem[];
@@ -41,7 +41,7 @@ export async function exportBackup(): Promise<void> {
     ]);
   const payload: BackupFile = {
     app: "house-ledger",
-    version: 5,
+    version: 6,
     exportedAt: new Date().toISOString(),
     entries,
     boqItems,
@@ -92,6 +92,32 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
       throw new Error("Backup BOQ items are malformed — import aborted.");
     }
   }
+  // Pre-v6 BOQ rows have no billId — give each (vendor|invoiceNo) group one
+  // shared id — nor the measure-basis columns.
+  const billIds = new Map<string, string>();
+  const boqItems = data.boqItems.map((b) => {
+    const key = `${b.vendor}|${b.invoiceNo}`;
+    let billId: string;
+    if (b.billId) {
+      billId = b.billId;
+    } else {
+      const cached = billIds.get(key);
+      if (cached) {
+        billId = cached;
+      } else {
+        billId = crypto.randomUUID();
+        billIds.set(key, billId);
+      }
+    }
+    return {
+      ...b,
+      billId,
+      basis: b.basis ?? "qty",
+      length: b.length ?? null,
+      width: b.width ?? null,
+    };
+  });
+
   return {
     version: typeof data.version === "number" ? data.version : 1,
     // Older backups (v1–v3) have no updatedAt — seed it from createdAt so
@@ -100,14 +126,17 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
       ...e,
       updatedAt: e.updatedAt ?? e.createdAt,
     })),
-    boqItems: data.boqItems,
+    boqItems,
     stockItems: Array.isArray(data.stockItems) ? data.stockItems : [],
-    stockMoves: Array.isArray(data.stockMoves) ? data.stockMoves : [],
+    // Pre-v6 stock moves have no bill link.
+    stockMoves: (Array.isArray(data.stockMoves) ? data.stockMoves : []).map(
+      (m) => ({ ...m, billId: m.billId ?? null }),
+    ),
     // Pre-v5 category rows have no `order` — slot them after the built-ins.
     categories: (Array.isArray(data.categories) ? data.categories : []).map(
       (c) => ({ ...c, order: c.order ?? CUSTOM_ORDER }),
     ),
-    // Pre-v5 people rows have no bank fields — default them to empty.
+    // Pre-v5 people rows have no bank fields; pre-v6 have no contract basis.
     people: (Array.isArray(data.people) ? data.people : []).map((p) => ({
       ...p,
       bankName: p.bankName ?? "",
@@ -115,6 +144,9 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
       accountNumber: p.accountNumber ?? "",
       ifsc: p.ifsc ?? "",
       upi: p.upi ?? "",
+      contractBasis: p.contractBasis ?? "lumpsum",
+      contractArea: p.contractArea ?? null,
+      contractRate: p.contractRate ?? null,
       updatedAt: p.updatedAt ?? p.createdAt,
     })),
   };
