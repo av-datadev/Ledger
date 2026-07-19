@@ -5,6 +5,7 @@ import { useCategories } from "../hooks/useCategories";
 import { inr, num, todayStr, formatDate } from "../lib/format";
 import { fileToOcrImage } from "../lib/scanImage";
 import { recognizeText } from "../lib/ocr";
+import { pdfToText } from "../lib/pdf";
 import { parseScannedBill } from "../lib/scanParse";
 import { BillReview, type DraftBill, emptyDraft, blankItem } from "./BillReview";
 
@@ -24,12 +25,19 @@ export function Boq() {
   const onScanFile = async (file: File) => {
     setError(null);
     try {
-      setBusy("Preparing the photo…");
-      const image = await fileToOcrImage(file);
-      setBusy("Reading the bill on this phone… 0%");
-      const text = await recognizeText(image, (pct) =>
-        setBusy(`Reading the bill on this phone… ${pct}%`),
-      );
+      const isPdf =
+        file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      let text: string;
+      if (isPdf) {
+        text = await pdfToText(file, setBusy);
+      } else {
+        setBusy("Preparing the photo…");
+        const image = await fileToOcrImage(file);
+        setBusy("Reading the bill on this phone… 0%");
+        text = await recognizeText(image, (pct) =>
+          setBusy(`Reading the bill on this phone… ${pct}%`),
+        );
+      }
       const scan = parseScannedBill(text);
       setScanned(true);
       setDraft({
@@ -54,7 +62,7 @@ export function Boq() {
     } catch (err) {
       console.error("Scan failed:", err);
       setError(
-        (err instanceof Error ? err.message : "Could not read that photo.") +
+        (err instanceof Error ? err.message : "Could not read that file.") +
           " You can still enter the bill manually.",
       );
     } finally {
@@ -124,7 +132,7 @@ export function Boq() {
           disabled={!!busy}
           onClick={() => uploadRef.current?.click()}
         >
-          Upload photo
+          Upload file
         </button>
         <button
           className="btn"
@@ -139,8 +147,9 @@ export function Boq() {
         </button>
       </div>
       <div className="text-[11px] text-ink-soft mb-2">
-        Scanning happens on this phone — free, offline, nothing uploaded.
-        Always check the rows against the paper bill before saving.
+        Photos and PDF bills both work. Scanning happens on this phone — free,
+        offline, nothing uploaded. Always check the rows against the bill
+        before saving.
       </div>
       <input
         ref={cameraRef}
@@ -157,7 +166,7 @@ export function Boq() {
       <input
         ref={uploadRef}
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf,.pdf"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];

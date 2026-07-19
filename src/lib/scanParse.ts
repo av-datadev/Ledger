@@ -33,7 +33,8 @@ const JUNK_LINE =
   /\b(gstin|gst no|pan|phone|ph\.|mob|mobile|email|e&oe|thank|terms|condition|state code|hsn code|authori[sz]ed|signat|declar|bank|ifsc|a\/c)\b/i;
 
 const num = (s: string): number => parseFloat(s.replace(/,/g, ""));
-const isHsnLike = (s: string): boolean => /^\d{6,8}$/.test(s.replace(/,/g, ""));
+// Bare 6-8 digit runs are HSN codes; digits with comma separators are amounts.
+const isHsnLike = (s: string): boolean => !s.includes(",") && /^\d{6,8}$/.test(s);
 
 function toIsoDate(d: string, m: string, y: string): string | null {
   const day = parseInt(d, 10);
@@ -83,7 +84,7 @@ export function parseScannedBill(text: string): ScannedBill {
     if (
       letters.length >= 5 &&
       letters.length / l.length > 0.6 &&
-      !/tax invoice|invoice|cash memo|estimate|bill of|original|duplicate/i.test(l)
+      !/tax invoice|invoice|cash memo|estimate|bill of|original|duplicate|authori[sz]ed|dealer|quotation|proforma|\boffer\b/i.test(l)
     ) {
       bill.vendor = l;
       break;
@@ -93,10 +94,11 @@ export function parseScannedBill(text: string): ScannedBill {
   // Invoice number and date can be anywhere in the top half.
   for (const l of lines) {
     if (!bill.invoiceNo) {
+      // "ref" catches quotation/offer references ("Offer Ref : 2026/125").
       const m = l.match(
-        /(?:invoice|inv|bill|memo)\s*(?:no|num|number|#)?\s*[:.\-]?\s*([A-Za-z0-9][A-Za-z0-9\/-]{0,14})/i,
+        /(?:invoice|inv|bill|memo|ref)\s*(?:no|num|number|#)?\s*[:.\-]?\s*([A-Za-z0-9][A-Za-z0-9\/-]{0,14})/i,
       );
-      if (m && !/^(no|date)$/i.test(m[1])) bill.invoiceNo = m[1];
+      if (m && !/^(no|date|of|for|the)$/i.test(m[1])) bill.invoiceNo = m[1];
     }
     if (!bill.date) {
       const m = l.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
@@ -107,8 +109,11 @@ export function parseScannedBill(text: string): ScannedBill {
     }
   }
 
-  // Grand total: prefer explicit total lines; fall back to the largest number.
+  // Grand total: the largest amount on an explicit total line (multi-section
+  // bills print sub-totals before the grand total; the grand total is the
+  // biggest). Fall back to the largest number anywhere on the bill.
   let fallbackMax = 0;
+  let labeledMax = 0;
   for (const l of lines) {
     const nums = l.match(/\d[\d,]*(?:\.\d+)?/g) ?? [];
     for (const s of nums) {
@@ -116,15 +121,13 @@ export function parseScannedBill(text: string): ScannedBill {
       if (!isHsnLike(s) && v > fallbackMax && v < 10_000_000) fallbackMax = v;
     }
     if (/(grand\s*total|net\s*(amt|amount|payable)|total\s*(amt|amount|payable)?\b)/i.test(l) && nums.length) {
-      const v = num(nums[nums.length - 1]);
-      if (v > 0 && !isHsnLike(nums[nums.length - 1])) {
-        bill.invoiceTotal = String(v);
-      }
+      const s = nums[nums.length - 1];
+      const v = num(s);
+      if (v > labeledMax && !isHsnLike(s) && v < 10_000_000) labeledMax = v;
     }
   }
-  if (!bill.invoiceTotal && fallbackMax > 0) {
-    bill.invoiceTotal = String(fallbackMax);
-  }
+  if (labeledMax > 0) bill.invoiceTotal = String(labeledMax);
+  else if (fallbackMax > 0) bill.invoiceTotal = String(fallbackMax);
 
   // Line items: lines with leading text and trailing numbers.
   for (const l of lines) {

@@ -5,6 +5,7 @@ import { useCategories } from "../hooks/useCategories";
 import { inr, num } from "../lib/format";
 import { withBalances } from "../lib/stock";
 import { BudgetCard } from "./BudgetCard";
+import { AddressCard } from "./AddressCard";
 
 export function Dashboard({
   onOpenCategory,
@@ -53,6 +54,8 @@ export function Dashboard({
       </div>
 
       <BudgetCard spent={total} />
+
+      <AddressCard />
 
       <section className="px-4 pt-5">
         <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-1">

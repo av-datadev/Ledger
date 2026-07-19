@@ -183,6 +183,9 @@ export async function seedIfEmpty(): Promise<void> {
           id: SETTINGS_ID,
           lastBackupDate: null,
           budget: null,
+          homeAddress: "",
+          state: "",
+          city: "",
         });
       }
     },
@@ -216,13 +219,16 @@ export async function resetToSeed(): Promise<void> {
 }
 
 export async function getSettings(): Promise<Settings> {
-  return (
-    (await db.settings.get(SETTINGS_ID)) ?? {
-      id: SETTINGS_ID,
-      lastBackupDate: null,
-      budget: null,
-    }
-  );
+  const s = await db.settings.get(SETTINGS_ID);
+  return {
+    id: SETTINGS_ID,
+    lastBackupDate: null,
+    budget: null,
+    homeAddress: "",
+    state: "",
+    city: "",
+    ...s,
+  };
 }
 
 export async function updateSettings(patch: Partial<Settings>): Promise<void> {

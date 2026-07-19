@@ -32,9 +32,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Precache the entire app shell — including the OCR worker, wasm core
-        // and language data — so the app AND bill scanning work fully offline.
-        globPatterns: ["**/*.{js,css,html,svg,png,woff2,gz}"],
+        // Precache the entire app shell — including the OCR worker, wasm core,
+        // language data and the pdf.js worker (.mjs) — so the app AND bill
+        // scanning (photos + PDFs) work fully offline.
+        globPatterns: ["**/*.{js,mjs,css,html,svg,png,woff2,gz}"],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
     }),

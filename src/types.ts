@@ -33,6 +33,10 @@ export interface Settings {
   id: string; // always "app"
   lastBackupDate: string | null; // ISO timestamp
   budget: number | null; // total project budget (₹); null = not set
+  // The house/project address shown on the Dashboard.
+  homeAddress: string;
+  state: string;
+  city: string;
 }
 
 /**

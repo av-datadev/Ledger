@@ -168,20 +168,19 @@ function Fields({
           <label className="field-label" htmlFor="p-role">
             Role / type
           </label>
-          <select
+          <input
             id="p-role"
             className="input"
+            list="role-options"
+            placeholder="Pick one or type your own"
             value={form.role}
             onChange={(e) => set("role", e.target.value)}
-          >
-            <option value="">— select —</option>
-            {form.role && !ROLES.includes(form.role) && (
-              <option value={form.role}>{form.role}</option>
-            )}
+          />
+          <datalist id="role-options">
             {ROLES.map((r) => (
-              <option key={r}>{r}</option>
+              <option key={r} value={r} />
             ))}
-          </select>
+          </datalist>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
