@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, renameCategory, deleteCategory } from "../db";
 import { useBackClose } from "../hooks/useBackClose";
 import { inr } from "../lib/format";
+import { decodeQrFromFile } from "../lib/qr";
+import { fileToOcrImage } from "../lib/scanImage";
+import { recognizeText } from "../lib/ocr";
+import { parseUpiQr, parseBankText, type ScannedBank } from "../lib/bankScan";
 import {
   CONTRACT_BASES,
   basisLabel,
@@ -70,9 +74,77 @@ function Fields({
   }));
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [scanBusy, setScanBusy] = useState<string | null>(null);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+  const scanCameraRef = useRef<HTMLInputElement>(null);
+  const scanUploadRef = useRef<HTMLInputElement>(null);
 
   const set = (k: keyof typeof form, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  // Fold a scanned result into the bank fields, filling only what was found so a
+  // partial scan never wipes anything already typed. Returns the labels filled.
+  const applyBank = (b: ScannedBank): string[] => {
+    const map: [keyof ScannedBank, keyof typeof form, string][] = [
+      ["bankName", "bankName", "Bank name"],
+      ["accountHolder", "accountHolder", "Account holder"],
+      ["accountNumber", "accountNumber", "Account number"],
+      ["ifsc", "ifsc", "IFSC"],
+      ["upi", "upi", "UPI"],
+    ];
+    const filled: string[] = [];
+    setForm((f) => {
+      const next = { ...f };
+      for (const [src, dst, label] of map) {
+        const v = b[src].trim();
+        if (v) {
+          next[dst] = dst === "ifsc" ? v.toUpperCase() : v;
+          filled.push(label);
+        }
+      }
+      return next;
+    });
+    return filled;
+  };
+
+  const onScanBank = async (file: File) => {
+    setError(null);
+    setScanNote(null);
+    try {
+      // A UPI QR carries the payee's UPI id (and often their name) directly —
+      // try that first; it's instant and needs no OCR.
+      setScanBusy("Looking for a QR code…");
+      const qr = await decodeQrFromFile(file);
+      const fromQr = qr ? parseUpiQr(qr) : null;
+      if (fromQr) {
+        const filled = applyBank(fromQr);
+        setScanNote(`Filled from QR: ${filled.join(", ")}. Please verify.`);
+        return;
+      }
+
+      // Otherwise treat it as a photo of a cheque / passbook / details slip and
+      // read it on-device, same as bill scanning.
+      setScanBusy("Reading the details on this phone… 0%");
+      const image = await fileToOcrImage(file);
+      const text = await recognizeText(image, (pct) =>
+        setScanBusy(`Reading the details on this phone… ${pct}%`),
+      );
+      const filled = applyBank(parseBankText(text));
+      setScanNote(
+        filled.length
+          ? `Filled: ${filled.join(", ")}. Check each against the original.`
+          : "Couldn't read any bank details — try a clearer photo, or type them in.",
+      );
+    } catch (err) {
+      console.error("Bank scan failed:", err);
+      setError(
+        (err instanceof Error ? err.message : "Could not read that image.") +
+          " You can still enter the details manually.",
+      );
+    } finally {
+      setScanBusy(null);
+    }
+  };
 
   const save = async () => {
     setError(null);
@@ -342,6 +414,64 @@ function Fields({
           <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
             Bank details
           </div>
+
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <button
+              type="button"
+              className="btn !py-2 !text-[13px]"
+              disabled={!!scanBusy}
+              onClick={() => scanCameraRef.current?.click()}
+            >
+              📷 Scan QR / photo
+            </button>
+            <button
+              type="button"
+              className="btn !py-2 !text-[13px]"
+              disabled={!!scanBusy}
+              onClick={() => scanUploadRef.current?.click()}
+            >
+              Upload image
+            </button>
+          </div>
+          <div className="text-[11px] text-ink-soft mb-2">
+            Point at a UPI QR, or photograph a cheque / passbook — the fields
+            below fill in automatically. Reading happens on this phone; always
+            check the result before saving.
+          </div>
+          <input
+            ref={scanCameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void onScanBank(f);
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={scanUploadRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void onScanBank(f);
+              e.target.value = "";
+            }}
+          />
+          {scanBusy && (
+            <div className="text-[13px] px-3 py-2 rounded-md border border-rule bg-surface text-ink-soft mb-2">
+              {scanBusy}
+            </div>
+          )}
+          {scanNote && (
+            <div className="text-[13px] px-3 py-2 rounded-md border border-moss bg-moss/5 text-moss mb-2">
+              {scanNote}
+            </div>
+          )}
+
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
