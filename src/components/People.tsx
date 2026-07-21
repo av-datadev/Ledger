@@ -14,8 +14,37 @@ function detailSummary(d: PersonDetails): string {
   const bits: string[] = [];
   if (d.role) bits.push(d.role);
   if (d.phone) bits.push(d.phone);
-  if (d.contractAmount != null) bits.push(inr(d.contractAmount));
   return bits.join(" · ");
+}
+
+/** Contract value vs how much has actually been paid to this person. */
+function ContractBar({ contract, paid }: { contract: number; paid: number }) {
+  const balance = contract - paid;
+  const over = balance < 0;
+  const pct = contract > 0 ? (paid / contract) * 100 : 0;
+  return (
+    <div className="mt-2">
+      <div className="flex items-center justify-between text-[11px] mb-1">
+        <span className="text-ink-soft">
+          Contract{" "}
+          <span className="money text-ink font-medium">{inr(contract)}</span>
+        </span>
+        <span className={over ? "text-crimson font-medium" : "text-moss font-medium"}>
+          {over ? `over by ${inr(-balance)}` : `${inr(balance)} left`}
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-ink/10 overflow-hidden">
+        <div
+          className={`h-full rounded-full ${over ? "bg-crimson" : "bg-moss"}`}
+          style={{ width: `${Math.min(100, pct)}%` }}
+        />
+      </div>
+      <div className="text-[10px] text-ink-soft mt-1">
+        Paid <span className="money">{inr(paid)}</span> · {Math.round(pct)}%
+        settled
+      </div>
+    </div>
+  );
 }
 
 export function People({
@@ -159,6 +188,9 @@ export function People({
                   </button>
                 </div>
               </div>
+              {details?.contractAmount != null && details.contractAmount > 0 && (
+                <ContractBar contract={details.contractAmount} paid={total} />
+              )}
             </div>
           );
         })}

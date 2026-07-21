@@ -43,6 +43,11 @@ function Fields({
   requestClose: () => void;
 }) {
   const categories = useLiveQuery(() => db.categories.toArray(), []);
+  // How much has actually been paid to this person (entries in their category).
+  const paid = useLiveQuery(async () => {
+    const es = await db.entries.where("category").equals(name).toArray();
+    return es.reduce((s, e) => s + e.amount, 0);
+  }, [name]);
   // How many records reference this category — deleting it would orphan them.
   const usage = useLiveQuery(async () => {
     const [e, b, s] = await Promise.all([
@@ -396,6 +401,44 @@ function Fields({
             </>
           )}
         </div>
+
+        {(() => {
+          const contractVal =
+            form.contractBasis === "lumpsum"
+              ? toNum(form.contractAmount)
+              : amountFrom(toNum(form.contractArea), toNum(form.contractRate));
+          if (!contractVal || contractVal <= 0 || paid == null) return null;
+          const balance = contractVal - paid;
+          const over = balance < 0;
+          const pct = Math.min(100, (paid / contractVal) * 100);
+          return (
+            <div className="rounded-md border border-rule bg-surface p-3">
+              <div className="flex items-center justify-between text-[12px] mb-2">
+                <span className="text-ink-soft">Paid so far</span>
+                <span className="money font-semibold">
+                  {inr(paid)}{" "}
+                  <span className="text-ink-soft font-normal">
+                    of {inr(contractVal)}
+                  </span>
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-ink/10 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${over ? "bg-crimson" : "bg-moss"}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <div
+                className={`text-[12px] mt-2 font-medium ${over ? "text-crimson" : "text-moss"}`}
+              >
+                {over
+                  ? `Over contract by ${inr(-balance)}`
+                  : `${inr(balance)} left to pay`}{" "}
+                · {Math.round((paid / contractVal) * 100)}% settled
+              </div>
+            </div>
+          );
+        })()}
 
         <div>
           <label className="field-label" htmlFor="p-details">

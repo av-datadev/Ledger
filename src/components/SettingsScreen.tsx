@@ -4,6 +4,7 @@ import { db, resetToSeed } from "../db";
 import { exportBackup, readBackupFile, applyBackup } from "../lib/backup";
 import { withBalances } from "../lib/stock";
 import { toCsv, downloadFile, timestampSlug } from "../lib/csv";
+import { currentHouseholdId } from "../lib/sync";
 
 export function SettingsScreen() {
   const settings = useLiveQuery(() => db.settings.get("app"), []);
@@ -19,6 +20,9 @@ export function SettingsScreen() {
     null,
   );
   const importRef = useRef<HTMLInputElement>(null);
+  // While the shared cloud ledger is active, restoring/resetting local data
+  // fights the live sync (and isn't needed — the cloud already holds it).
+  const synced = currentHouseholdId() != null;
 
   const lastBackup = settings?.lastBackupDate
     ? new Date(settings.lastBackupDate)
@@ -28,6 +32,13 @@ export function SettingsScreen() {
 
   const onImportFile = async (file: File) => {
     setMsg(null);
+    if (synced) {
+      setMsg({
+        kind: "err",
+        text: "You're on the shared cloud ledger — restoring a local backup here would conflict with live sync. Sign out first if you really need to restore an old file.",
+      });
+      return;
+    }
     try {
       const backup = await readBackupFile(file);
       const ok = window.confirm(
@@ -97,6 +108,13 @@ export function SettingsScreen() {
   };
 
   const doReset = async () => {
+    if (synced) {
+      setMsg({
+        kind: "err",
+        text: "Resetting is disabled while you're on the shared cloud ledger — it would wipe the synced data. Sign out first.",
+      });
+      return;
+    }
     if (
       !window.confirm(
         "Reset to seed data? This deletes ALL current entries and BOQ items.",
@@ -159,10 +177,19 @@ export function SettingsScreen() {
         </button>
         <button
           className="btn w-full !py-3"
+          disabled={synced}
           onClick={() => importRef.current?.click()}
         >
           Import / restore from backup…
         </button>
+        {synced && (
+          <p className="text-[12px] text-ink-soft">
+            You're on the shared cloud ledger, so your data is already backed up
+            in the cloud. Restoring a local file is disabled here to avoid
+            conflicts with live sync — sign out (Data → account) first if you
+            truly need to restore an old backup.
+          </p>
+        )}
         <input
           ref={importRef}
           type="file"
@@ -199,6 +226,7 @@ export function SettingsScreen() {
         </h2>
         <button
           className="btn w-full !border-crimson !text-crimson"
+          disabled={synced}
           onClick={() => void doReset()}
         >
           Reset to seed data
