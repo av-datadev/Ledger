@@ -9,8 +9,63 @@ import { People } from "./components/People";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { TabBar, type Tab } from "./components/TabBar";
 import { useTheme } from "./hooks/useTheme";
+import { useAuth } from "./hooks/useAuth";
+import {
+  getMyHousehold,
+  startSync,
+  stopSync,
+  type Household,
+} from "./lib/sync";
+import { Splash, LoginScreen, HouseholdSetup, AccountPanel } from "./components/Auth";
 
+/**
+ * Auth gate: unauthenticated → email sign-in; signed in but no household →
+ * setup; otherwise resolve the household, start sync, and run the app.
+ */
 export default function App() {
+  const { session, loading } = useAuth();
+  // undefined = still resolving, null = signed in with no household yet.
+  const [household, setHousehold] = useState<Household | null | undefined>(
+    undefined,
+  );
+
+  useEffect(() => {
+    if (!session) {
+      setHousehold(undefined);
+      return;
+    }
+    let alive = true;
+    getMyHousehold()
+      .then((h) => alive && setHousehold(h))
+      .catch(() => alive && setHousehold(null));
+    return () => {
+      alive = false;
+    };
+  }, [session]);
+
+  // Start/stop the sync engine as the active household changes.
+  useEffect(() => {
+    if (!household) return;
+    void startSync(household.id).catch((e) => console.error("sync start", e));
+    return () => {
+      void stopSync();
+    };
+  }, [household]);
+
+  if (loading) return <Splash />;
+  if (!session) return <LoginScreen />;
+  if (household === undefined) return <Splash />;
+  if (household === null) return <HouseholdSetup onReady={setHousehold} />;
+  return <LedgerApp household={household} email={session.user.email} />;
+}
+
+function LedgerApp({
+  household,
+  email,
+}: {
+  household: Household;
+  email: string | undefined;
+}) {
   const [tab, setTab] = useState<Tab>("dashboard");
   const { theme, toggle } = useTheme();
   // Cross-tab hand-offs: "open the Ledger filtered to X" (dashboard drill-down,
@@ -70,7 +125,7 @@ export default function App() {
     <div className="min-h-dvh flex flex-col bg-paper">
       <header className="bg-header text-onhead sticky top-0 z-30 px-4 h-12 flex items-center justify-between border-b border-black/30">
         <h1 className="text-sm font-semibold tracking-[0.18em]">
-          HOUSE LEDGER
+          BRICK FLOW
         </h1>
         <button
           onClick={toggle}
@@ -120,7 +175,14 @@ export default function App() {
             onNewPayment={openEntry}
           />
         )}
-        {tab === "data" && <SettingsScreen />}
+        {tab === "data" && (
+          <>
+            <div className="px-4 pt-4">
+              <AccountPanel household={household} email={email} />
+            </div>
+            <SettingsScreen />
+          </>
+        )}
       </main>
 
       <TabBar tab={tab} onChange={navigateFromTabBar} />

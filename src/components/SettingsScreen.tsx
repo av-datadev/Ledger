@@ -51,7 +51,7 @@ export function SettingsScreen() {
   const exportEntriesCsv = async () => {
     const rows = await db.entries.toArray();
     downloadFile(
-      `house-ledger-entries-${timestampSlug()}.csv`,
+      `brick-flow-entries-${timestampSlug()}.csv`,
       toCsv(
         ["date", "category", "event", "detail", "amount", "mode", "paidBy", "notes"],
         rows as unknown as Record<string, unknown>[],
@@ -63,7 +63,7 @@ export function SettingsScreen() {
   const exportBoqCsv = async () => {
     const rows = await db.boqItems.toArray();
     downloadFile(
-      `house-ledger-boq-${timestampSlug()}.csv`,
+      `brick-flow-boq-${timestampSlug()}.csv`,
       toCsv(
         ["date", "category", "vendor", "invoiceNo", "invoiceTotal", "item", "hsn", "gstPct", "basis", "length", "width", "qty", "unit", "rate", "discPct", "amount"],
         rows as unknown as Record<string, unknown>[],
@@ -87,7 +87,7 @@ export function SettingsScreen() {
       done: s.done ? "yes" : "no",
     }));
     downloadFile(
-      `house-ledger-stock-${timestampSlug()}.csv`,
+      `brick-flow-stock-${timestampSlug()}.csv`,
       toCsv(
         ["name", "category", "unit", "received", "givenOut", "balance", "done"],
         rows as unknown as Record<string, unknown>[],

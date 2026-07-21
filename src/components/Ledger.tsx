@@ -125,7 +125,7 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
       "notes",
     ];
     downloadFile(
-      `house-ledger-entries-${timestampSlug()}.csv`,
+      `brick-flow-entries-${timestampSlug()}.csv`,
       toCsv(headers, visible as unknown as Record<string, unknown>[]),
       "text/csv",
     );

@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "icons/apple-touch-icon.png"],
       manifest: {
-        name: "House Ledger",
-        short_name: "House Ledger",
+        name: "Brick Flow",
+        short_name: "Brick Flow",
         description: "Construction expense ledger — offline-first",
         display: "standalone",
         orientation: "portrait",

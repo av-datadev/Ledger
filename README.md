@@ -1,4 +1,4 @@
-# House Ledger
+# Brick Flow
 
 Offline-first PWA for tracking construction expenses on the house project.
 Replaces the Excel workbook and the browser-only prototype.
@@ -57,7 +57,7 @@ environment variables, no serverless functions.
 
 1. Push the repo to GitHub:
    ```bash
-   git init && git add -A && git commit -m "House Ledger"
+   git init && git add -A && git commit -m "Brick Flow"
    git remote add origin <your-repo-url> && git push -u origin main
    ```
 2. Go to [vercel.com](https://vercel.com) → **Add New → Project** → import the
@@ -71,7 +71,7 @@ Vercel serves over HTTPS, which the PWA install requires.
 1. Open the deployed URL in **Chrome** on the phone.
 2. Wait for the first full load (this precaches the app shell for offline use).
 3. Tap the **⋮ menu → "Add to Home Screen"** (or the "Install app" prompt).
-4. Confirm. A **House Ledger** icon appears on the home screen; launching it
+4. Confirm. A **Brick Flow** icon appears on the home screen; launching it
    opens full-screen with no browser chrome (standalone display mode).
 
 ## Offline behavior — manual test checklist

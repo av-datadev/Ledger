@@ -38,6 +38,9 @@ const seedBoq: BoqItem[] = (() => {
   });
 })();
 
+// NB: the IndexedDB name stays "house-ledger" even though the app is now
+// branded "Brick Flow". Renaming it would make the browser open a brand-new,
+// empty database and orphan every existing entry, photo and bill on-device.
 export const db = new Dexie("house-ledger") as Dexie & {
   entries: EntityTable<Entry, "id">;
   boqItems: EntityTable<BoqItem, "id">;

@@ -112,12 +112,12 @@ story = []
 
 # ---------- Cover ----------
 story.append(Spacer(1, 1.3 * inch))
-story.append(Paragraph("HOUSE LEDGER", title_style))
+story.append(Paragraph("BRICK FLOW", title_style))
 story.append(Paragraph("How to open and use the app — Desktop &amp; Android", subtitle_style))
 story.append(rule())
 story.append(Spacer(1, 0.15 * inch))
 story.append(Paragraph(
-    "House Ledger is an offline-first expense tracker for the house-building "
+    "Brick Flow is an offline-first expense tracker for the house-building "
     "project. It runs entirely in your browser — there is nothing to install "
     "on a desktop, and on a phone it can be added to your home screen like a "
     "regular app. All of your data lives on your own device; "
@@ -145,7 +145,7 @@ story.append(PageBreak())
 # ---------- 1. Before you start ----------
 story.append(Paragraph("1. Before you start", h1_style))
 story.append(Paragraph(
-    "House Ledger lives at one web address (URL). This guide uses a "
+    "Brick Flow lives at one web address (URL). This guide uses a "
     "placeholder — replace it with your app's real address once it's "
     "deployed:",
     body_style,
@@ -160,7 +160,7 @@ story.append(Paragraph(
     body_style,
 ))
 story.append(Paragraph(
-    "You do not need to install any software to use House Ledger on a "
+    "You do not need to install any software to use Brick Flow on a "
     "desktop computer — it opens in your normal web browser (Chrome, Edge, "
     "or Safari). On Android, you'll install it as an app icon in a couple "
     "of taps, covered in Section 3.",
@@ -179,12 +179,12 @@ story.append(numbered([
     "Wait a few seconds for the page to load fully the first time — this also "
     "quietly saves a copy of the app on your computer so it can open instantly "
     "(and even offline) the next time.",
-    "You'll see the dark navy <b>HOUSE LEDGER</b> header and the Dashboard. "
+    "You'll see the dark navy <b>BRICK FLOW</b> header and the Dashboard. "
     "You're in.",
 ]))
 story.append(Paragraph("Optional: pin it as its own desktop app", h2_style))
 story.append(Paragraph(
-    "Chrome and Edge can install House Ledger as a standalone app window "
+    "Chrome and Edge can install Brick Flow as a standalone app window "
     "(no address bar, its own icon), the same way it works on a phone:",
     body_style,
 ))
@@ -192,7 +192,7 @@ story.append(numbered([
     "Look at the right side of the address bar for a small install icon "
     "(a monitor with a downward arrow, or a <b>+</b> in a box).",
     "Click it, then click <b>Install</b> in the popup.",
-    "House Ledger now opens from your Desktop, Start Menu, or Dock like any "
+    "Brick Flow now opens from your Desktop, Start Menu, or Dock like any "
     "other application.",
 ]))
 story.append(Paragraph(
@@ -218,7 +218,7 @@ story.append(numbered([
     "<b>Install app</b> banner near the address bar instead — tap that if "
     "you see it).",
     "Confirm by tapping <b>Add</b> or <b>Install</b> on the popup.",
-    "Go to your phone's home screen. You'll see a new <b>House Ledger</b> "
+    "Go to your phone's home screen. You'll see a new <b>Brick Flow</b> "
     "icon (dark navy square with a stacked-coins symbol).",
     "Tap the icon to open it. The app fills the whole screen — no browser "
     "address bar or tabs — exactly like a normal installed app.",
@@ -518,8 +518,8 @@ doc = SimpleDocTemplate(
     bottomMargin=0.85 * inch,
     leftMargin=0.9 * inch,
     rightMargin=0.9 * inch,
-    title="House Ledger — User Guide",
-    author="House Ledger",
+    title="Brick Flow — User Guide",
+    author="Brick Flow",
 )
 
 
@@ -529,7 +529,7 @@ def on_page(canvas, doc_):
     canvas.rect(0, letter[1] - 0.28 * inch, letter[0], 0.28 * inch, fill=1, stroke=0)
     canvas.setFillColor(colors.white)
     canvas.setFont("Helvetica-Bold", 8)
-    canvas.drawString(0.9 * inch, letter[1] - 0.2 * inch, "HOUSE LEDGER — USER GUIDE")
+    canvas.drawString(0.9 * inch, letter[1] - 0.2 * inch, "BRICK FLOW — USER GUIDE")
     canvas.setFillColor(INK_SOFT)
     canvas.setFont("Helvetica", 8)
     canvas.drawRightString(letter[0] - 0.9 * inch, 0.55 * inch, f"Page {doc_.page}")
