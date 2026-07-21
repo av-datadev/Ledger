@@ -6,16 +6,22 @@ import type {
   StockMove,
   CustomCategory,
   PersonDetails,
+  Attachment,
 } from "../types";
 import { CATEGORIES } from "../../shared/constants";
 import { downloadFile, timestampSlug } from "./csv";
+import { blobToBase64, base64ToBlob } from "./attach";
+
+// Attachments carry an image blob, which can't live in JSON — serialise the
+// blob as base64 (data) alongside the row's metadata.
+type SerializedAttachment = Omit<Attachment, "blob"> & { data: string };
 
 // Custom categories sort after every built-in (mirrors CUSTOM_ORDER in db.ts).
 const CUSTOM_ORDER = 1000;
 
 interface BackupFile {
   app: "house-ledger";
-  version: 1 | 2 | 3 | 4 | 5 | 6;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   exportedAt: string;
   entries: Entry[];
   boqItems: BoqItem[];
@@ -26,11 +32,13 @@ interface BackupFile {
   categories?: CustomCategory[];
   // Added in version 4 — per-person contact/contract details.
   people?: PersonDetails[];
+  // Added in version 7 — entry photos, blobs base64-encoded.
+  attachments?: SerializedAttachment[];
 }
 
 /** Full-database JSON export — the primary safety net. */
 export async function exportBackup(): Promise<void> {
-  const [entries, boqItems, stockItems, stockMoves, categories, people] =
+  const [entries, boqItems, stockItems, stockMoves, categories, people, atts] =
     await Promise.all([
       db.entries.toArray(),
       db.boqItems.toArray(),
@@ -38,10 +46,18 @@ export async function exportBackup(): Promise<void> {
       db.stockMoves.toArray(),
       db.categories.toArray(),
       db.people.toArray(),
+      db.attachments.toArray(),
     ]);
+  // Encode each photo's blob as base64 so it round-trips through JSON.
+  const attachments: SerializedAttachment[] = await Promise.all(
+    atts.map(async ({ blob, ...rest }) => ({
+      ...rest,
+      data: await blobToBase64(blob),
+    })),
+  );
   const payload: BackupFile = {
     app: "house-ledger",
-    version: 6,
+    version: 7,
     exportedAt: new Date().toISOString(),
     entries,
     boqItems,
@@ -49,6 +65,7 @@ export async function exportBackup(): Promise<void> {
     stockMoves,
     categories,
     people,
+    attachments,
   };
   downloadFile(
     `house-ledger-backup-${timestampSlug()}.json`,
@@ -66,6 +83,7 @@ export interface ParsedBackup {
   stockMoves: StockMove[];
   categories: CustomCategory[];
   people: PersonDetails[];
+  attachments: Attachment[];
 }
 
 /** Parse and sanity-check a backup file. Throws with a readable message. */
@@ -149,6 +167,26 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
       contractRate: p.contractRate ?? null,
       updatedAt: p.updatedAt ?? p.createdAt,
     })),
+    // Added in v7 — decode each photo's base64 back into a Blob. Skip any row
+    // that fails to decode rather than aborting the whole import.
+    attachments: (Array.isArray(data.attachments) ? data.attachments : [])
+      .map((a): Attachment | null => {
+        try {
+          return {
+            id: a.id,
+            entryId: a.entryId,
+            blob: base64ToBlob(a.data, a.mime || "image/jpeg"),
+            mime: a.mime || "image/jpeg",
+            name: a.name || "photo.jpg",
+            w: a.w ?? 0,
+            h: a.h ?? 0,
+            createdAt: a.createdAt ?? Date.now(),
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((a): a is Attachment => a !== null),
   };
 }
 
@@ -197,6 +235,7 @@ export async function applyBackup(backup: ParsedBackup): Promise<void> {
       db.stockMoves,
       db.categories,
       db.people,
+      db.attachments,
     ],
     async () => {
       await db.entries.clear();
@@ -205,6 +244,7 @@ export async function applyBackup(backup: ParsedBackup): Promise<void> {
       await db.stockMoves.clear();
       await db.categories.clear();
       await db.people.clear();
+      await db.attachments.clear();
       await db.entries.bulkAdd(backup.entries);
       await db.boqItems.bulkAdd(backup.boqItems);
       await db.stockItems.bulkAdd(backup.stockItems);
@@ -215,6 +255,7 @@ export async function applyBackup(backup: ParsedBackup): Promise<void> {
         ...builtinRows,
       ]);
       await db.people.bulkAdd(backup.people);
+      await db.attachments.bulkAdd(backup.attachments);
     },
   );
 }

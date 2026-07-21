@@ -7,6 +7,7 @@ import type {
   StockMove,
   CustomCategory,
   PersonDetails,
+  Attachment,
 } from "./types";
 import { CATEGORIES } from "../shared/constants";
 import seedEntriesJson from "../seed-entries.json";
@@ -45,6 +46,7 @@ export const db = new Dexie("house-ledger") as Dexie & {
   stockMoves: EntityTable<StockMove, "id">;
   categories: EntityTable<CustomCategory, "id">;
   people: EntityTable<PersonDetails, "id">;
+  attachments: EntityTable<Attachment, "id">;
 };
 
 db.version(1).stores({
@@ -162,6 +164,19 @@ db.version(6)
       });
   });
 
+// v7 adds photo attachments on ledger entries (cheques, diary pages). New table
+// only — existing data is untouched.
+db.version(7).stores({
+  entries: "id, date, category, paidBy, createdAt, updatedAt",
+  boqItems: "id, invoiceNo, category, date, vendor, billId",
+  settings: "id",
+  stockItems: "id, category, name, createdAt",
+  stockMoves: "id, stockId, date, createdAt, billId",
+  categories: "id, name",
+  people: "id, name",
+  attachments: "id, entryId, createdAt",
+});
+
 const SETTINGS_ID = "app";
 
 // Custom categories sort after every built-in (which occupy 0..N-1).
@@ -231,6 +246,14 @@ export async function deleteBill(billId: string): Promise<void> {
   });
 }
 
+/** Delete a ledger entry and every photo attached to it. */
+export async function deleteEntry(entryId: string): Promise<void> {
+  await db.transaction("rw", [db.entries, db.attachments], async () => {
+    await db.entries.delete(entryId);
+    await db.attachments.where("entryId").equals(entryId).delete();
+  });
+}
+
 /** Remove a category row and any attached person details. */
 export async function deleteCategory(name: string): Promise<void> {
   await db.transaction("rw", [db.categories, db.people], async () => {
@@ -282,6 +305,7 @@ export async function resetToSeed(): Promise<void> {
       db.stockMoves,
       db.categories,
       db.people,
+      db.attachments,
     ],
     async () => {
       await db.entries.clear();
@@ -290,6 +314,7 @@ export async function resetToSeed(): Promise<void> {
       await db.stockMoves.clear();
       await db.categories.clear();
       await db.people.clear();
+      await db.attachments.clear();
       await db.entries.bulkAdd(seedEntries);
       await db.boqItems.bulkAdd(seedBoq);
       await db.categories.bulkAdd(builtinCategoryRows());

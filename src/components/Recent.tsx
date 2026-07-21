@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
 import { useBackClose } from "../hooks/useBackClose";
@@ -38,6 +38,15 @@ export function Recent() {
     () => db.entries.orderBy("updatedAt").reverse().limit(RECENT_LIMIT).toArray(),
     [],
   );
+  // Which entries have photos — read only the entryId index, not the blobs.
+  const photoKeys = useLiveQuery(
+    () => db.attachments.orderBy("entryId").keys(),
+    [],
+  );
+  const withPhotos = useMemo(
+    () => new Set((photoKeys ?? []) as string[]),
+    [photoKeys],
+  );
   const [editing, setEditing] = useState<Entry | null>(null);
 
   return (
@@ -69,6 +78,7 @@ export function Recent() {
                     <span className="money">{formatDate(e.date)}</span>
                     <span className="badge">{e.category}</span>
                     <span>· {e.paidBy}</span>
+                    {withPhotos.has(e.id) && <span className="badge">📎</span>}
                   </div>
                 </div>
                 <div className="text-right shrink-0">

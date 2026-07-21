@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../db";
+import { db, deleteEntry } from "../db";
 import { MODES, PAYERS } from "../../shared/constants";
 import { useCategories } from "../hooks/useCategories";
 import { useBackClose } from "../hooks/useBackClose";
@@ -35,6 +35,18 @@ function summarize(label: string, sel: string[]): string {
 
 export function Ledger({ preset }: { preset: LedgerPreset | null }) {
   const entries = useLiveQuery(() => db.entries.toArray(), []);
+  // How many photos each entry has — read only the entryId index (not the
+  // blobs) so this stays cheap.
+  const photoKeys = useLiveQuery(
+    () => db.attachments.orderBy("entryId").keys(),
+    [],
+  );
+  const photoCount = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const k of (photoKeys ?? []) as string[])
+      m.set(k, (m.get(k) ?? 0) + 1);
+    return m;
+  }, [photoKeys]);
   const categories = useCategories();
   const [search, setSearch] = useState("");
   const [cats, setCats] = useState<string[]>([]);
@@ -244,6 +256,9 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
                   <span className="badge">{e.category}</span>
                   <span>{e.mode}</span>
                   <span>· {e.paidBy}</span>
+                  {photoCount.get(e.id) && (
+                    <span className="badge">📎 {photoCount.get(e.id)}</span>
+                  )}
                 </div>
               </div>
               <div className="text-right shrink-0">
@@ -253,7 +268,7 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
                     <button
                       className="text-[11px] text-white bg-crimson rounded px-2 py-0.5"
                       onClick={() => {
-                        void db.entries.delete(e.id);
+                        void deleteEntry(e.id);
                         setConfirmId(null);
                       }}
                     >

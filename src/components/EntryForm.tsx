@@ -1,9 +1,21 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { db } from "../db";
 import { MODES, PAYERS } from "../../shared/constants";
 import { useCategories } from "../hooks/useCategories";
 import { todayStr } from "../lib/format";
-import type { Entry } from "../types";
+import { fileToAttachment, type ProcessedImage } from "../lib/attach";
+import type { Entry, Attachment } from "../types";
+
+// A photo shown in the form: either already saved to the DB (edit mode) or
+// freshly picked and still in memory. `url` is an object URL for display and is
+// revoked on removal / unmount.
+interface LocalPhoto {
+  id: string;
+  url: string;
+  name: string;
+  persisted: boolean;
+  img?: ProcessedImage; // present for not-yet-saved photos
+}
 
 interface EntryFormProps {
   /** When set, the form edits this existing entry instead of creating one. */
@@ -39,8 +51,92 @@ export function EntryForm({
   const [errors, setErrors] = useState<string[]>([]);
   const editing = !!initial;
 
+  // Stable id for this entry so freshly-picked photos can be linked at save.
+  // Regenerated after each new-entry save so the next one gets a fresh key.
+  const [entryId, setEntryId] = useState(() => initial?.id ?? crypto.randomUUID());
+  const [photos, setPhotos] = useState<LocalPhoto[]>([]);
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const [processing, setProcessing] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<string | null>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
+
+  // Keep the latest photo list in a ref so the unmount cleanup can revoke every
+  // object URL without re-running on each change.
+  const photosRef = useRef<LocalPhoto[]>([]);
+  photosRef.current = photos;
+  useEffect(
+    () => () => {
+      for (const p of photosRef.current) URL.revokeObjectURL(p.url);
+    },
+    [],
+  );
+
+  // In edit mode, load any photos already saved for this entry (once).
+  useEffect(() => {
+    if (!initial) return;
+    let alive = true;
+    const urls: string[] = [];
+    void db.attachments
+      .where("entryId")
+      .equals(initial.id)
+      .sortBy("createdAt")
+      .then((rows) => {
+        if (!alive) {
+          return;
+        }
+        setPhotos(
+          rows.map((a) => {
+            const url = URL.createObjectURL(a.blob);
+            urls.push(url);
+            return { id: a.id, url, name: a.name, persisted: true };
+          }),
+        );
+      });
+    return () => {
+      alive = false;
+    };
+  }, [initial]);
+
   const set = (k: keyof ReturnType<typeof formFrom>, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  const addFiles = async (files: FileList) => {
+    setPhotoError(null);
+    setProcessing(true);
+    try {
+      const added: LocalPhoto[] = [];
+      for (const file of Array.from(files)) {
+        const img = await fileToAttachment(file);
+        added.push({
+          id: crypto.randomUUID(),
+          url: URL.createObjectURL(img.blob),
+          name: img.name,
+          persisted: false,
+          img,
+        });
+      }
+      setPhotos((p) => [...p, ...added]);
+    } catch (err) {
+      setPhotoError(
+        err instanceof Error ? err.message : "Could not add that photo.",
+      );
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const removePhoto = (id: string) => {
+    setPhotos((list) => {
+      const target = list.find((p) => p.id === id);
+      if (target) {
+        URL.revokeObjectURL(target.url);
+        if (target.persisted) setRemovedIds((r) => [...r, id]);
+      }
+      return list.filter((p) => p.id !== id);
+    });
+  };
 
   const save = async () => {
     const errs: string[] = [];
@@ -63,17 +159,41 @@ export function EntryForm({
       updatedAt: Date.now(),
     };
 
+    // New photos (still in memory) become rows; removed ones are deleted. The
+    // entry write and photo writes share one transaction so they never diverge.
+    const newRows: Attachment[] = photos
+      .filter((p) => !p.persisted && p.img)
+      .map((p) => ({
+        id: p.id,
+        entryId,
+        blob: p.img!.blob,
+        mime: p.img!.mime,
+        name: p.img!.name,
+        w: p.img!.w,
+        h: p.img!.h,
+        createdAt: Date.now(),
+      }));
+
     if (editing) {
-      await db.entries.update(initial.id, fields);
+      await db.transaction("rw", [db.entries, db.attachments], async () => {
+        await db.entries.update(initial.id, fields);
+        if (removedIds.length) await db.attachments.bulkDelete(removedIds);
+        if (newRows.length) await db.attachments.bulkAdd(newRows);
+      });
       onDone?.();
       return;
     }
 
-    await db.entries.add({
-      id: crypto.randomUUID(),
-      ...fields,
-      createdAt: Date.now(),
+    await db.transaction("rw", [db.entries, db.attachments], async () => {
+      await db.entries.add({ id: entryId, ...fields, createdAt: Date.now() });
+      if (newRows.length) await db.attachments.bulkAdd(newRows);
     });
+    // Reset for the next entry: clear fields and release the saved photos'
+    // preview URLs (the blobs are now safe in the DB).
+    for (const p of photos) URL.revokeObjectURL(p.url);
+    setPhotos([]);
+    setRemovedIds([]);
+    setEntryId(crypto.randomUUID());
     setForm(formFrom(undefined, presetCategory));
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -201,6 +321,98 @@ export function EntryForm({
           />
         </div>
 
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="field-label !mb-0">Photos (optional)</label>
+            {photos.length > 0 && (
+              <span className="text-[11px] text-ink-soft">
+                {photos.length} attached
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className="btn !py-2 !text-[13px]"
+              disabled={processing}
+              onClick={() => cameraRef.current?.click()}
+            >
+              📷 Take photo
+            </button>
+            <button
+              type="button"
+              className="btn !py-2 !text-[13px]"
+              disabled={processing}
+              onClick={() => uploadRef.current?.click()}
+            >
+              Attach image
+            </button>
+          </div>
+          <p className="text-[11px] text-ink-soft mt-1.5">
+            Snap the cheque or a diary page and keep it with this entry as proof.
+            Stored on this phone — nothing is uploaded. You still fill the amount.
+          </p>
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) void addFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={uploadRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) void addFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          {processing && (
+            <div className="text-[12px] text-ink-soft mt-2">Adding photo…</div>
+          )}
+          {photoError && (
+            <div className="text-[12px] text-crimson mt-2">{photoError}</div>
+          )}
+          {photos.length > 0 && (
+            <div className="grid grid-cols-3 gap-2 mt-2">
+              {photos.map((p) => (
+                <div
+                  key={p.id}
+                  className="relative aspect-square rounded-md overflow-hidden border border-rule bg-surface"
+                >
+                  <button
+                    type="button"
+                    className="w-full h-full"
+                    onClick={() => setViewer(p.url)}
+                    aria-label={`View ${p.name}`}
+                  >
+                    <img
+                      src={p.url}
+                      alt={p.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-sm leading-none flex items-center justify-center"
+                    aria-label="Remove photo"
+                    onClick={() => removePhoto(p.id)}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {errors.length > 0 && (
           <ul className="text-[13px] text-crimson list-disc pl-5">
             {errors.map((e) => (
@@ -222,6 +434,26 @@ export function EntryForm({
           </div>
         )}
       </div>
+
+      {viewer && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setViewer(null)}
+        >
+          <img
+            src={viewer}
+            alt="Attached photo"
+            className="max-w-full max-h-full object-contain"
+          />
+          <button
+            className="absolute top-4 right-4 text-white text-3xl leading-none"
+            aria-label="Close"
+            onClick={() => setViewer(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }

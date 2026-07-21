@@ -107,6 +107,22 @@ export interface StockItem {
   createdAt: number;
 }
 
+/**
+ * A photo attached to a ledger entry as proof — a cheque, a handwritten diary
+ * page, a receipt. Stored on-device as a downscaled JPEG blob; nothing is
+ * uploaded. Kept in its own table so entry rows stay light.
+ */
+export interface Attachment {
+  id: string;
+  entryId: string; // the Entry this photo belongs to
+  blob: Blob; // downscaled JPEG image data
+  mime: string; // "image/jpeg"
+  name: string; // original file name, best-effort
+  w: number; // stored pixel dimensions (for layout)
+  h: number;
+  createdAt: number;
+}
+
 /** One quantity movement: received into stock, or given out to labour. */
 export interface StockMove {
   id: string;
