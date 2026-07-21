@@ -180,6 +180,29 @@ db.version(7).stores({
   attachments: "id, entryId, createdAt",
 });
 
+// v8 adds floor-wise contract lines on people (the contract total built from
+// per-floor parts). No new index — backfill an empty array on existing rows so
+// the field is always present.
+db.version(8)
+  .stores({
+    entries: "id, date, category, paidBy, createdAt, updatedAt",
+    boqItems: "id, invoiceNo, category, date, vendor, billId",
+    settings: "id",
+    stockItems: "id, category, name, createdAt",
+    stockMoves: "id, stockId, date, createdAt, billId",
+    categories: "id, name",
+    people: "id, name",
+    attachments: "id, entryId, createdAt",
+  })
+  .upgrade(async (tx) => {
+    await tx
+      .table("people")
+      .toCollection()
+      .modify((p: PersonDetails) => {
+        if (!Array.isArray(p.contractLines)) p.contractLines = [];
+      });
+  });
+
 const SETTINGS_ID = "app";
 
 // Custom categories sort after every built-in (which occupy 0..N-1).

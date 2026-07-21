@@ -69,6 +69,22 @@ export interface CustomCategory {
 }
 
 /**
+ * One floor/section line of a contract (e.g. "Ground floor · 1000 sqft @ ₹750").
+ * Each line is a mini-contract in its own right: "lumpsum" carries a flat
+ * `amount`, otherwise `amount` = `area` × `rate`. A person's contract total is
+ * the sum of its lines — this is how the single-total contract is "built from
+ * parts" for splits like Sharik's ₹750 (ground) / ₹725 (upper) floor rates.
+ */
+export interface ContractLine {
+  id: string;
+  label: string; // "Ground floor", "First floor", "Terrace"…
+  basis: "lumpsum" | MeasureBasis;
+  area: number | null; // measured quantity (running ft or area); null for lumpsum
+  rate: number | null; // rate per unit (₹); null for lumpsum
+  amount: number | null; // lumpsum price, or the derived area × rate
+}
+
+/**
  * Contact & contract details for a person/contractor (e.g. "Sharik").
  * Linked by `name` to a category/payee, so it works for both built-in
  * people and ones added on the People tab. Every field is optional to fill.
@@ -82,10 +98,16 @@ export interface PersonDetails {
   // Contract pricing. "lumpsum" = a flat agreed price in contractAmount.
   // Otherwise contractAmount = contractArea × contractRate (e.g. 2000 sqft
   // @ ₹1200), with the basis giving the unit.
+  //
+  // When `contractLines` is non-empty the contract is built floor-wise: the
+  // lines are the source of truth and `contractAmount` mirrors their sum (the
+  // single-field trio below is then unused). An empty `contractLines` keeps the
+  // original single-total behaviour.
   contractBasis: "lumpsum" | MeasureBasis;
   contractArea: number | null; // measured quantity (running ft or area)
   contractRate: number | null; // rate per unit (₹)
-  contractAmount: number | null; // agreed final price (₹)
+  contractAmount: number | null; // agreed final price (₹) — sum of lines when floor-wise
+  contractLines: ContractLine[]; // per-floor/section breakdown; [] = single total
   contractDetails: string; // scope / terms / anything else
   // Bank details for paying this person.
   bankName: string;

@@ -12,14 +12,32 @@ import {
   basisLabel,
   basisUnit,
   amountFrom,
+  sumLines,
   type ContractBasis,
 } from "../lib/measure";
-import type { PersonDetails } from "../types";
+import type { ContractLine, PersonDetails } from "../types";
 
 const toNum = (s: string): number | null => {
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : null;
 };
+
+// A floor-wise line while it's being edited — every field is a raw string.
+type LineForm = {
+  id: string;
+  label: string;
+  basis: string;
+  area: string;
+  rate: string;
+  amount: string;
+};
+
+// Resolve the ₹ value of an in-progress line: lumpsum reads `amount`, a measure
+// basis derives area × rate. null when the needed inputs aren't filled yet.
+const lineFormAmount = (l: LineForm): number | null =>
+  l.basis === "lumpsum"
+    ? toNum(l.amount)
+    : amountFrom(toNum(l.area), toNum(l.rate));
 
 const ROLES = [
   "Contractor",
@@ -77,6 +95,21 @@ function Fields({
     ifsc: existing?.ifsc ?? "",
     upi: existing?.upi ?? "",
   }));
+  // Single agreed total vs a floor-wise breakdown. Start in whichever mode the
+  // saved contract used.
+  const [contractMode, setContractMode] = useState<"single" | "lines">(
+    existing?.contractLines?.length ? "lines" : "single",
+  );
+  const [lines, setLines] = useState<LineForm[]>(() =>
+    (existing?.contractLines ?? []).map((l) => ({
+      id: l.id,
+      label: l.label,
+      basis: l.basis,
+      area: l.area != null ? String(l.area) : "",
+      rate: l.rate != null ? String(l.rate) : "",
+      amount: l.amount != null ? String(l.amount) : "",
+    })),
+  );
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [scanBusy, setScanBusy] = useState<string | null>(null);
@@ -86,6 +119,25 @@ function Fields({
 
   const set = (k: keyof typeof form, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  const setLine = (id: string, patch: Partial<LineForm>) =>
+    setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  const removeLine = (id: string) =>
+    setLines((ls) => ls.filter((l) => l.id !== id));
+  const addLine = () =>
+    setLines((ls) => [
+      ...ls,
+      {
+        id: crypto.randomUUID(),
+        label: "",
+        // Inherit the previous line's basis (floors usually share one), else
+        // default to sqft — the common case for floor-area contracts.
+        basis: ls.length ? ls[ls.length - 1].basis : "sqft",
+        area: "",
+        rate: "",
+        amount: "",
+      },
+    ]);
 
   // Fold a scanned result into the bank fields, filling only what was found so a
   // partial scan never wipes anything already typed. Returns the labels filled.
@@ -172,11 +224,46 @@ function Fields({
       return;
     }
 
-    const basis = form.contractBasis as ContractBasis;
+    let basis = form.contractBasis as ContractBasis;
     let area: number | null = null;
     let rate: number | null = null;
     let amount: number | null = null;
-    if (basis === "lumpsum") {
+    let contractLines: ContractLine[] = [];
+
+    if (contractMode === "lines") {
+      // Floor-wise: each filled line becomes a ContractLine; the total is their
+      // sum, mirrored into contractAmount so every existing consumer (the People
+      // bar, backups) keeps reading a single number.
+      const rows: ContractLine[] = [];
+      for (const l of lines) {
+        const lb = l.basis as ContractBasis;
+        const la = toNum(l.area);
+        const lr = toNum(l.rate);
+        const lAmt = lineFormAmount(l);
+        // Skip a line that's entirely blank — an empty trailing row is fine.
+        const blank =
+          !l.label.trim() && la == null && lr == null && toNum(l.amount) == null;
+        if (blank) continue;
+        if (
+          (la != null && la < 0) ||
+          (lr != null && lr < 0) ||
+          (lAmt != null && lAmt < 0)
+        ) {
+          setError("Floor amounts, areas and rates must be positive numbers.");
+          return;
+        }
+        rows.push({
+          id: l.id,
+          label: l.label.trim(),
+          basis: lb,
+          area: lb === "lumpsum" ? null : la,
+          rate: lb === "lumpsum" ? null : lr,
+          amount: lb === "lumpsum" ? toNum(l.amount) : lAmt,
+        });
+      }
+      contractLines = rows;
+      amount = sumLines(rows);
+    } else if (basis === "lumpsum") {
       const raw = form.contractAmount.trim();
       if (raw !== "") {
         amount = parseFloat(raw);
@@ -194,6 +281,12 @@ function Fields({
       }
       amount = amountFrom(area, rate);
     }
+    // In floor-wise mode the single-field trio is unused; keep it neutral.
+    if (contractMode === "lines") {
+      basis = "lumpsum";
+      area = null;
+      rate = null;
+    }
 
     // Rename the category everywhere first, so details attach to the new name.
     if (nextName !== name) await renameCategory(name, nextName);
@@ -207,6 +300,7 @@ function Fields({
       contractArea: area,
       contractRate: rate,
       contractAmount: amount,
+      contractLines,
       contractDetails: form.contractDetails.trim(),
       bankName: form.bankName.trim(),
       accountHolder: form.accountHolder.trim(),
@@ -220,6 +314,7 @@ function Fields({
       !fields.phone &&
       !fields.idNumber &&
       fields.contractAmount == null &&
+      fields.contractLines.length === 0 &&
       !fields.contractDetails &&
       !fields.bankName &&
       !fields.accountHolder &&
@@ -249,6 +344,17 @@ function Fields({
     await deleteCategory(name);
     requestClose();
   };
+
+  // Live floor-wise total, and the contract value for whichever mode is active.
+  const linesTotal = lines.reduce((s, l) => s + (lineFormAmount(l) ?? 0), 0);
+  const contractVal =
+    contractMode === "lines"
+      ? linesTotal > 0
+        ? linesTotal
+        : null
+      : form.contractBasis === "lumpsum"
+        ? toNum(form.contractAmount)
+        : amountFrom(toNum(form.contractArea), toNum(form.contractRate));
 
   return (
     <div className="px-4 py-4 max-w-lg mx-auto">
@@ -325,88 +431,207 @@ function Fields({
 
         <div>
           <label className="field-label">Contract pricing</label>
-          <div className="flex gap-1.5 flex-wrap mb-2">
-            {CONTRACT_BASES.map((b) => (
+          {/* Single agreed total, or a floor-wise breakdown that sums to one. */}
+          <div className="flex gap-1.5 mb-2">
+            {(["single", "lines"] as const).map((m) => (
               <button
-                key={b}
+                key={m}
                 type="button"
-                className={`text-[12px] rounded px-2.5 py-1 border ${
-                  form.contractBasis === b
+                className={`text-[12px] rounded px-3 py-1 border ${
+                  contractMode === m
                     ? "bg-ink text-paper border-ink"
                     : "border-rule text-ink-soft"
                 }`}
-                onClick={() => set("contractBasis", b)}
+                onClick={() => {
+                  setContractMode(m);
+                  // Opening an empty floor-wise contract? Seed the first line.
+                  if (m === "lines" && lines.length === 0) addLine();
+                }}
               >
-                {basisLabel(b)}
+                {m === "single" ? "Single total" : "Floor-wise"}
               </button>
             ))}
           </div>
-          {form.contractBasis === "lumpsum" ? (
-            <input
-              id="p-amount"
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="any"
-              className="input money"
-              placeholder="agreed final price (₹)"
-              value={form.contractAmount}
-              onChange={(e) => set("contractAmount", e.target.value)}
-            />
-          ) : (
+
+          {contractMode === "single" ? (
             <>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="field-label" htmlFor="p-area">
-                    Area / length ({basisUnit(form.contractBasis as ContractBasis)})
-                  </label>
-                  <input
-                    id="p-area"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="any"
-                    className="input money"
-                    placeholder="e.g. 2000"
-                    value={form.contractArea}
-                    onChange={(e) => set("contractArea", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="field-label" htmlFor="p-rate">
-                    Rate / {basisUnit(form.contractBasis as ContractBasis)} (₹)
-                  </label>
-                  <input
-                    id="p-rate"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="any"
-                    className="input money"
-                    placeholder="e.g. 1200"
-                    value={form.contractRate}
-                    onChange={(e) => set("contractRate", e.target.value)}
-                  />
-                </div>
+              <div className="flex gap-1.5 flex-wrap mb-2">
+                {CONTRACT_BASES.map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    className={`text-[12px] rounded px-2.5 py-1 border ${
+                      form.contractBasis === b
+                        ? "bg-ink text-paper border-ink"
+                        : "border-rule text-ink-soft"
+                    }`}
+                    onClick={() => set("contractBasis", b)}
+                  >
+                    {basisLabel(b)}
+                  </button>
+                ))}
               </div>
-              <div className="text-[13px] text-ink-soft money mt-1.5">
-                Contract ={" "}
-                <span className="font-semibold text-ink">
-                  {inr(
-                    amountFrom(toNum(form.contractArea), toNum(form.contractRate)) ??
-                      0,
-                  )}
-                </span>
-              </div>
+              {form.contractBasis === "lumpsum" ? (
+                <input
+                  id="p-amount"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="any"
+                  className="input money"
+                  placeholder="agreed final price (₹)"
+                  value={form.contractAmount}
+                  onChange={(e) => set("contractAmount", e.target.value)}
+                />
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="field-label" htmlFor="p-area">
+                        Area / length (
+                        {basisUnit(form.contractBasis as ContractBasis)})
+                      </label>
+                      <input
+                        id="p-area"
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="any"
+                        className="input money"
+                        placeholder="e.g. 2000"
+                        value={form.contractArea}
+                        onChange={(e) => set("contractArea", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="field-label" htmlFor="p-rate">
+                        Rate / {basisUnit(form.contractBasis as ContractBasis)} (₹)
+                      </label>
+                      <input
+                        id="p-rate"
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="any"
+                        className="input money"
+                        placeholder="e.g. 1200"
+                        value={form.contractRate}
+                        onChange={(e) => set("contractRate", e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-[13px] text-ink-soft money mt-1.5">
+                    Contract ={" "}
+                    <span className="font-semibold text-ink">
+                      {inr(
+                        amountFrom(
+                          toNum(form.contractArea),
+                          toNum(form.contractRate),
+                        ) ?? 0,
+                      )}
+                    </span>
+                  </div>
+                </>
+              )}
             </>
+          ) : (
+            <div className="space-y-2">
+              {lines.map((l, i) => (
+                <div
+                  key={l.id}
+                  className="rounded-md border border-rule bg-surface p-2.5"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      className="input flex-1 !py-1.5 !text-[13px]"
+                      placeholder={`Floor / section ${i + 1} — e.g. Ground floor`}
+                      value={l.label}
+                      onChange={(e) => setLine(l.id, { label: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      className="text-ink-soft text-xl leading-none px-1.5 shrink-0"
+                      aria-label="Remove this line"
+                      onClick={() => removeLine(l.id)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="flex gap-1 flex-wrap mb-2">
+                    {CONTRACT_BASES.map((b) => (
+                      <button
+                        key={b}
+                        type="button"
+                        className={`text-[11px] rounded px-2 py-0.5 border ${
+                          l.basis === b
+                            ? "bg-ink text-paper border-ink"
+                            : "border-rule text-ink-soft"
+                        }`}
+                        onClick={() => setLine(l.id, { basis: b })}
+                      >
+                        {basisLabel(b)}
+                      </button>
+                    ))}
+                  </div>
+                  {l.basis === "lumpsum" ? (
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="any"
+                      className="input money !py-1.5 !text-[13px]"
+                      placeholder="amount for this floor (₹)"
+                      value={l.amount}
+                      onChange={(e) => setLine(l.id, { amount: e.target.value })}
+                    />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="any"
+                        className="input money !py-1.5 !text-[13px]"
+                        placeholder={`area (${basisUnit(l.basis as ContractBasis)})`}
+                        value={l.area}
+                        onChange={(e) => setLine(l.id, { area: e.target.value })}
+                      />
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="any"
+                        className="input money !py-1.5 !text-[13px]"
+                        placeholder={`rate / ${basisUnit(l.basis as ContractBasis)} (₹)`}
+                        value={l.rate}
+                        onChange={(e) => setLine(l.id, { rate: e.target.value })}
+                      />
+                    </div>
+                  )}
+                  <div className="text-[12px] text-ink-soft money mt-1.5 text-right">
+                    ={" "}
+                    <span className="font-semibold text-ink">
+                      {inr(lineFormAmount(l) ?? 0)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn w-full !py-2 !text-[13px]"
+                onClick={addLine}
+              >
+                + Add floor / section
+              </button>
+              <div className="flex items-center justify-between text-[13px] pt-0.5">
+                <span className="text-ink-soft">Contract total</span>
+                <span className="money font-semibold">{inr(linesTotal)}</span>
+              </div>
+            </div>
           )}
         </div>
 
         {(() => {
-          const contractVal =
-            form.contractBasis === "lumpsum"
-              ? toNum(form.contractAmount)
-              : amountFrom(toNum(form.contractArea), toNum(form.contractRate));
           if (!contractVal || contractVal <= 0 || paid == null) return null;
           const balance = contractVal - paid;
           const over = balance < 0;

@@ -165,6 +165,8 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
       contractBasis: p.contractBasis ?? "lumpsum",
       contractArea: p.contractArea ?? null,
       contractRate: p.contractRate ?? null,
+      // Pre-v8 backups have no floor-wise lines.
+      contractLines: Array.isArray(p.contractLines) ? p.contractLines : [],
       updatedAt: p.updatedAt ?? p.createdAt,
     })),
     // Added in v7 — decode each photo's base64 back into a Blob. Skip any row

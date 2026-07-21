@@ -3,6 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
 import { useCategories } from "../hooks/useCategories";
 import { inr } from "../lib/format";
+import { contractTotal } from "../lib/measure";
 import { PersonDetailsForm } from "./PersonDetailsForm";
 import type { PersonDetails } from "../types";
 
@@ -18,7 +19,15 @@ function detailSummary(d: PersonDetails): string {
 }
 
 /** Contract value vs how much has actually been paid to this person. */
-function ContractBar({ contract, paid }: { contract: number; paid: number }) {
+function ContractBar({
+  contract,
+  paid,
+  floors,
+}: {
+  contract: number;
+  paid: number;
+  floors: number;
+}) {
   const balance = contract - paid;
   const over = balance < 0;
   const pct = contract > 0 ? (paid / contract) * 100 : 0;
@@ -28,6 +37,12 @@ function ContractBar({ contract, paid }: { contract: number; paid: number }) {
         <span className="text-ink-soft">
           Contract{" "}
           <span className="money text-ink font-medium">{inr(contract)}</span>
+          {floors > 0 && (
+            <span className="text-ink-soft">
+              {" "}
+              · {floors} floor{floors === 1 ? "" : "s"}
+            </span>
+          )}
         </span>
         <span className={over ? "text-crimson font-medium" : "text-moss font-medium"}>
           {over ? `over by ${inr(-balance)}` : `${inr(balance)} left`}
@@ -188,9 +203,18 @@ export function People({
                   </button>
                 </div>
               </div>
-              {details?.contractAmount != null && details.contractAmount > 0 && (
-                <ContractBar contract={details.contractAmount} paid={total} />
-              )}
+              {(() => {
+                if (!details) return null;
+                const contract = contractTotal(details);
+                if (contract == null || contract <= 0) return null;
+                return (
+                  <ContractBar
+                    contract={contract}
+                    paid={total}
+                    floors={details.contractLines?.length ?? 0}
+                  />
+                );
+              })()}
             </div>
           );
         })}

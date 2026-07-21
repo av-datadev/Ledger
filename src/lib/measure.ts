@@ -1,4 +1,4 @@
-import type { MeasureBasis } from "../types";
+import type { MeasureBasis, ContractLine } from "../types";
 
 export type ContractBasis = "lumpsum" | MeasureBasis;
 
@@ -56,4 +56,35 @@ export function amountFrom(
 
 function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
+}
+
+/** A single contract line's value: its lumpsum amount, or area × rate. */
+export function lineAmount(line: ContractLine): number | null {
+  if (line.basis === "lumpsum") return line.amount;
+  return amountFrom(line.area, line.rate);
+}
+
+/** Sum of every line that has a value; null when none contribute. */
+export function sumLines(lines: ContractLine[]): number | null {
+  const vals = lines
+    .map(lineAmount)
+    .filter((n): n is number => n != null);
+  if (!vals.length) return null;
+  return Math.round(vals.reduce((s, n) => s + n, 0) * 100) / 100;
+}
+
+/**
+ * A person's agreed contract value. Floor-wise lines win when present (total =
+ * their sum); otherwise it falls back to the single lumpsum / area × rate.
+ */
+export function contractTotal(p: {
+  contractLines?: ContractLine[] | null;
+  contractBasis: ContractBasis;
+  contractArea: number | null;
+  contractRate: number | null;
+  contractAmount: number | null;
+}): number | null {
+  if (p.contractLines && p.contractLines.length) return sumLines(p.contractLines);
+  if (p.contractBasis === "lumpsum") return p.contractAmount;
+  return amountFrom(p.contractArea, p.contractRate);
 }
