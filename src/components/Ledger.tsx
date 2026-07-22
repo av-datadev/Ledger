@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, deleteEntry } from "../db";
-import { MODES, PAYERS } from "../../shared/constants";
 import { useCategories } from "../hooks/useCategories";
+import { usePayers, useModes } from "../hooks/useFacets";
 import { useBackClose } from "../hooks/useBackClose";
 import { inr, formatDate } from "../lib/format";
 import { toCsv, downloadFile, timestampSlug } from "../lib/csv";
@@ -48,6 +48,8 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
     return m;
   }, [photoKeys]);
   const categories = useCategories();
+  const payerOptions = usePayers();
+  const modeOptions = useModes();
   const [search, setSearch] = useState("");
   const [cats, setCats] = useState<string[]>([]);
   const [modes, setModes] = useState<string[]>([]);
@@ -104,8 +106,8 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
     set: (v: string[]) => void;
   }[] = [
     { key: "category", label: "Category", options: categories, sel: cats, set: setCats },
-    { key: "mode", label: "Mode", options: MODES, sel: modes, set: setModes },
-    { key: "paidBy", label: "Paid by", options: PAYERS, sel: payers, set: setPayers },
+    { key: "mode", label: "Mode", options: modeOptions, sel: modes, set: setModes },
+    { key: "paidBy", label: "Paid by", options: payerOptions, sel: payers, set: setPayers },
   ];
   const active = filters.find((f) => f.key === openFilter);
 

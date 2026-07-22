@@ -1,7 +1,7 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
-import { PAYERS } from "../../shared/constants";
 import { useCategories } from "../hooks/useCategories";
+import { usePayers } from "../hooks/useFacets";
 import { inr, num } from "../lib/format";
 import { withBalances } from "../lib/stock";
 import { BudgetCard } from "./BudgetCard";
@@ -19,6 +19,7 @@ export function Dashboard({
   const stockItems = useLiveQuery(() => db.stockItems.toArray(), []);
   const stockMoves = useLiveQuery(() => db.stockMoves.toArray(), []);
   const categories = useCategories();
+  const payers = usePayers();
 
   if (!entries) return null;
 
@@ -40,12 +41,14 @@ export function Dashboard({
     .sort((a, b) => b.total - a.total);
   const maxCat = Math.max(1, ...byCategory.map((c) => c.total));
 
-  const byPayer = PAYERS.map((p) => ({
-    payer: p,
-    total: entries
-      .filter((e) => e.paidBy === p)
-      .reduce((s, e) => s + e.amount, 0),
-  })).sort((a, b) => b.total - a.total);
+  const byPayer = payers
+    .map((p) => ({
+      payer: p,
+      total: entries
+        .filter((e) => e.paidBy === p)
+        .reduce((s, e) => s + e.amount, 0),
+    }))
+    .sort((a, b) => b.total - a.total);
 
   return (
     <div>

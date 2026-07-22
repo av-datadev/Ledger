@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { db } from "../db";
-import { MODES, PAYERS } from "../../shared/constants";
+import { PAYERS } from "../../shared/constants";
 import { useCategories } from "../hooks/useCategories";
+import { usePayers, useModes } from "../hooks/useFacets";
 import { todayStr } from "../lib/format";
 import { fileToAttachment, type ProcessedImage } from "../lib/attach";
 import type { Entry, Attachment } from "../types";
@@ -46,7 +47,23 @@ export function EntryForm({
   onCancel,
 }: EntryFormProps) {
   const categories = useCategories();
+  const payers = usePayers();
+  const modes = useModes();
   const [form, setForm] = useState(() => formFrom(initial, presetCategory));
+
+  // For a NEW entry, the mode/payer defaults come from the generic constants,
+  // but a signed-in user's real options are data-derived. Once those load,
+  // snap a still-default new entry onto the first real option so the picker
+  // never shows a generic value that isn't in the user's own list.
+  useEffect(() => {
+    if (initial) return; // editing an existing entry — keep its saved values
+    setForm((f) => {
+      const paidBy = payers.includes(f.paidBy) ? f.paidBy : (payers[0] ?? f.paidBy);
+      const mode = modes.includes(f.mode) ? f.mode : (modes[0] ?? f.mode);
+      return paidBy === f.paidBy && mode === f.mode ? f : { ...f, paidBy, mode };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payers, modes, initial]);
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const editing = !!initial;
@@ -291,7 +308,7 @@ export function EntryForm({
               value={form.mode}
               onChange={(e) => set("mode", e.target.value)}
             >
-              {MODES.map((m) => (
+              {modes.map((m) => (
                 <option key={m}>{m}</option>
               ))}
             </select>
@@ -304,7 +321,7 @@ export function EntryForm({
               value={form.paidBy}
               onChange={(e) => set("paidBy", e.target.value)}
             >
-              {PAYERS.map((p) => (
+              {payers.map((p) => (
                 <option key={p}>{p}</option>
               ))}
             </select>

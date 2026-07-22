@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { db } from "../db";
-import { MODES, PAYERS } from "../../shared/constants";
 import { useCategories } from "../hooks/useCategories";
+import { usePayers, useModes } from "../hooks/useFacets";
 import { inr, todayStr } from "../lib/format";
 import { addBillRowsToStock } from "../lib/stock";
 import { BASIS, MEASURE_BASES, deriveMeasure, amountFrom } from "../lib/measure";
@@ -80,12 +80,22 @@ export function BillReview({
   onClose: () => void;
 }) {
   const categories = useCategories();
+  const payers = usePayers();
+  const modes = useModes();
   const [ackMismatch, setAckMismatch] = useState(false);
   const [alsoLedger, setAlsoLedger] = useState(false);
   const [addToStock, setAddToStock] = useState(!editing);
   const [ledgerMode, setLedgerMode] = useState<string>("Cash");
-  const [ledgerPayer, setLedgerPayer] = useState<string>(PAYERS[0]);
+  const [ledgerPayer, setLedgerPayer] = useState<string>("");
   const [errors, setErrors] = useState<string[]>([]);
+
+  // Default the optional ledger entry's payer/mode to the user's own first real
+  // option (data-derived) rather than a generic placeholder.
+  useEffect(() => {
+    setLedgerPayer((p) => (p && payers.includes(p) ? p : (payers[0] ?? p)));
+    setLedgerMode((m) => (modes.includes(m) ? m : (modes[0] ?? m)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payers, modes]);
 
   const requestClose = useBackClose(true, onClose);
 
@@ -367,7 +377,7 @@ export function BillReview({
                 value={ledgerMode}
                 onChange={(e) => setLedgerMode(e.target.value)}
               >
-                {MODES.map((m) => (
+                {modes.map((m) => (
                   <option key={m}>{m}</option>
                 ))}
               </select>
@@ -379,7 +389,7 @@ export function BillReview({
                 value={ledgerPayer}
                 onChange={(e) => setLedgerPayer(e.target.value)}
               >
-                {PAYERS.map((p) => (
+                {payers.map((p) => (
                   <option key={p}>{p}</option>
                 ))}
               </select>
