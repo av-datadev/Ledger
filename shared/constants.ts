@@ -23,15 +23,18 @@ export const CATEGORIES = [
   "Misc",
 ] as const;
 
+// Blank-state default payment modes — generic labels, no real bank/account
+// tails. A signed-in user's real modes ride in their cloud data (the `mode`
+// field of synced entries) and appear after login.
 export const MODES = [
   "Cash",
-  "GPay (SBI - 8101)",
-  "GPay (DCB 0003)",
-  "GPay (Deutsche Bank)",
-  "GPay (PNB)",
-  "SBI 8101",
+  "UPI 1",
+  "UPI 2",
+  "UPI 3",
+  "UPI 4",
+  "Bank Transfer 1",
   "Cheque",
-  "SBI FD MDA",
+  "Bank Transfer 2",
   "Other",
 ] as const;
 
