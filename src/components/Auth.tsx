@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { sendMagicLink, signOut } from "../hooks/useAuth";
+import { sendMagicLink, verifyEmailCode, signOut } from "../hooks/useAuth";
 import {
   createHousehold,
   joinHousehold,
@@ -68,10 +68,13 @@ export function AccountSection({
   return <AccountPanel household={household} email={session.user.email} />;
 }
 
-/** Passwordless email sign-in, inline on the Data tab. */
+/** Passwordless email sign-in (6-digit code), inline on the Data tab. */
 function SignInCard() {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
+  const [code, setCode] = useState("");
+  const [status, setStatus] = useState<
+    "idle" | "sending" | "sent" | "verifying"
+  >("idle");
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
@@ -86,7 +89,25 @@ function SignInCard() {
       setStatus("sent");
     } catch (err) {
       setStatus("idle");
-      setError(err instanceof Error ? err.message : "Could not send the link.");
+      setError(err instanceof Error ? err.message : "Could not send the email.");
+    }
+  };
+
+  const verify = async () => {
+    setError(null);
+    if (!/^\d{6}$/.test(code.trim())) {
+      setError("Enter the 6-digit code from the email.");
+      return;
+    }
+    setStatus("verifying");
+    try {
+      // On success, onAuthStateChange (useAuth) flips the app to signed-in.
+      await verifyEmailCode(email, code);
+    } catch (err) {
+      setStatus("sent");
+      setError(
+        err instanceof Error ? err.message : "That code didn't work. Try again.",
+      );
     }
   };
 
@@ -95,17 +116,45 @@ function SignInCard() {
       <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
         Shared ledger
       </div>
-      {status === "sent" ? (
-        <div className="space-y-1.5">
+      {status === "sent" || status === "verifying" ? (
+        <div className="space-y-2">
           <div className="text-sm">
-            We sent a sign-in link to <b>{email.trim()}</b>.
+            We emailed a 6-digit sign-in code to <b>{email.trim()}</b>.
           </div>
-          <div className="text-[12px] text-ink-soft">
-            Open it on this device to sign in and sync your data.
-          </div>
+          <label className="field-label" htmlFor="login-code">
+            Enter the code
+          </label>
+          <input
+            id="login-code"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            className="input tracking-[0.4em] text-center text-lg"
+            placeholder="000000"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            onKeyDown={(e) => e.key === "Enter" && void verify()}
+          />
+          {error && <div className="text-[13px] text-crimson">{error}</div>}
+          <button
+            className="btn btn-primary w-full !py-2.5"
+            disabled={status === "verifying"}
+            onClick={() => void verify()}
+          >
+            {status === "verifying" ? "Signing in…" : "Verify & sign in"}
+          </button>
+          <p className="text-[12px] text-ink-soft">
+            On iPhone, use this code (not the link in the email) so you stay
+            signed in inside the installed app.
+          </p>
           <button
             className="text-[12px] text-ink-soft underline"
-            onClick={() => setStatus("idle")}
+            onClick={() => {
+              setStatus("idle");
+              setCode("");
+              setError(null);
+            }}
           >
             Use a different email
           </button>
@@ -114,7 +163,7 @@ function SignInCard() {
         <div className="space-y-2">
           <p className="text-[13px] text-ink-soft">
             Your entries live on this device. Sign in to back them up and sync
-            across phones — no password, just a one-tap email link.
+            across phones — no password, just a 6-digit email code.
           </p>
           <label className="field-label" htmlFor="login-email">
             Email
@@ -136,7 +185,7 @@ function SignInCard() {
             disabled={status === "sending"}
             onClick={() => void submit()}
           >
-            {status === "sending" ? "Sending…" : "Send sign-in link"}
+            {status === "sending" ? "Sending…" : "Email me a code"}
           </button>
         </div>
       )}
