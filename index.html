@@ -28,6 +28,10 @@
           document.documentElement.setAttribute("data-theme", t);
           var m = document.querySelector('meta[name="theme-color"]');
           if (m) m.setAttribute("content", t === "dark" ? "#0b1015" : "#182B3A");
+          // Apply saved text-size zoom before paint, so the UI doesn't resize
+          // visibly on launch.
+          var z = Number(localStorage.getItem("hl-text-scale"));
+          if (z > 0) document.documentElement.style.zoom = String(z);
         } catch (e) {}
       })();
     </script>

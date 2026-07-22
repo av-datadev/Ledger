@@ -10,33 +10,6 @@ import type {
   Attachment,
 } from "./types";
 import { CATEGORIES } from "../shared/constants";
-import seedEntriesJson from "../seed-entries.json";
-import seedBoqJson from "../seed-boq.json";
-
-// Seed rows predate the updatedAt field — stamp it from createdAt on load so
-// freshly-seeded entries sort correctly in the Recent tab.
-const seedEntries = (
-  seedEntriesJson as unknown as Omit<Entry, "updatedAt">[]
-).map((e) => ({ ...e, updatedAt: e.createdAt })) as Entry[];
-
-// Seed BOQ rows predate billId + the measure-basis fields. Assign one shared
-// billId per (vendor|invoiceNo) group and default the new columns on load.
-const seedBoq: BoqItem[] = (() => {
-  const raw = seedBoqJson as unknown as Omit<
-    BoqItem,
-    "billId" | "basis" | "length" | "width"
-  >[];
-  const billIds = new Map<string, string>();
-  return raw.map((b) => {
-    const key = `${b.vendor}|${b.invoiceNo}`;
-    let billId = billIds.get(key);
-    if (!billId) {
-      billId = crypto.randomUUID();
-      billIds.set(key, billId);
-    }
-    return { ...b, billId, basis: "qty", length: null, width: null };
-  });
-})();
 
 // NB: the IndexedDB name stays "house-ledger" even though the app is now
 // branded "Brick Flow". Renaming it would make the browser open a brand-new,
@@ -290,38 +263,34 @@ export async function deleteCategory(name: string): Promise<void> {
   });
 }
 
-/** First-run-only migration: seed each table independently if empty. */
+/**
+ * First-run-only setup: seed only the *structural* rows (built-in categories +
+ * the settings singleton) so the app is usable the moment it opens. The ledger
+ * and BOQ start EMPTY — a new visitor gets a blank slate, and signing in syncs
+ * the real household data down from the cloud. (The demo seed JSON is still
+ * cleared any time via `clearAllData` in the Data tab's danger zone.)
+ */
 export async function seedIfEmpty(): Promise<void> {
-  await db.transaction(
-    "rw",
-    [db.entries, db.boqItems, db.settings, db.categories],
-    async () => {
-      if ((await db.entries.count()) === 0) {
-        await db.entries.bulkAdd(seedEntries);
-      }
-      if ((await db.boqItems.count()) === 0) {
-        await db.boqItems.bulkAdd(seedBoq);
-      }
-      // Fresh install: populate the built-in categories as editable rows.
-      if ((await db.categories.count()) === 0) {
-        await db.categories.bulkAdd(builtinCategoryRows());
-      }
-      if (!(await db.settings.get(SETTINGS_ID))) {
-        await db.settings.add({
-          id: SETTINGS_ID,
-          lastBackupDate: null,
-          budget: null,
-          homeAddress: "",
-          state: "",
-          city: "",
-        });
-      }
-    },
-  );
+  await db.transaction("rw", [db.settings, db.categories], async () => {
+    // Fresh install: populate the built-in categories as editable rows.
+    if ((await db.categories.count()) === 0) {
+      await db.categories.bulkAdd(builtinCategoryRows());
+    }
+    if (!(await db.settings.get(SETTINGS_ID))) {
+      await db.settings.add({
+        id: SETTINGS_ID,
+        lastBackupDate: null,
+        budget: null,
+        homeAddress: "",
+        state: "",
+        city: "",
+      });
+    }
+  });
 }
 
-/** Wipe everything and reload the bundled seed JSON. */
-export async function resetToSeed(): Promise<void> {
+/** Wipe all on-device data back to a blank slate (built-in categories only). */
+export async function clearAllData(): Promise<void> {
   await db.transaction(
     "rw",
     [
@@ -341,8 +310,7 @@ export async function resetToSeed(): Promise<void> {
       await db.categories.clear();
       await db.people.clear();
       await db.attachments.clear();
-      await db.entries.bulkAdd(seedEntries);
-      await db.boqItems.bulkAdd(seedBoq);
+      // Re-seed the built-in categories so the pickers aren't empty.
       await db.categories.bulkAdd(builtinCategoryRows());
     },
   );
@@ -362,5 +330,12 @@ export async function getSettings(): Promise<Settings> {
 }
 
 export async function updateSettings(patch: Partial<Settings>): Promise<void> {
-  await db.settings.update(SETTINGS_ID, patch);
+  // Upsert, not update: db.settings.update() is a silent no-op when the "app"
+  // row is missing (e.g. a DB that predates settings-seeding, or a restore that
+  // rebuilt the other tables). Read-merge-put inside one transaction so the
+  // budget/address always persist, whether or not the row already exists.
+  await db.transaction("rw", db.settings, async () => {
+    const current = await getSettings();
+    await db.settings.put({ ...current, ...patch });
+  });
 }

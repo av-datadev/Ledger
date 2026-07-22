@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { Session } from "@supabase/supabase-js";
 import { sendMagicLink, signOut } from "../hooks/useAuth";
 import {
   createHousehold,
@@ -6,33 +7,54 @@ import {
   type Household,
 } from "../lib/sync";
 
-/** Centered full-screen shell used by the auth/loading states. */
-function Shell({ children }: { children: React.ReactNode }) {
+/** Bordered surface card used for the account blocks on the Data tab. */
+function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh bg-paper text-ink flex flex-col items-center justify-center px-6">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-6">
-          <div className="text-lg font-semibold tracking-[0.18em]">BRICK FLOW</div>
-          <div className="text-[12px] text-ink-soft mt-1">
-            Shared construction ledger
-          </div>
-        </div>
-        {children}
-      </div>
+    <div className="bg-surface border border-rule rounded-md p-3 mb-4">
+      {children}
     </div>
   );
 }
 
-export function Splash() {
-  return (
-    <Shell>
-      <div className="text-center text-sm text-ink-soft">Loading…</div>
-    </Shell>
-  );
+/**
+ * The account block on the Data tab. The app itself runs with no sign-in — this
+ * is where a user opts into the shared cloud ledger. States, in order:
+ * checking → sign-in prompt → create/join a household → live household panel.
+ */
+export function AccountSection({
+  session,
+  authLoading,
+  household,
+  onHouseholdReady,
+}: {
+  session: Session | null;
+  authLoading: boolean;
+  household: Household | null | undefined;
+  onHouseholdReady: (h: Household) => void;
+}) {
+  if (!session) {
+    if (authLoading)
+      return (
+        <Card>
+          <div className="text-[13px] text-ink-soft">Checking sign-in…</div>
+        </Card>
+      );
+    return <SignInCard />;
+  }
+  if (household === undefined)
+    return (
+      <Card>
+        <div className="text-[13px] text-ink-soft">
+          Loading your shared ledger…
+        </div>
+      </Card>
+    );
+  if (household === null) return <HouseholdSetupCard onReady={onHouseholdReady} />;
+  return <AccountPanel household={household} email={session.user.email} />;
 }
 
-/** Passwordless email sign-in. */
-export function LoginScreen() {
+/** Passwordless email sign-in, inline on the Data tab. */
+function SignInCard() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -53,17 +75,18 @@ export function LoginScreen() {
     }
   };
 
-  if (status === "sent") {
-    return (
-      <Shell>
-        <div className="text-center space-y-3">
-          <div className="text-2xl">📧</div>
+  return (
+    <Card>
+      <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
+        Shared ledger
+      </div>
+      {status === "sent" ? (
+        <div className="space-y-1.5">
           <div className="text-sm">
             We sent a sign-in link to <b>{email.trim()}</b>.
           </div>
           <div className="text-[12px] text-ink-soft">
-            Open it on this device to sign in. You can close this once you've
-            tapped the link.
+            Open it on this device to sign in and sync your data.
           </div>
           <button
             className="text-[12px] text-ink-soft underline"
@@ -72,16 +95,14 @@ export function LoginScreen() {
             Use a different email
           </button>
         </div>
-      </Shell>
-    );
-  }
-
-  return (
-    <Shell>
-      <div className="space-y-3">
-        <div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[13px] text-ink-soft">
+            Your entries live on this device. Sign in to back them up and sync
+            across phones — no password, just a one-tap email link.
+          </p>
           <label className="field-label" htmlFor="login-email">
-            Sign in with your email
+            Email
           </label>
           <input
             id="login-email"
@@ -94,29 +115,22 @@ export function LoginScreen() {
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void submit()}
           />
+          {error && <div className="text-[13px] text-crimson">{error}</div>}
+          <button
+            className="btn btn-primary w-full !py-2.5"
+            disabled={status === "sending"}
+            onClick={() => void submit()}
+          >
+            {status === "sending" ? "Sending…" : "Send sign-in link"}
+          </button>
         </div>
-        <p className="text-[12px] text-ink-soft">
-          No password — we email you a one-tap sign-in link.
-        </p>
-        {error && <div className="text-[13px] text-crimson">{error}</div>}
-        <button
-          className="btn btn-primary w-full !py-3 !text-base"
-          disabled={status === "sending"}
-          onClick={() => void submit()}
-        >
-          {status === "sending" ? "Sending…" : "Send sign-in link"}
-        </button>
-      </div>
-    </Shell>
+      )}
+    </Card>
   );
 }
 
 /** First sign-in: create a household or join an existing one by code. */
-export function HouseholdSetup({
-  onReady,
-}: {
-  onReady: (h: Household) => void;
-}) {
+function HouseholdSetupCard({ onReady }: { onReady: (h: Household) => void }) {
   const [mode, setMode] = useState<"create" | "join">("create");
   const [name, setName] = useState("Our House");
   const [code, setCode] = useState("");
@@ -141,7 +155,10 @@ export function HouseholdSetup({
   };
 
   return (
-    <Shell>
+    <Card>
+      <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
+        Set up your shared ledger
+      </div>
       <div className="space-y-3">
         <div className="flex gap-1.5">
           {(["create", "join"] as const).map((m) => (
@@ -195,7 +212,7 @@ export function HouseholdSetup({
 
         {error && <div className="text-[13px] text-crimson">{error}</div>}
         <button
-          className="btn btn-primary w-full !py-3 !text-base"
+          className="btn btn-primary w-full !py-2.5"
           disabled={busy}
           onClick={() => void go()}
         >
@@ -208,12 +225,12 @@ export function HouseholdSetup({
           Sign out
         </button>
       </div>
-    </Shell>
+    </Card>
   );
 }
 
-/** Small account/household panel shown on the Data tab. */
-export function AccountPanel({
+/** Live household panel: name, invite code, sign-out. */
+function AccountPanel({
   household,
   email,
 }: {
@@ -233,7 +250,7 @@ export function AccountPanel({
   };
 
   return (
-    <div className="bg-surface border border-rule rounded-md p-3 mb-4">
+    <Card>
       <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
         Shared ledger
       </div>
@@ -262,6 +279,6 @@ export function AccountPanel({
       >
         Sign out
       </button>
-    </div>
+    </Card>
   );
 }

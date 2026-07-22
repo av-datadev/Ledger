@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
 import { Dashboard } from "./components/Dashboard";
 import { EntryForm } from "./components/EntryForm";
 import { Ledger, type LedgerPreset } from "./components/Ledger";
@@ -16,25 +17,29 @@ import {
   stopSync,
   type Household,
 } from "./lib/sync";
-import { Splash, LoginScreen, HouseholdSetup, AccountPanel } from "./components/Auth";
+import { AccountSection } from "./components/Auth";
 
 /**
- * Auth gate: unauthenticated → email sign-in; signed in but no household →
- * setup; otherwise resolve the household, start sync, and run the app.
+ * No auth gate: the app runs on the on-device ledger the moment it opens, so a
+ * fresh visitor sees a blank slate they can use offline. Signing in (from the
+ * Data tab) resolves the user's household and starts sync, which pulls their
+ * cloud data down onto this device.
  */
 export default function App() {
   const { session, loading } = useAuth();
-  // undefined = still resolving, null = signed in with no household yet.
+  // undefined = signed in, still resolving; null = no active household (signed
+  // out, or signed in without one yet).
   const [household, setHousehold] = useState<Household | null | undefined>(
-    undefined,
+    null,
   );
 
   useEffect(() => {
     if (!session) {
-      setHousehold(undefined);
+      setHousehold(null);
       return;
     }
     let alive = true;
+    setHousehold(undefined);
     getMyHousehold()
       .then((h) => alive && setHousehold(h))
       .catch(() => alive && setHousehold(null));
@@ -43,7 +48,8 @@ export default function App() {
     };
   }, [session]);
 
-  // Start/stop the sync engine as the active household changes.
+  // Start/stop the sync engine as the active household changes. With no
+  // household the app simply keeps running on local data.
   useEffect(() => {
     if (!household) return;
     void startSync(household.id).catch((e) => console.error("sync start", e));
@@ -52,19 +58,26 @@ export default function App() {
     };
   }, [household]);
 
-  if (loading) return <Splash />;
-  if (!session) return <LoginScreen />;
-  if (household === undefined) return <Splash />;
-  if (household === null) return <HouseholdSetup onReady={setHousehold} />;
-  return <LedgerApp household={household} email={session.user.email} />;
+  return (
+    <LedgerApp
+      session={session}
+      authLoading={loading}
+      household={household}
+      onHouseholdReady={setHousehold}
+    />
+  );
 }
 
 function LedgerApp({
+  session,
+  authLoading,
   household,
-  email,
+  onHouseholdReady,
 }: {
-  household: Household;
-  email: string | undefined;
+  session: Session | null;
+  authLoading: boolean;
+  household: Household | null | undefined;
+  onHouseholdReady: (h: Household) => void;
 }) {
   const [tab, setTab] = useState<Tab>("dashboard");
   const { theme, toggle } = useTheme();
@@ -178,7 +191,12 @@ function LedgerApp({
         {tab === "data" && (
           <>
             <div className="px-4 pt-4">
-              <AccountPanel household={household} email={email} />
+              <AccountSection
+                session={session}
+                authLoading={authLoading}
+                household={household}
+                onHouseholdReady={onHouseholdReady}
+              />
             </div>
             <SettingsScreen />
           </>

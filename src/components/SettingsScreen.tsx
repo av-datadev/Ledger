@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, resetToSeed } from "../db";
+import { db, clearAllData } from "../db";
 import { exportBackup, readBackupFile, applyBackup } from "../lib/backup";
 import { withBalances } from "../lib/stock";
 import { toCsv, downloadFile, timestampSlug } from "../lib/csv";
 import { currentHouseholdId } from "../lib/sync";
+import { useTextScale, TEXT_SCALES } from "../hooks/useTextScale";
 
 export function SettingsScreen() {
   const settings = useLiveQuery(() => db.settings.get("app"), []);
@@ -20,6 +21,7 @@ export function SettingsScreen() {
     null,
   );
   const importRef = useRef<HTMLInputElement>(null);
+  const { scale, setScale } = useTextScale();
   // While the shared cloud ledger is active, restoring/resetting local data
   // fights the live sync (and isn't needed — the cloud already holds it).
   const synced = currentHouseholdId() != null;
@@ -111,13 +113,13 @@ export function SettingsScreen() {
     if (synced) {
       setMsg({
         kind: "err",
-        text: "Resetting is disabled while you're on the shared cloud ledger — it would wipe the synced data. Sign out first.",
+        text: "Clearing is disabled while you're on the shared cloud ledger — it would wipe the synced data. Sign out first.",
       });
       return;
     }
     if (
       !window.confirm(
-        "Reset to seed data? This deletes ALL current entries and BOQ items.",
+        "Clear all data? This deletes ALL entries, BOQ items and stock on this device.",
       )
     )
       return;
@@ -127,12 +129,38 @@ export function SettingsScreen() {
       )
     )
       return;
-    await resetToSeed();
-    setMsg({ kind: "ok", text: "Database reset to seed data." });
+    await clearAllData();
+    setMsg({ kind: "ok", text: "All on-device data cleared." });
   };
 
   return (
     <div className="px-4 py-4 max-w-lg mx-auto space-y-5">
+      <section className="space-y-2">
+        <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+          Text size
+        </h2>
+        <div className="flex gap-2">
+          {TEXT_SCALES.map((s) => {
+            const active = s.value === scale;
+            return (
+              <button
+                key={s.value}
+                className={`btn flex-1 !py-2.5 ${
+                  active ? "!bg-ink !text-paper !border-ink" : ""
+                }`}
+                aria-pressed={active}
+                onClick={() => setScale(s.value)}
+              >
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[13px] text-ink-soft">
+          Scales the whole app so text is easier to read. Saved on this device.
+        </p>
+      </section>
+
       <section
         className={`border rounded-md px-3 py-3 ${
           backupStale ? "border-crimson bg-crimson/5" : "border-rule bg-surface"
@@ -229,7 +257,7 @@ export function SettingsScreen() {
           disabled={synced}
           onClick={() => void doReset()}
         >
-          Reset to seed data
+          Clear all data
         </button>
       </section>
 
