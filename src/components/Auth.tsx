@@ -4,8 +4,23 @@ import { sendMagicLink, signOut } from "../hooks/useAuth";
 import {
   createHousehold,
   joinHousehold,
+  stopSync,
   type Household,
 } from "../lib/sync";
+import { clearAllData } from "../db";
+
+/**
+ * Sign out AND wipe this ledger off the device — the shared/public-machine
+ * path. Sync is stopped FIRST so clearing the local rows doesn't fire the
+ * delete-hooks that would propagate the wipe up to the cloud; the data stays
+ * safe in Supabase and returns on the next sign-in. Only used where a synced
+ * household exists (see AccountPanel).
+ */
+async function signOutAndClear(): Promise<void> {
+  await stopSync();
+  await clearAllData();
+  await signOut();
+}
 
 /** Bordered surface card used for the account blocks on the Data tab. */
 function Card({ children }: { children: React.ReactNode }) {
@@ -275,9 +290,16 @@ function AccountPanel({
       </p>
       <button
         className="text-[13px] text-crimson mt-3"
-        onClick={() => void signOut()}
+        onClick={() => {
+          if (
+            window.confirm(
+              "Sign out and remove this ledger from this device? Your data stays safe in the cloud and comes back when you sign in again. (Recommended on a shared phone.)",
+            )
+          )
+            void signOutAndClear();
+        }}
       >
-        Sign out
+        Sign out &amp; clear this device
       </button>
     </Card>
   );

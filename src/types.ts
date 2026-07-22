@@ -58,7 +58,7 @@ export interface Settings {
 }
 
 /**
- * A category/person row (e.g. "Sharik", "Paint", "Electrician"). Built-in
+ * A category/person row (e.g. "Contractor", "Paint", "Electrician"). Built-in
  * categories are seeded as rows too, so every one can be renamed or removed.
  */
 export interface CustomCategory {
@@ -73,7 +73,7 @@ export interface CustomCategory {
  * Each line is a mini-contract in its own right: "lumpsum" carries a flat
  * `amount`, otherwise `amount` = `area` × `rate`. A person's contract total is
  * the sum of its lines — this is how the single-total contract is "built from
- * parts" for splits like Sharik's ₹750 (ground) / ₹725 (upper) floor rates.
+ * parts" for splits like a contractor's ₹750 (ground) / ₹725 (upper) floor rates.
  */
 export interface ContractLine {
   id: string;
@@ -85,7 +85,7 @@ export interface ContractLine {
 }
 
 /**
- * Contact & contract details for a person/contractor (e.g. "Sharik").
+ * Contact & contract details for a person/contractor (e.g. "Contractor").
  * Linked by `name` to a category/payee, so it works for both built-in
  * people and ones added on the People tab. Every field is optional to fill.
  */

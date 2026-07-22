@@ -248,7 +248,7 @@ export function EntryForm({
           <input
             id="f-event"
             className="input"
-            placeholder="e.g. Payment to Sharik"
+            placeholder="e.g. Payment to contractor"
             value={form.event}
             onChange={(e) => set("event", e.target.value)}
           />

@@ -1,8 +1,12 @@
 // Single source of truth for the domain enums.
 
+// Built-in categories are the blank-state defaults everyone starts with, so
+// they use generic role labels (Contractor, Architect …) — never real people's
+// names. A signed-in user's own category names (which may rename these to real
+// people) live in their private cloud data and sync down on login.
 export const CATEGORIES = [
-  "Sharik",
-  "Nitin",
+  "Contractor",
+  "Architect",
   "Wood",
   "Electrical",
   "Paint",
@@ -31,12 +35,15 @@ export const MODES = [
   "Other",
 ] as const;
 
+// Blank-state default payers — generic labels only, never real names. A
+// signed-in user's real payers ride along in their cloud data (the `paidBy`
+// field of synced entries) and appear after login.
 export const PAYERS = [
-  "Rajesh Verma",
-  "Sanjeev Verma",
-  "Sachin Verma",
-  "Chitra Verma",
-  "Apoorv Verma",
+  "Owner 1",
+  "Owner 2",
+  "Owner 3",
+  "Owner 4",
+  "Owner 5",
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
