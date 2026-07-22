@@ -28,13 +28,16 @@ export function Dashboard({
 
   const total = entries.reduce((s, e) => s + e.amount, 0);
 
-  const byCategory = categories.map((cat) => ({
-    cat,
-    count: entries.filter((e) => e.category === cat).length,
-    total: entries
-      .filter((e) => e.category === cat)
-      .reduce((s, e) => s + e.amount, 0),
-  }));
+  const byCategory = categories
+    .map((cat) => ({
+      cat,
+      count: entries.filter((e) => e.category === cat).length,
+      total: entries
+        .filter((e) => e.category === cat)
+        .reduce((s, e) => s + e.amount, 0),
+    }))
+    // Highest spend first (empty categories fall to the bottom in list order).
+    .sort((a, b) => b.total - a.total);
   const maxCat = Math.max(1, ...byCategory.map((c) => c.total));
 
   const byPayer = PAYERS.map((p) => ({
