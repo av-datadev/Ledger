@@ -19,7 +19,7 @@ export interface Entry {
  *   sqft — square feet: length × width × a rate-per-sqft
  *   sqm  — square metre: length × width × a rate-per-sqm
  */
-export type MeasureBasis = "qty" | "rft" | "sqft" | "sqm";
+export type MeasureBasis = "qty" | "rft" | "sqft" | "sqm" | "wt";
 
 export interface BoqItem {
   id: string;

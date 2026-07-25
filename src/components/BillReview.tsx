@@ -610,7 +610,11 @@ function LineItem({
           <div className={`grid ${area ? "grid-cols-3" : "grid-cols-2"} gap-1.5`}>
             <input
               className="input !py-1.5 !text-[13px] money"
-              placeholder={area ? "Length" : `Length (${BASIS[it.basis].unit})`}
+              placeholder={
+                area
+                  ? "Length"
+                  : `${BASIS[it.basis].measureLabel} (${BASIS[it.basis].unit})`
+              }
               inputMode="decimal"
               value={it.length}
               onChange={(e) => onField({ length: e.target.value })}

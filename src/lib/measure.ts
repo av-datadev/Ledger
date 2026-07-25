@@ -6,17 +6,20 @@ interface BasisMeta {
   label: string; // shown in the picker
   unit: string; // stored as the row's unit + shown after amounts
   area: boolean; // true = needs length × width; false = a single length/count
+  measureLabel: string; // label for the primary (non-qty) measurement input
 }
 
 /** Everything the UI needs to know about each measurement basis. */
 export const BASIS: Record<MeasureBasis, BasisMeta> = {
-  qty: { label: "Quantity", unit: "", area: false },
-  rft: { label: "Running ft", unit: "rft", area: false },
-  sqft: { label: "Sq ft", unit: "sqft", area: true },
-  sqm: { label: "Sq m", unit: "sqm", area: true },
+  qty: { label: "Quantity", unit: "", area: false, measureLabel: "Qty" },
+  rft: { label: "Running ft", unit: "rft", area: false, measureLabel: "Length" },
+  sqft: { label: "Sq ft", unit: "sqft", area: true, measureLabel: "Length" },
+  sqm: { label: "Sq m", unit: "sqm", area: true, measureLabel: "Length" },
+  // Steel/TMT and cement are sold by weight: weight (kg) × rate = amount.
+  wt: { label: "Weight", unit: "kg", area: false, measureLabel: "Weight" },
 };
 
-export const MEASURE_BASES: MeasureBasis[] = ["qty", "rft", "sqft", "sqm"];
+export const MEASURE_BASES: MeasureBasis[] = ["qty", "rft", "sqft", "sqm", "wt"];
 export const CONTRACT_BASES: ContractBasis[] = ["lumpsum", "rft", "sqft", "sqm"];
 
 export function basisLabel(basis: ContractBasis): string {
@@ -39,7 +42,9 @@ export function deriveMeasure(
   count: number | null,
 ): number | null {
   if (basis === "qty") return count;
-  if (basis === "rft") return length;
+  // rft and wt are single-value bases: the primary input (running feet /
+  // kilograms) IS the measure.
+  if (basis === "rft" || basis === "wt") return length;
   // Area bases need both sides.
   if (length == null || width == null) return null;
   return round3(length * width);
