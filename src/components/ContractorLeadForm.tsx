@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { submitContractorLead } from "../lib/contractors";
+import { FindContractor } from "./FindContractor";
 
 const SENT_KEY = "hl-contractor-lead-sent";
 
@@ -63,13 +64,19 @@ export function ContractorLeadForm({
   };
 
   return (
-    <div className="min-h-dvh bg-paper text-ink flex flex-col items-center justify-center px-6">
-      <div className="w-full max-w-sm space-y-5">
-        <div className="text-center">
-          <div className="text-lg font-semibold tracking-[0.18em]">
-            BRICK FLOW
-          </div>
-        </div>
+    <div className="min-h-dvh bg-paper text-ink">
+      <header className="bg-header text-onhead sticky top-0 z-30 px-4 h-12 flex items-center justify-between border-b border-black/30">
+        <h1 className="text-sm font-semibold tracking-[0.18em]">BRICK FLOW</h1>
+        <button
+          onClick={onSwitchToBuilder}
+          className="text-onhead/90 active:text-onhead text-[11px] border border-onhead/30 rounded px-2 py-1"
+          title="Switch back to the home builder side"
+        >
+          Home builder view
+        </button>
+      </header>
+
+      <div className="px-6 py-5 mx-auto max-w-sm space-y-5">
 
         {sent ? (
           <div className="text-center space-y-3">
@@ -139,12 +146,12 @@ export function ContractorLeadForm({
           </div>
         )}
 
-        <button
-          className="text-[12px] text-ink-soft underline w-full text-center"
-          onClick={onSwitchToBuilder}
-        >
-          Actually, I'm building or renovating a home →
-        </button>
+      </div>
+
+      {/* The live public directory — the same list homeowners browse, so a
+          newly added listing can be verified from this side too. */}
+      <div className="border-t border-rule">
+        <FindContractor />
       </div>
     </div>
   );

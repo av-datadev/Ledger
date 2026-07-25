@@ -81,6 +81,7 @@ export default function App() {
       authLoading={loading}
       household={household}
       onHouseholdReady={setHousehold}
+      onSwitchToContractor={() => choose("contractor")}
     />
   );
 }
@@ -90,11 +91,13 @@ function LedgerApp({
   authLoading,
   household,
   onHouseholdReady,
+  onSwitchToContractor,
 }: {
   session: Session | null;
   authLoading: boolean;
   household: Household | null | undefined;
   onHouseholdReady: (h: Household) => void;
+  onSwitchToContractor: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("dashboard");
   const { theme, toggle } = useTheme();
@@ -157,6 +160,16 @@ function LedgerApp({
         <h1 className="text-sm font-semibold tracking-[0.18em]">
           BRICK FLOW
         </h1>
+        <div className="flex items-center gap-1">
+        {/* One-tap hop to the contractor side and back, so a listing can be
+            added and checked without clearing app state. */}
+        <button
+          onClick={onSwitchToContractor}
+          className="text-onhead/90 active:text-onhead text-[11px] border border-onhead/30 rounded px-2 py-1"
+          title="Switch to the contractor side"
+        >
+          Contractor view
+        </button>
         <button
           onClick={toggle}
           className="text-onhead/90 active:text-onhead p-1 -mr-1"
@@ -183,6 +196,7 @@ function LedgerApp({
             </svg>
           )}
         </button>
+        </div>
       </header>
 
       <main className="flex-1 pb-20">

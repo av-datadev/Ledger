@@ -58,6 +58,18 @@ export function Boq() {
     try {
       const isPdf =
         file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      const isImage =
+        file.type.startsWith("image/") ||
+        /\.(jpe?g|png|heic|heif|webp|gif|bmp)$/i.test(file.name);
+      // The picker is deliberately unfiltered (see the file inputs below) so
+      // every OS offers both the camera/gallery and Files — so an unsupported
+      // pick is possible and needs a clear message rather than a parse crash.
+      if (!isPdf && !isImage) {
+        setError(
+          `"${file.name}" isn't a photo or a PDF. Pick a bill photo or a PDF, or enter the bill manually.`,
+        );
+        return;
+      }
       let text: string;
       if (isPdf) {
         text = await pdfToText(file, setBusy);
@@ -161,14 +173,14 @@ export function Boq() {
           disabled={!!busy}
           onClick={() => cameraRef.current?.click()}
         >
-          📷 Scan bill
+          📷 Take photo
         </button>
         <button
           className="btn"
           disabled={!!busy}
           onClick={() => uploadRef.current?.click()}
         >
-          Upload file
+          Photo / PDF
         </button>
         <button
           className="btn"
@@ -184,10 +196,12 @@ export function Boq() {
         </button>
       </div>
       <div className="text-[11px] text-ink-soft mb-2">
-        Photos and PDF bills both work. Scanning happens on this phone — free,
+        <b>Take photo</b> opens the camera. <b>Photo / PDF</b> lets you pick an
+        existing photo or a PDF bill. Scanning happens on this phone — free,
         offline, nothing uploaded. Always check the rows against the bill
         before saving.
       </div>
+      {/* Straight to the camera — `capture` makes the OS skip the picker. */}
       <input
         ref={cameraRef}
         type="file"
@@ -200,10 +214,14 @@ export function Boq() {
           e.target.value = "";
         }}
       />
+      {/* Deliberately NO `accept`: a mixed image+PDF accept list makes some
+          phone pickers hide one of the two (photos on iOS, PDFs elsewhere),
+          which is exactly the "it takes a PDF but not a photo" problem. Left
+          unfiltered every OS offers gallery, camera and Files together;
+          onScanFile validates the pick and explains any unsupported file. */}
       <input
         ref={uploadRef}
         type="file"
-        accept="image/*,application/pdf,.pdf"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
