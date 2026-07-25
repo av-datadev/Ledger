@@ -273,10 +273,34 @@ export function SettingsScreen() {
         </div>
       )}
 
-      <div className="text-[12px] text-ink-soft pb-4">
-        {counts
-          ? `${counts.entries} entries · ${counts.boq} BOQ items · ${counts.stock} stock items on device`
-          : ""}
+      <div className="text-[12px] text-ink-soft pb-4 space-y-1">
+        <div>
+          {counts
+            ? `${counts.entries} entries · ${counts.boq} BOQ items · ${counts.stock} stock items on device`
+            : ""}
+        </div>
+        <div className="flex items-center gap-2">
+          <span>App version {__BUILD_ID__}</span>
+          <button
+            className="underline"
+            onClick={() => {
+              // Force the newest build onto this device: drop the service
+              // worker + its caches, then hard-reload.
+              void (async () => {
+                try {
+                  for (const r of await navigator.serviceWorker.getRegistrations())
+                    await r.unregister();
+                  for (const k of await caches.keys()) await caches.delete(k);
+                } catch {
+                  /* not supported / blocked — the reload below still helps */
+                }
+                location.reload();
+              })();
+            }}
+          >
+            check for update
+          </button>
+        </div>
       </div>
     </div>
   );
