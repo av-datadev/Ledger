@@ -142,7 +142,12 @@ export function BillReview({
   // arithmetic works. Rounded to the rupee like the bill's "Rounding Off" row.
   const gstPct = toNum(draft.billGstPct) ?? 0;
   const otherCharges = toNum(draft.otherCharges) ?? 0;
-  const gstAmount = Math.round(linesSum * gstPct) / 100;
+  // Intrastate bills levy the slab as two equal halves — CGST + SGST — and
+  // print them as separate rows, so show it the same way. Each half is rounded
+  // to paise on its own, exactly as the bill computes them.
+  const halfPct = gstPct / 2;
+  const halfGst = Math.round(linesSum * halfPct) / 100;
+  const gstAmount = Math.round(halfGst * 2 * 100) / 100;
   const computedTotal = Math.round(linesSum + gstAmount + otherCharges);
 
   const total = toNum(draft.invoiceTotal) ?? 0;
@@ -371,8 +376,12 @@ export function BillReview({
             <span>{inr(linesSum)}</span>
           </div>
           <div className="flex justify-between text-ink-soft">
-            <span>GST @ {gstPct}%</span>
-            <span>{inr(gstAmount)}</span>
+            <span>CGST @ {halfPct}%</span>
+            <span>{inr(halfGst)}</span>
+          </div>
+          <div className="flex justify-between text-ink-soft">
+            <span>SGST @ {halfPct}%</span>
+            <span>{inr(halfGst)}</span>
           </div>
           {otherCharges > 0 && (
             <div className="flex justify-between text-ink-soft">
@@ -416,12 +425,14 @@ export function BillReview({
           <label className="flex items-start gap-2 text-[13px]">
             <input
               type="checkbox"
-              className="mt-0.5"
+              className="mt-0.5 shrink-0"
               checked={ackMismatch}
               onChange={(e) => setAckMismatch(e.target.checked)}
             />
-            I understand the rows add up to more than the printed total — save
-            anyway.
+            <span>
+              I understand the rows add up to more than the printed total — save
+              anyway.
+            </span>
           </label>
         )}
 
@@ -429,12 +440,17 @@ export function BillReview({
           <label className="flex items-start gap-2 text-[13px]">
             <input
               type="checkbox"
-              className="mt-0.5 accent-[#2F6D4F]"
+              className="mt-0.5 shrink-0 accent-[#2F6D4F]"
               checked={addToStock}
               onChange={(e) => setAddToStock(e.target.checked)}
             />
-            Add the material rows (with quantities) to <b>Stock</b> so you can
-            track how much is given to labour and what's left.
+            {/* One span: as direct children of a flex label, the text nodes
+                and <b> would each become separate flex items and break onto
+                their own columns. */}
+            <span>
+              Add the material rows (with quantities) to <b>Stock</b> so you can
+              track how much is given to labour and what's left.
+            </span>
           </label>
         )}
 
@@ -442,12 +458,14 @@ export function BillReview({
           <label className="flex items-start gap-2 text-[13px]">
             <input
               type="checkbox"
-              className="mt-0.5"
+              className="mt-0.5 shrink-0"
               checked={alsoLedger}
               onChange={(e) => setAlsoLedger(e.target.checked)}
             />
-            Also create a ledger entry for this bill's total (leave unchecked if
-            the payment is already in the ledger).
+            <span>
+              Also create a ledger entry for this bill's total (leave unchecked
+              if the payment is already in the ledger).
+            </span>
           </label>
         )}
 

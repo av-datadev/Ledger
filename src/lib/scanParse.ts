@@ -81,6 +81,23 @@ const MONTHS: Record<string, number> = {
   jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
 };
 
+/**
+ * Reduce a scanned row's description to just the product name. A bill's item
+ * column carries the serial number, the HSN/SAC code and the GST rate around
+ * the name ("1 Pvc Conduit Pipe-25mm-Heavy-Norpack 39172310 18 %"), none of
+ * which belong in a stock/BOQ row.
+ */
+function cleanItemName(desc: string): string {
+  return desc
+    .replace(/^\s*\d{1,3}\s*[.)\-:]?\s+/, "") // leading serial ("1 ", "2. ")
+    .replace(/\b\d{6,8}\b/g, " ") // HSN / SAC code
+    .replace(/\b\d{1,2}(?:\.\d+)?\s*%/g, " ") // "18 %"
+    .replace(/\s+\d{1,2}(?:\.\d+)?\s*$/, "") // bare trailing rate ("… 18")
+    .replace(/\s{2,}/g, " ")
+    .replace(/[|:;,\-]+$/, "")
+    .trim();
+}
+
 const num = (s: string): number => parseFloat(s.replace(/,/g, ""));
 // Bare 6-8 digit runs are HSN codes; digits with comma separators are amounts.
 const isHsnLike = (s: string): boolean => !s.includes(",") && /^\d{6,8}$/.test(s);
@@ -229,6 +246,9 @@ export function parseScannedBill(text: string): ScannedBill {
     }
     const desc = tokens.slice(0, descEnd).join(" ").replace(/[|:;]+$/, "").trim();
     if (desc.replace(/[^A-Za-z]/g, "").length < 3) continue;
+    // Keyword tests below run on the raw text; only the stored name is cleaned.
+    const name = cleanItemName(desc);
+    if (name.replace(/[^A-Za-z]/g, "").length < 3) continue;
 
     // Tax / rounding rows are never goods: they'd double-count against the
     // total and put non-material rows into Stock. Dropped — the GST is
@@ -245,7 +265,7 @@ export function parseScannedBill(text: string): ScannedBill {
       // desc [qty] [rate] ... [amount] — take first as qty, last as amount,
       // second-to-last as rate (middle columns like disc% get dropped).
       bill.items.push({
-        item: desc,
+        item: name,
         qty: String(numsAtEnd[0]),
         unit,
         rate: String(numsAtEnd[numsAtEnd.length - 2]),
@@ -255,7 +275,7 @@ export function parseScannedBill(text: string): ScannedBill {
       const [a, b] = numsAtEnd;
       // qty × implied rate = amount, or rate + amount. Assume qty if small.
       bill.items.push({
-        item: desc,
+        item: name,
         qty: a <= 10000 && a < b ? String(a) : "",
         unit,
         rate: "",
@@ -271,7 +291,7 @@ export function parseScannedBill(text: string): ScannedBill {
       const moneyLike = raw.includes(",") || /\.\d{2}$/.test(raw);
       if (moneyLike && numsAtEnd[0] > 0) {
         bill.items.push({
-          item: desc,
+          item: name,
           qty: "",
           unit,
           rate: "",
