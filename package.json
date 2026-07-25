@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p tsconfig.json && vite build",
+    "build": "npm run vendor:tesseract && tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
     "icons": "node scripts/generate-icons.mjs",
+    "vendor:tesseract": "node scripts/vendor-tesseract.mjs",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
