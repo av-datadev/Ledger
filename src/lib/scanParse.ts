@@ -27,7 +27,18 @@ const UNITS = new Set([
   "pcs", "pc", "nos", "no", "kg", "g", "gm", "ltr", "lt", "l", "ml",
   "mtr", "m", "ft", "sqft", "sq.ft", "bag", "bags", "box", "pkt",
   "set", "pair", "roll", "bndl", "len", "tin", "drum",
+  // Volume/area/weight units common on Indian construction bills.
+  "cft", "cum", "cbm", "brass", "rft", "rmt", "sqm", "quintal", "qtl",
+  "ton", "tonne", "mt", "dozen", "doz", "unit", "nos.",
 ]);
+
+// Units the reader reliably garbles on a photographed bill — the letters sit in
+// a narrow column, so "pcs" comes back "pos"/"pes" and "Mtr" comes back "Mr".
+// Mapped back so Stock receives a real quantity unit.
+const UNIT_FIX: Record<string, string> = {
+  pos: "pcs", pes: "pcs", pces: "pcs", nes: "nos", nps: "nos",
+  mr: "mtr", mtrs: "mtr", mir: "mtr", mfr: "mtr", kgs: "kg",
+};
 
 // Pure tax / adjustment rows — never goods, and never part of the taxable
 // value. Dropped entirely; the GST is recomputed from the goods subtotal.
@@ -36,8 +47,9 @@ const UNITS = new Set([
 const TAX_ROW = /\b([sciuo])?gst\b|\bround(ing|ed)?(\s*off)?\b|\bdiscount\b|\btax\s*(amount|value)?\b/i;
 
 // Charges that aren't goods but ARE part of what was paid. Captured separately
-// so the total reconstructs as goods + GST(goods) + these.
-const OTHER_CHARGE = /\b(freight|packing|cartage|transport|loading|unloading|delivery)\b/i;
+// so the total reconstructs as goods + GST(goods) + these. "fr[ae]ight" also
+// catches the common OCR misread "Fraight".
+const OTHER_CHARGE = /\b(fr[ae]ight|packing|cartage|transport|loading|unloading|delivery)\b/i;
 
 // Standard Indian GST slabs, plus the half-rates that appear when a bill splits
 // the tax into CGST + SGST (9% + 9% = 18%).
@@ -83,6 +95,13 @@ const JUNK_LINE =
 const SUMMARY_LINE =
   /\b(taxable\s*value|invoice\s*value|total\s*(invoice|amount|amt|value|qty|payable|tax)?|sub\s*total|grand\s*total|net\s*(amt|amount|payable)|amount\s*(charge|payable|before)|before\s*tax|in\s*words|balance|carried|previous|outstanding)\b/i;
 
+// The goods table always ends above the "amount in words" / grand-total block.
+// Everything below it — the CGST/SGST tax summary, bank details, signatures —
+// repeats the bill's numbers and, when OCR mangles its headers, leaks in as
+// bogus line items. Stop scanning rows once any of these markers appears.
+const END_OF_ITEMS =
+  /\bamount\s*chargeable\b|\bin\s*words\b|\be\.?\s*&\s*o\.?\s*e\b|computer\s*generated|company'?s\s*(pan|bank)|authori[sz]ed\s*signat/i;
+
 const MONTHS: Record<string, number> = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
   jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
@@ -96,6 +115,7 @@ const MONTHS: Record<string, number> = {
  */
 function cleanItemName(desc: string): string {
   return desc
+    .replace(/^[^A-Za-z0-9]+/, "") // leading stray punctuation ('. ', '" ')
     .replace(/^\s*\d{1,3}\s*[.)\-:]?\s+/, "") // leading serial ("1 ", "2. ")
     .replace(/\b\d{6,8}\b/g, " ") // HSN / SAC code
     .replace(/\b\d{1,2}(?:\.\d+)?\s*%/g, " ") // "18 %"
@@ -108,6 +128,23 @@ function cleanItemName(desc: string): string {
 const num = (s: string): number => parseFloat(s.replace(/,/g, ""));
 // Bare 6-8 digit runs are HSN codes; digits with comma separators are amounts.
 const isHsnLike = (s: string): boolean => !s.includes(",") && /^\d{6,8}$/.test(s);
+
+// A trailing table token reduced to its numeric string, tolerating the
+// punctuation OCR sprays into column gaps ("21.47|" -> "21.47", "14.69)" ->
+// "14.69"). Percent columns ("18%", "9%|") return null so a GST/discount rate
+// is never mistaken for a quantity. Only punctuation may surround the digits —
+// letters must not, or a hyphenated product name ("Pipe-25mm-Heavy-Norpack")
+// reads as the number -25 and swallows the rest of the description.
+const asNumber = (raw: string): string | null => {
+  if (raw.includes("%")) return null;
+  const m = raw
+    .replace(/₹/g, "")
+    .match(/^[^\dA-Za-z-]*(-?\d[\d,]*(?:\.\d+)?)[^\dA-Za-z]*$/);
+  return m ? m[1] : null;
+};
+// Pure table punctuation — column rules and stray marks OCR leaves between
+// numbers ("|", ":", "]", ")"). Never part of a product name.
+const isPunct = (raw: string): boolean => /^[|:;)(\][.,'’"`*_-]+$/.test(raw);
 
 function toIsoDate(d: string, m: string, y: string): string | null {
   const day = parseInt(d, 10);
@@ -156,15 +193,21 @@ export function parseScannedBill(text: string): ScannedBill {
   };
   let otherTotal = 0;
 
-  // Vendor: first "wordy" line near the top that isn't a header keyword.
+  // Vendor: first "wordy" line near the top that isn't a header keyword. OCR
+  // frequently glues the vendor name to the adjacent column header on the same
+  // scan row ("Gopal Jee Electricals Invoice No. Dated"), so keep only the part
+  // before the first header word and judge that.
+  const HEADER_CUT =
+    /\b(invoice|dated?|gstin|uin|delivery|reference|mode|buyer|dispatch|destination|terms|state\s*name)\b/i;
   for (const l of lines.slice(0, 6)) {
-    const letters = l.replace(/[^A-Za-z ]/g, "");
+    const head = l.split(HEADER_CUT)[0].trim();
+    const letters = head.replace(/[^A-Za-z ]/g, "");
     if (
-      letters.length >= 5 &&
-      letters.length / l.length > 0.6 &&
-      !/tax invoice|invoice|cash memo|estimate|bill of|original|duplicate|authori[sz]ed|dealer|quotation|proforma|\boffer\b/i.test(l)
+      letters.replace(/ /g, "").length >= 5 &&
+      letters.length / head.length > 0.6 &&
+      !/tax invoice|invoice|cash memo|estimate|bill of|original|duplicate|authori[sz]ed|dealer|quotation|proforma|\boffer\b/i.test(head)
     ) {
-      bill.vendor = l;
+      bill.vendor = head;
       break;
     }
   }
@@ -177,9 +220,13 @@ export function parseScannedBill(text: string): ScannedBill {
       // word "Invoice" on a bare "Tax Invoice" heading and captures the
       // leftover "oice" as the bill number.
       const m = l.match(
-        /(?:invoice|inv|bill|memo|ref)\b\s*(?:no|num|number|#)?\s*[:.\-]?\s*([A-Za-z0-9][A-Za-z0-9\/-]{0,14})/i,
+        /\b(?:invoice|inv|bill|memo|ref)\b\s*(?:no|num|number|#)?\s*[:.\-]?\s*([A-Za-z0-9][A-Za-z0-9\/-]{0,14})/i,
       );
-      if (m && !/^(no|date|of|for|the)$/i.test(m[1])) bill.invoiceNo = m[1];
+      // Require a digit: a real invoice number has one, and it rejects the
+      // adjacent column header OCR often captures instead ("No", "Dated") when
+      // the printed number sits in the cell below the label, not inline.
+      if (m && /\d/.test(m[1]) && !/^(no|date|of|for|the)$/i.test(m[1]))
+        bill.invoiceNo = m[1];
     }
     if (!bill.date) {
       const m = l.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
@@ -202,50 +249,100 @@ export function parseScannedBill(text: string): ScannedBill {
     }
   }
 
-  // Grand total: the largest amount on an explicit total line (multi-section
-  // bills print sub-totals before the grand total; the grand total is the
-  // biggest). Fall back to the largest number anywhere on the bill.
-  let fallbackMax = 0;
-  let labeledMax = 0;
-  for (const l of lines) {
-    const nums = l.match(/\d[\d,]*(?:\.\d+)?/g) ?? [];
-    for (const s of nums) {
-      const v = num(s);
-      if (!isHsnLike(s) && v > fallbackMax && v < 10_000_000) fallbackMax = v;
-    }
-    if (/(grand\s*total|net\s*(amt|amount|payable)|total\s*(amt|amount|payable)?\b)/i.test(l) && nums.length) {
-      const s = nums[nums.length - 1];
-      const v = num(s);
-      if (v > labeledMax && !isHsnLike(s) && v < 10_000_000) labeledMax = v;
+  // Tally-style invoices print "Invoice No." as a boxed column header with the
+  // number in the cell BELOW it, so the label and its value land on different
+  // OCR lines and the inline match above finds nothing. Fall back to the first
+  // standalone number on the label line or the two lines under it. Bare 19xx /
+  // 20xx are skipped — on those rows they're the year of the adjacent date.
+  if (!bill.invoiceNo) {
+    const at = lines.findIndex((l) => /\binv(oice)?\b\s*(no|num|number|#)/i.test(l));
+    if (at >= 0) {
+      outer: for (const l of lines.slice(at, at + 3)) {
+        for (const t of l.split(" ")) {
+          if (/^\d{2,6}$/.test(t) && !/^(19|20)\d{2}$/.test(t)) {
+            bill.invoiceNo = t;
+            break outer;
+          }
+        }
+      }
     }
   }
-  if (labeledMax > 0) bill.invoiceTotal = String(labeledMax);
-  else if (fallbackMax > 0) bill.invoiceTotal = String(fallbackMax);
+
+  // Grand total: the largest amount on the bill. Account and phone numbers are
+  // excluded by the HSN and 10-million guards; a "Total"-labeled row is NOT
+  // trusted on its own, because tax-summary blocks label their own CGST/SGST
+  // subtotals "Total" and those are smaller than the real grand total.
+  // A printed amount is its own cell, so it must stand alone as a token (bar a
+  // currency prefix or table punctuation). Digits welded to letters belong to
+  // an email, a GSTIN or a phone number — "akhil45333@gmail.com" otherwise
+  // reads as ₹45,333 and beats the real total.
+  const asAmount = (raw: string): number | null => {
+    const t = raw.replace(/₹/g, "").replace(/^(?:rs|inr)\.?/i, "");
+    const m = t.match(/^[^\dA-Za-z-]*(\d[\d,]*(?:\.\d+)?)[^\dA-Za-z]*$/);
+    if (!m || isHsnLike(m[1])) return null;
+    const v = num(m[1]);
+    return v > 0 && v < 10_000_000 ? v : null;
+  };
+  const largestAmount = (ls: string[]): number => {
+    let max = 0;
+    for (const l of ls) {
+      for (const t of l.split(" ")) {
+        const v = asAmount(t);
+        if (v != null && v > max) max = v;
+      }
+    }
+    return max;
+  };
+  // Scan only the goods table and the grand-total line. The CGST/SGST summary
+  // and bank block below them repeat the bill's figures, and a decimal point
+  // dropped there ("579.65" -> "57966") would otherwise beat the true total.
+  const endAt = lines.findIndex((l) => END_OF_ITEMS.test(l));
+  const best =
+    (endAt >= 0 ? largestAmount(lines.slice(0, endAt + 1)) : 0) ||
+    largestAmount(lines);
+  if (best > 0) bill.invoiceTotal = String(best);
 
   // Line items: lines with leading text and trailing numbers.
   for (const l of lines) {
+    if (END_OF_ITEMS.test(l)) break;
     if (JUNK_LINE.test(l)) continue;
     if (SUMMARY_LINE.test(l)) continue;
 
-    // Tokenize; collect trailing numeric tokens (ignoring HSN-looking codes
-    // and percent marks) and the leading description.
+    // Tokenize; collect the trailing number columns (qty / rate / amount),
+    // reading right-to-left and stepping over the noise OCR wedges between them
+    // — HSN codes, the "GST %" and per-unit columns, stray table rules — until
+    // the product description begins.
     const tokens = l.split(" ");
     const numsAtEnd: number[] = [];
     let unit = "";
     let descEnd = tokens.length;
     for (let i = tokens.length - 1; i >= 0; i--) {
-      const raw = tokens[i].replace(/[₹%]/g, "");
-      const clean = raw.replace(/,/g, "");
-      // Allow negative amounts (Rounding / Discount rows on GST bills).
-      if (/^-?\d+(?:\.\d+)?$/.test(clean)) {
-        if (!isHsnLike(raw)) numsAtEnd.unshift(num(raw));
+      const raw = tokens[i];
+      const numStr = asNumber(raw);
+      if (numStr != null) {
+        // Allow negative amounts (Rounding / Discount rows on GST bills).
+        if (!isHsnLike(numStr)) numsAtEnd.unshift(num(numStr));
         descEnd = i;
-      } else if (UNITS.has(raw.toLowerCase().replace(/\.$/, ""))) {
-        unit = raw.toLowerCase().replace(/\.$/, "");
-        descEnd = i;
-      } else {
-        break;
+        continue;
       }
+      // GST/discount percent column, or a stray column rule — never the name.
+      if (raw.includes("%") || isPunct(raw)) {
+        descEnd = i;
+        continue;
+      }
+      const asUnit = raw.toLowerCase().replace(/^[|:(\[]+|[.|,)\]]+$/g, "");
+      if (UNITS.has(asUnit) || UNIT_FIX[asUnit]) {
+        // Keep the left-most unit seen: reading right-to-left, the last one
+        // assigned is the qty column's own unit ("150.00 Mtr"), not the
+        // per-rate column's repeat ("21.47 Mtr").
+        unit = UNIT_FIX[asUnit] ?? asUnit;
+        descEnd = i;
+        continue;
+      }
+      // Anything else starts the description. Garbled per-unit columns ("Mtr"
+      // -> "Mr", "pcs" -> "pos") are caught by UNIT_FIX above rather than by a
+      // generic short-token rule, which would eat real short names like "PVC".
+      break;
     }
     const desc = tokens.slice(0, descEnd).join(" ").replace(/[|:;]+$/, "").trim();
     if (desc.replace(/[^A-Za-z]/g, "").length < 3) continue;
