@@ -29,6 +29,8 @@ export interface DraftBill {
   date: string;
   category: string;
   invoiceTotal: string;
+  billGstPct: string; // GST slab for the whole bill (18 = 9% CGST + 9% SGST)
+  otherCharges: string; // freight/packing — paid, but not taxable goods
   items: DraftItem[];
 }
 
@@ -53,6 +55,8 @@ export const emptyDraft = (): DraftBill => ({
   date: todayStr(),
   category: "Misc",
   invoiceTotal: "",
+  billGstPct: "18",
+  otherCharges: "",
   items: [blankItem()],
 });
 
@@ -132,16 +136,28 @@ export function BillReview({
     Math.round(
       draft.items.reduce((s, it) => s + (toNum(it.amount) ?? 0), 0) * 100,
     ) / 100;
+  // Goods → GST → total, rebuilt from the rows rather than trusting the reader
+  // to have got the printed grand total right. GST applies to the goods only;
+  // freight and other charges are added after tax, which is how the bill's own
+  // arithmetic works. Rounded to the rupee like the bill's "Rounding Off" row.
+  const gstPct = toNum(draft.billGstPct) ?? 0;
+  const otherCharges = toNum(draft.otherCharges) ?? 0;
+  const gstAmount = Math.round(linesSum * gstPct) / 100;
+  const computedTotal = Math.round(linesSum + gstAmount + otherCharges);
+
   const total = toNum(draft.invoiceTotal) ?? 0;
   const diff = Math.round((linesSum - total) * 100) / 100;
   const matches = Math.abs(diff) < 0.005 && total > 0;
+  // How far the printed/entered total is from the arithmetic. A rupee of slack
+  // absorbs the bill's own rounding row.
+  const computedAgrees =
+    total > 0 && Math.abs(Math.round((computedTotal - total) * 100) / 100) <= 1;
   // Line items are goods only — GST, freight and rounding are deliberately not
   // itemised (see scanParse), so on a tax invoice the rows legitimately sit
   // BELOW the printed total and that gap is the tax. Only the opposite case
   // means something is actually wrong: rows adding up to more than the bill
   // total implies a duplicated or misread row, so that's what blocks saving.
   const overCounted = total > 0 && diff > 0.005;
-  const taxGap = total > 0 && diff < -0.005 ? Math.abs(diff) : 0;
 
   const save = async () => {
     const errs: string[] = [];
@@ -318,20 +334,83 @@ export function BillReview({
           </div>
         </div>
 
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="field-label" htmlFor="b-gst">GST %</label>
+            <select
+              id="b-gst"
+              className="input"
+              value={draft.billGstPct}
+              onChange={(e) => set({ billGstPct: e.target.value })}
+            >
+              {["0", "5", "12", "18", "28"].map((p) => (
+                <option key={p} value={p}>{p}%</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="field-label" htmlFor="b-other">
+              Freight / other (₹)
+            </label>
+            <input
+              id="b-other"
+              type="number"
+              inputMode="decimal"
+              className="input"
+              placeholder="0"
+              value={draft.otherCharges}
+              onChange={(e) => set({ otherCharges: e.target.value })}
+            />
+          </div>
+        </div>
+
+        {/* Goods → GST → total, computed from the rows. */}
+        <div className="px-3 py-2 rounded-md border border-rule bg-surface text-[13px] money space-y-0.5">
+          <div className="flex justify-between">
+            <span>Items ({draft.items.length})</span>
+            <span>{inr(linesSum)}</span>
+          </div>
+          <div className="flex justify-between text-ink-soft">
+            <span>GST @ {gstPct}%</span>
+            <span>{inr(gstAmount)}</span>
+          </div>
+          {otherCharges > 0 && (
+            <div className="flex justify-between text-ink-soft">
+              <span>Freight / other</span>
+              <span>{inr(otherCharges)}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-semibold border-t border-rule pt-1 mt-1">
+            <span>Calculated total</span>
+            <span>{inr(computedTotal)}</span>
+          </div>
+        </div>
+
         <div
           className={`px-3 py-2 rounded-md border text-[13px] money ${
             overCounted
               ? "border-crimson text-crimson bg-crimson/5"
-              : matches
+              : computedAgrees || matches
                 ? "border-moss text-moss bg-moss/5"
                 : "border-rule text-ink-soft bg-surface"
           }`}
         >
-          Items: {inr(linesSum)} · Invoice total: {inr(total)}
-          {overCounted && ` — items exceed the total by ${inr(diff)}`}
-          {matches && " ✓ match"}
-          {taxGap > 0 && ` · ${inr(taxGap)} tax / freight (not itemised)`}
+          Invoice total on bill: {inr(total)}
+          {overCounted && ` — items alone exceed it by ${inr(diff)}`}
+          {!overCounted && computedAgrees && " ✓ matches the calculation"}
+          {!overCounted && !computedAgrees && total > 0 &&
+            ` — calculation says ${inr(computedTotal)}`}
+          {!overCounted && total <= 0 && " — not read; use the calculated total"}
         </div>
+
+        {!overCounted && !computedAgrees && computedTotal > 0 && (
+          <button
+            className="btn w-full !py-2"
+            onClick={() => set({ invoiceTotal: String(computedTotal) })}
+          >
+            Use calculated total ({inr(computedTotal)})
+          </button>
+        )}
 
         {overCounted && (
           <label className="flex items-start gap-2 text-[13px]">

@@ -18,6 +18,8 @@ export interface ScannedBill {
   date: string; // YYYY-MM-DD or ""
   category: Category | "";
   invoiceTotal: string;
+  gstPct: string; // detected GST rate, e.g. "18"
+  otherCharges: string; // freight/packing/cartage, taxed separately from goods
   items: ScannedItem[];
 }
 
@@ -27,7 +29,49 @@ const UNITS = new Set([
   "set", "pair", "roll", "bndl", "len", "tin", "drum",
 ]);
 
-const TAX_ROW = /\b(sgst|cgst|igst|gst|freight|packing|round(ing|ed)?( off)?|discount|cartage|labour chg)\b/i;
+// Pure tax / adjustment rows — never goods, and never part of the taxable
+// value. Dropped entirely; the GST is recomputed from the goods subtotal.
+// The optional single-letter prefix covers SGST/CGST/IGST/UGST/OGST (bills use
+// all of them, and OCR flips C<->O), plus plain GST.
+const TAX_ROW = /\b([sciuo])?gst\b|\bround(ing|ed)?(\s*off)?\b|\bdiscount\b|\btax\s*(amount|value)?\b/i;
+
+// Charges that aren't goods but ARE part of what was paid. Captured separately
+// so the total reconstructs as goods + GST(goods) + these.
+const OTHER_CHARGE = /\b(freight|packing|cartage|transport|loading|unloading|delivery)\b/i;
+
+// Standard Indian GST slabs, plus the half-rates that appear when a bill splits
+// the tax into CGST + SGST (9% + 9% = 18%).
+const GST_SLABS = new Set([5, 12, 18, 28]);
+const HALF_SLABS: Record<string, number> = {
+  "2.5": 5, "6": 12, "9": 18, "14": 28,
+};
+
+/**
+ * Best-effort GST rate for the bill. Bills print it either as a per-item "GST
+ * Rate" column (18 %) or as a CGST/SGST pair in the tax summary (9% + 9%), so
+ * half-rates are doubled back to the slab. The most frequently seen slab wins;
+ * ties go to the higher rate.
+ */
+function detectGstPct(lines: string[]): string {
+  const counts = new Map<number, number>();
+  for (const l of lines) {
+    for (const m of l.matchAll(/(\d{1,2}(?:\.\d+)?)\s*%/g)) {
+      const raw = m[1].replace(/\.0+$/, "");
+      const v = parseFloat(raw);
+      const slab = GST_SLABS.has(v) ? v : HALF_SLABS[raw];
+      if (slab) counts.set(slab, (counts.get(slab) ?? 0) + 1);
+    }
+  }
+  let best = 0;
+  let bestN = 0;
+  for (const [slab, n] of counts) {
+    if (n > bestN || (n === bestN && slab > best)) {
+      best = slab;
+      bestN = n;
+    }
+  }
+  return best ? String(best) : "";
+}
 
 const JUNK_LINE =
   /\b(gstin|gst no|pan|phone|ph\.|mob|mobile|email|e&oe|thank|terms|condition|state code|hsn code|authori[sz]ed|signat|declar|bank|ifsc|a\/c)\b/i;
@@ -80,8 +124,13 @@ export function parseScannedBill(text: string): ScannedBill {
     date: "",
     category: guessCategory(text),
     invoiceTotal: "",
+    // Default to 18% when the bill doesn't state a rate — the most common slab
+    // for construction material.
+    gstPct: detectGstPct(lines) || "18",
+    otherCharges: "",
     items: [],
   };
+  let otherTotal = 0;
 
   // Vendor: first "wordy" line near the top that isn't a header keyword.
   for (const l of lines.slice(0, 6)) {
@@ -158,6 +207,7 @@ export function parseScannedBill(text: string): ScannedBill {
     // and percent marks) and the leading description.
     const tokens = l.split(" ");
     const numsAtEnd: number[] = [];
+    const rawAtEnd: string[] = [];
     let unit = "";
     let descEnd = tokens.length;
     for (let i = tokens.length - 1; i >= 0; i--) {
@@ -165,7 +215,10 @@ export function parseScannedBill(text: string): ScannedBill {
       const clean = raw.replace(/,/g, "");
       // Allow negative amounts (Rounding / Discount rows on GST bills).
       if (/^-?\d+(?:\.\d+)?$/.test(clean)) {
-        if (!isHsnLike(raw)) numsAtEnd.unshift(num(raw));
+        if (!isHsnLike(raw)) {
+          numsAtEnd.unshift(num(raw));
+          rawAtEnd.unshift(raw);
+        }
         descEnd = i;
       } else if (UNITS.has(raw.toLowerCase().replace(/\.$/, ""))) {
         unit = raw.toLowerCase().replace(/\.$/, "");
@@ -177,11 +230,16 @@ export function parseScannedBill(text: string): ScannedBill {
     const desc = tokens.slice(0, descEnd).join(" ").replace(/[|:;]+$/, "").trim();
     if (desc.replace(/[^A-Za-z]/g, "").length < 3) continue;
 
-    // Tax/freight/rounding rows are NOT line items — they're part of what
-    // makes the invoice total exceed the goods. Capturing them as items would
-    // double-count them against the total and pollute Stock with non-material
-    // rows. The bill's own printed total already includes them.
+    // Tax / rounding rows are never goods: they'd double-count against the
+    // total and put non-material rows into Stock. Dropped — the GST is
+    // recomputed from the goods subtotal instead.
     if (TAX_ROW.test(desc)) continue;
+    // Freight & friends aren't goods either, but they were paid — keep the
+    // amount aside so the total still reconstructs exactly.
+    if (OTHER_CHARGE.test(desc)) {
+      if (numsAtEnd.length) otherTotal += numsAtEnd[numsAtEnd.length - 1];
+      continue;
+    }
 
     if (numsAtEnd.length >= 3) {
       // desc [qty] [rate] ... [amount] — take first as qty, last as amount,
@@ -203,9 +261,28 @@ export function parseScannedBill(text: string): ScannedBill {
         rate: "",
         amount: String(b),
       });
+    } else if (numsAtEnd.length === 1) {
+      // A lone trailing number is usually noise (pin codes, serial numbers,
+      // phone digits), so it's only taken when it's clearly *money*: printed
+      // with a thousands comma or paise. That keeps rows whose qty/rate columns
+      // the reader mangled — previously the whole row was dropped, which is the
+      // main reason a bill came back with no items at all.
+      const raw = rawAtEnd[0];
+      const moneyLike = raw.includes(",") || /\.\d{2}$/.test(raw);
+      if (moneyLike && numsAtEnd[0] > 0) {
+        bill.items.push({
+          item: desc,
+          qty: "",
+          unit,
+          rate: "",
+          amount: String(numsAtEnd[0]),
+        });
+      }
     }
-    // A single trailing number is too ambiguous (often pin codes, GST %,
-    // serial numbers) — skip rather than pollute the draft.
+  }
+
+  if (otherTotal > 0) {
+    bill.otherCharges = String(Math.round(otherTotal * 100) / 100);
   }
 
   return bill;

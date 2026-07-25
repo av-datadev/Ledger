@@ -37,6 +37,10 @@ export function Boq() {
       date: head.date,
       category: head.category,
       invoiceTotal: String(head.invoiceTotal),
+      // Saved rows keep their own per-item GST; the bill-level slab is only a
+      // calculator input, so re-derive it from the first row that has one.
+      billGstPct: String(rows.find((r) => r.gstPct != null)?.gstPct ?? 18),
+      otherCharges: "",
       items: rows.map((r) => ({
         item: r.item,
         hsn: r.hsn ?? "",
@@ -91,6 +95,8 @@ export function Boq() {
         date: scan.date || todayStr(),
         category: scan.category || "Misc",
         invoiceTotal: scan.invoiceTotal,
+        billGstPct: scan.gstPct || "18",
+        otherCharges: scan.otherCharges,
         items: scan.items.length
           ? scan.items.map((it) => ({
               item: it.item,
