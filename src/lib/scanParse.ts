@@ -76,6 +76,13 @@ function detectGstPct(lines: string[]): string {
 const JUNK_LINE =
   /\b(gstin|gst no|pan|phone|ph\.|mob|mobile|email|e&oe|thank|terms|condition|state code|hsn code|authori[sz]ed|signat|declar|bank|ifsc|a\/c)\b/i;
 
+// Totals / tax-summary rows a bill prints below the items. They repeat the
+// goods value ("Taxable Value 6,78,000") and totals, so capturing them as line
+// items double-counts the whole bill — the cause of a scanned bill's computed
+// total coming out ~2x. Matched on the raw line and skipped before item parse.
+const SUMMARY_LINE =
+  /\b(taxable\s*value|invoice\s*value|total\s*(invoice|amount|amt|value|qty|payable|tax)?|sub\s*total|grand\s*total|net\s*(amt|amount|payable)|amount\s*(charge|payable|before)|before\s*tax|in\s*words|balance|carried|previous|outstanding)\b/i;
+
 const MONTHS: Record<string, number> = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
   jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
@@ -218,13 +225,12 @@ export function parseScannedBill(text: string): ScannedBill {
   // Line items: lines with leading text and trailing numbers.
   for (const l of lines) {
     if (JUNK_LINE.test(l)) continue;
-    if (/(grand\s*total|sub\s*total|net\s*(amt|amount|payable)|^total\b)/i.test(l)) continue;
+    if (SUMMARY_LINE.test(l)) continue;
 
     // Tokenize; collect trailing numeric tokens (ignoring HSN-looking codes
     // and percent marks) and the leading description.
     const tokens = l.split(" ");
     const numsAtEnd: number[] = [];
-    const rawAtEnd: string[] = [];
     let unit = "";
     let descEnd = tokens.length;
     for (let i = tokens.length - 1; i >= 0; i--) {
@@ -232,10 +238,7 @@ export function parseScannedBill(text: string): ScannedBill {
       const clean = raw.replace(/,/g, "");
       // Allow negative amounts (Rounding / Discount rows on GST bills).
       if (/^-?\d+(?:\.\d+)?$/.test(clean)) {
-        if (!isHsnLike(raw)) {
-          numsAtEnd.unshift(num(raw));
-          rawAtEnd.unshift(raw);
-        }
+        if (!isHsnLike(raw)) numsAtEnd.unshift(num(raw));
         descEnd = i;
       } else if (UNITS.has(raw.toLowerCase().replace(/\.$/, ""))) {
         unit = raw.toLowerCase().replace(/\.$/, "");
@@ -281,24 +284,11 @@ export function parseScannedBill(text: string): ScannedBill {
         rate: "",
         amount: String(b),
       });
-    } else if (numsAtEnd.length === 1) {
-      // A lone trailing number is usually noise (pin codes, serial numbers,
-      // phone digits), so it's only taken when it's clearly *money*: printed
-      // with a thousands comma or paise. That keeps rows whose qty/rate columns
-      // the reader mangled — previously the whole row was dropped, which is the
-      // main reason a bill came back with no items at all.
-      const raw = rawAtEnd[0];
-      const moneyLike = raw.includes(",") || /\.\d{2}$/.test(raw);
-      if (moneyLike && numsAtEnd[0] > 0) {
-        bill.items.push({
-          item: name,
-          qty: "",
-          unit,
-          rate: "",
-          amount: String(numsAtEnd[0]),
-        });
-      }
     }
+    // A single trailing number is too ambiguous — it's just as often a summary
+    // line's value (Taxable Value, a repeated subtotal) as a real item whose
+    // columns the reader mangled. Capturing those double-counted the bill, so a
+    // lone number is skipped; that row can be added by hand instead.
   }
 
   if (otherTotal > 0) {
