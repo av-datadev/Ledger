@@ -11,6 +11,7 @@ import { SettingsScreen } from "./components/SettingsScreen";
 import { TabBar, type Tab } from "./components/TabBar";
 import { useTheme } from "./hooks/useTheme";
 import { useAuth } from "./hooks/useAuth";
+import { useAppMode } from "./hooks/useAppMode";
 import {
   getMyHousehold,
   startSync,
@@ -18,15 +19,25 @@ import {
   type Household,
 } from "./lib/sync";
 import { AccountSection } from "./components/Auth";
+import { RoleGate } from "./components/RoleGate";
+import { ContractorLeadForm } from "./components/ContractorLeadForm";
+import { FindContractor } from "./components/FindContractor";
+import { AddContractorAdmin } from "./components/AddContractorAdmin";
+import { DIRECTORY_ADMIN_EMAIL } from "./lib/contractors";
 
 /**
  * No auth gate: the app runs on the on-device ledger the moment it opens, so a
  * fresh visitor sees a blank slate they can use offline. Signing in (from the
  * Data tab) resolves the user's household and starts sync, which pulls their
  * cloud data down onto this device.
+ *
+ * A separate, one-time role gate sits in front of all of this — see
+ * useAppMode: it's skipped entirely for any device with existing local data
+ * or a session (every current user), so it changes nothing for them.
  */
 export default function App() {
   const { session, loading } = useAuth();
+  const { mode, settled, choose } = useAppMode(!!session, loading);
   // undefined = signed in, still resolving; null = no active household (signed
   // out, or signed in without one yet).
   const [household, setHousehold] = useState<Household | null | undefined>(
@@ -57,6 +68,12 @@ export default function App() {
       void stopSync();
     };
   }, [household]);
+
+  if (!settled) return null; // near-instant local check — avoids a flash
+  if (mode === "contractor") {
+    return <ContractorLeadForm onSwitchToBuilder={() => choose("builder")} />;
+  }
+  if (mode === null) return <RoleGate onChoose={choose} />;
 
   return (
     <LedgerApp
@@ -199,6 +216,16 @@ function LedgerApp({
               />
             </div>
             <SettingsScreen />
+            <div className="border-t border-rule mt-2">
+              <FindContractor />
+            </div>
+            {session?.user?.email === DIRECTORY_ADMIN_EMAIL && (
+              <div className="border-t border-rule px-4 py-4 max-w-lg mx-auto">
+                <AddContractorAdmin
+                  adminName={session.user.email ?? "Admin"}
+                />
+              </div>
+            )}
           </>
         )}
       </main>
