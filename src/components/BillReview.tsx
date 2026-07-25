@@ -135,6 +135,13 @@ export function BillReview({
   const total = toNum(draft.invoiceTotal) ?? 0;
   const diff = Math.round((linesSum - total) * 100) / 100;
   const matches = Math.abs(diff) < 0.005 && total > 0;
+  // Line items are goods only — GST, freight and rounding are deliberately not
+  // itemised (see scanParse), so on a tax invoice the rows legitimately sit
+  // BELOW the printed total and that gap is the tax. Only the opposite case
+  // means something is actually wrong: rows adding up to more than the bill
+  // total implies a duplicated or misread row, so that's what blocks saving.
+  const overCounted = total > 0 && diff > 0.005;
+  const taxGap = total > 0 && diff < -0.005 ? Math.abs(diff) : 0;
 
   const save = async () => {
     const errs: string[] = [];
@@ -146,9 +153,9 @@ export function BillReview({
     );
     if (validItems.length === 0)
       errs.push("At least one line item with a description and amount is required.");
-    if (!matches && !ackMismatch)
+    if (overCounted && !ackMismatch)
       errs.push(
-        "Line items don't add up to the invoice total. Fix the rows or tick the mismatch acknowledgement.",
+        "Line items add up to MORE than the invoice total — a row is probably duplicated or misread. Fix the rows or tick the acknowledgement.",
       );
     setErrors(errs);
     if (errs.length) return;
@@ -313,16 +320,20 @@ export function BillReview({
 
         <div
           className={`px-3 py-2 rounded-md border text-[13px] money ${
-            matches
-              ? "border-moss text-moss bg-moss/5"
-              : "border-crimson text-crimson bg-crimson/5"
+            overCounted
+              ? "border-crimson text-crimson bg-crimson/5"
+              : matches
+                ? "border-moss text-moss bg-moss/5"
+                : "border-rule text-ink-soft bg-surface"
           }`}
         >
-          Lines sum: {inr(linesSum)} · Invoice total: {inr(total)}{" "}
-          {matches ? "✓ match" : `— off by ${inr(Math.abs(diff))}`}
+          Items: {inr(linesSum)} · Invoice total: {inr(total)}
+          {overCounted && ` — items exceed the total by ${inr(diff)}`}
+          {matches && " ✓ match"}
+          {taxGap > 0 && ` · ${inr(taxGap)} tax / freight (not itemised)`}
         </div>
 
-        {!matches && (
+        {overCounted && (
           <label className="flex items-start gap-2 text-[13px]">
             <input
               type="checkbox"
@@ -330,8 +341,8 @@ export function BillReview({
               checked={ackMismatch}
               onChange={(e) => setAckMismatch(e.target.checked)}
             />
-            I understand the line items don't add up to the printed total —
-            save anyway.
+            I understand the rows add up to more than the printed total — save
+            anyway.
           </label>
         )}
 

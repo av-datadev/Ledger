@@ -32,6 +32,11 @@ const TAX_ROW = /\b(sgst|cgst|igst|gst|freight|packing|round(ing|ed)?( off)?|dis
 const JUNK_LINE =
   /\b(gstin|gst no|pan|phone|ph\.|mob|mobile|email|e&oe|thank|terms|condition|state code|hsn code|authori[sz]ed|signat|declar|bank|ifsc|a\/c)\b/i;
 
+const MONTHS: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+
 const num = (s: string): number => parseFloat(s.replace(/,/g, ""));
 // Bare 6-8 digit runs are HSN codes; digits with comma separators are amounts.
 const isHsnLike = (s: string): boolean => !s.includes(",") && /^\d{6,8}$/.test(s);
@@ -95,8 +100,11 @@ export function parseScannedBill(text: string): ScannedBill {
   for (const l of lines) {
     if (!bill.invoiceNo) {
       // "ref" catches quotation/offer references ("Offer Ref : 2026/125").
+      // The \b after the keyword matters: without it "inv" matches inside the
+      // word "Invoice" on a bare "Tax Invoice" heading and captures the
+      // leftover "oice" as the bill number.
       const m = l.match(
-        /(?:invoice|inv|bill|memo|ref)\s*(?:no|num|number|#)?\s*[:.\-]?\s*([A-Za-z0-9][A-Za-z0-9\/-]{0,14})/i,
+        /(?:invoice|inv|bill|memo|ref)\b\s*(?:no|num|number|#)?\s*[:.\-]?\s*([A-Za-z0-9][A-Za-z0-9\/-]{0,14})/i,
       );
       if (m && !/^(no|date|of|for|the)$/i.test(m[1])) bill.invoiceNo = m[1];
     }
@@ -104,6 +112,18 @@ export function parseScannedBill(text: string): ScannedBill {
       const m = l.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
       if (m) {
         const iso = toIsoDate(m[1], m[2], m[3]);
+        if (iso) bill.date = iso;
+      }
+    }
+    if (!bill.date) {
+      // Tally-style GST invoices print the month as a name ("25-Jul-26"),
+      // which the all-numeric pattern above can't read.
+      const m = l.match(
+        /\b(\d{1,2})[\s\/\-.]*([A-Za-z]{3,9})[\s\/\-.]*(\d{2,4})\b/,
+      );
+      const mon = m ? MONTHS[m[2].slice(0, 3).toLowerCase()] : undefined;
+      if (m && mon) {
+        const iso = toIsoDate(m[1], String(mon), m[3]);
         if (iso) bill.date = iso;
       }
     }
@@ -157,16 +177,11 @@ export function parseScannedBill(text: string): ScannedBill {
     const desc = tokens.slice(0, descEnd).join(" ").replace(/[|:;]+$/, "").trim();
     if (desc.replace(/[^A-Za-z]/g, "").length < 3) continue;
 
-    if (TAX_ROW.test(desc) && numsAtEnd.length >= 1) {
-      bill.items.push({
-        item: desc,
-        qty: "",
-        unit: "",
-        rate: "",
-        amount: String(numsAtEnd[numsAtEnd.length - 1]),
-      });
-      continue;
-    }
+    // Tax/freight/rounding rows are NOT line items — they're part of what
+    // makes the invoice total exceed the goods. Capturing them as items would
+    // double-count them against the total and pollute Stock with non-material
+    // rows. The bill's own printed total already includes them.
+    if (TAX_ROW.test(desc)) continue;
 
     if (numsAtEnd.length >= 3) {
       // desc [qty] [rate] ... [amount] — take first as qty, last as amount,
