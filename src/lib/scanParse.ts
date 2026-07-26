@@ -114,10 +114,18 @@ const MONTHS: Record<string, number> = {
  * which belong in a stock/BOQ row.
  */
 function cleanItemName(desc: string): string {
-  return desc
+  let s = desc
     .replace(/^[^A-Za-z0-9]+/, "") // leading stray punctuation ('. ', '" ')
-    .replace(/^\s*\d{1,3}\s*[.)\-:]?\s+/, "") // leading serial ("1 ", "2. ")
-    .replace(/\b\d{6,8}\b/g, " ") // HSN / SAC code
+    .replace(/^\s*\d{1,3}\s*[.)\-:]?\s+/, ""); // leading serial ("1 ", "2. ")
+  // The HSN/SAC code marks the end of the name column; everything from it on is
+  // the numeric columns (which OCR smears into the name on a skewed scan —
+  // "…Indoasian |as389000 | Spec"). An OCR'd code is 6-8 mostly-digit chars,
+  // optionally with a stray leading letter ("8s389000", "as389000"). Cut there.
+  s = s.replace(/\s+[|\\/]*\s*[a-z]?[a-z0-9]?\d{4,}[a-z0-9]{0,2}\b.*$/i, "");
+  // Also cut at a bare column pipe if one survived before any code.
+  s = s.replace(/\s*[|\\]\s*.*$/, "");
+  return s
+    .replace(/\b\d{6,8}\b/g, " ") // any HSN / SAC code still inline
     .replace(/\b\d{1,2}(?:\.\d+)?\s*%/g, " ") // "18 %"
     .replace(/\s+\d{1,2}(?:\.\d+)?\s*$/, "") // bare trailing rate ("… 18")
     .replace(/\s{2,}/g, " ")
@@ -142,9 +150,32 @@ const asNumber = (raw: string): string | null => {
     .match(/^[^\dA-Za-z-]*(-?\d[\d,]*(?:\.\d+)?)[^\dA-Za-z]*$/);
   return m ? m[1] : null;
 };
-// Pure table punctuation — column rules and stray marks OCR leaves between
-// numbers ("|", ":", "]", ")"). Never part of a product name.
-const isPunct = (raw: string): boolean => /^[|:;)(\][.,'’"`*_-]+$/.test(raw);
+// A token with no letters or digits is pure table noise — the column rules and
+// stray marks a skewed scan sprays between cells ("|", "\", "=", "»", "®", "~~").
+// Never part of a product name, and must not stop the trailing-number scan.
+const isPunct = (raw: string): boolean => raw.length > 0 && !/[A-Za-z0-9]/.test(raw);
+
+// Repair two artifacts a skewed scan introduces into a single item row before
+// its columns are read:
+//   • a thousands separator OCR'd as a space — "4,830.75" comes back as the two
+//     tokens "4" and ",830.75", which otherwise read as a stray 4 and 830.75.
+//   • the "GST %" column split into "18" + "%", leaving a bare 18 that reads as
+//     a quantity. A slab integer immediately before a percent sign is dropped.
+const normalizeRow = (tokens: string[]): string[] => {
+  const out: string[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    const next = tokens[i + 1] ?? "";
+    if (/^\d{1,3}$/.test(t) && /^,\d{3}(?:\.\d+)?\D*$/.test(next)) {
+      out.push(t + next);
+      i++;
+      continue;
+    }
+    if (/^(?:0|5|12|18|28)$/.test(t) && /^%/.test(next)) continue;
+    out.push(t);
+  }
+  return out;
+};
 
 function toIsoDate(d: string, m: string, y: string): string | null {
   const day = parseInt(d, 10);
@@ -312,7 +343,7 @@ export function parseScannedBill(text: string): ScannedBill {
     // reading right-to-left and stepping over the noise OCR wedges between them
     // — HSN codes, the "GST %" and per-unit columns, stray table rules — until
     // the product description begins.
-    const tokens = l.split(" ");
+    const tokens = normalizeRow(l.split(" "));
     const numsAtEnd: number[] = [];
     let unit = "";
     let descEnd = tokens.length;
