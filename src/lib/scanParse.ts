@@ -19,7 +19,11 @@ export interface ScannedBill {
   category: Category | "";
   invoiceTotal: string;
   gstPct: string; // detected GST rate, e.g. "18"
-  otherCharges: string; // freight/packing/cartage, taxed separately from goods
+  otherCharges: string; // freight/packing/cartage — paid, but not goods
+  /** True when the bill charges GST on that freight (its row carries an HSN
+   * and a rate, e.g. "Freight (GST) 996511 18 %") rather than adding it after
+   * the tax. Bills do it both ways, so it has to be read per bill. */
+  otherChargesTaxed: boolean;
   items: ScannedItem[];
 }
 
@@ -220,6 +224,7 @@ export function parseScannedBill(text: string): ScannedBill {
     // for construction material.
     gstPct: detectGstPct(lines) || "18",
     otherCharges: "",
+    otherChargesTaxed: false,
     items: [],
   };
   let otherTotal = 0;
@@ -384,13 +389,20 @@ export function parseScannedBill(text: string): ScannedBill {
     // Tax / rounding rows are never goods: they'd double-count against the
     // total and put non-material rows into Stock. Dropped — the GST is
     // recomputed from the goods subtotal instead.
-    if (TAX_ROW.test(desc)) continue;
     // Freight & friends aren't goods either, but they were paid — keep the
-    // amount aside so the total still reconstructs exactly.
+    // amount aside so the total still reconstructs exactly. Checked BEFORE
+    // TAX_ROW: a freight row billed as a taxable service reads "Freight (GST)",
+    // whose "GST" would otherwise match TAX_ROW and drop the charge entirely.
     if (OTHER_CHARGE.test(desc)) {
       if (numsAtEnd.length) otherTotal += numsAtEnd[numsAtEnd.length - 1];
+      // That same row tells us whether the freight is taxed: charged as a
+      // service it carries its own HSN/SAC code and rate ("996511 18 %").
+      if (/\d{1,2}(?:\.\d+)?\s*%/.test(l) || /\b\d{6}\b/.test(l) || /\(\s*gst\s*\)/i.test(l)) {
+        bill.otherChargesTaxed = true;
+      }
       continue;
     }
+    if (TAX_ROW.test(desc)) continue;
 
     if (numsAtEnd.length >= 3) {
       // desc [qty] [rate] ... [amount] — take first as qty, last as amount,

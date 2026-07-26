@@ -30,7 +30,11 @@ export interface DraftBill {
   category: string;
   invoiceTotal: string;
   billGstPct: string; // GST slab for the whole bill (18 = 9% CGST + 9% SGST)
-  otherCharges: string; // freight/packing — paid, but not taxable goods
+  otherCharges: string; // freight/packing — paid, but not goods
+  /** Whether freight/other is part of the taxable value. Bills differ: one
+   * prints "Freight (GST)" with its own HSN and rate (taxed), another prints a
+   * bare "Freight" line below the tax summary (not taxed). */
+  otherChargesTaxed: boolean;
   items: DraftItem[];
 }
 
@@ -57,6 +61,7 @@ export const emptyDraft = (): DraftBill => ({
   invoiceTotal: "",
   billGstPct: "18",
   otherCharges: "",
+  otherChargesTaxed: false,
   items: [blankItem()],
 });
 
@@ -137,16 +142,21 @@ export function BillReview({
       draft.items.reduce((s, it) => s + (toNum(it.amount) ?? 0), 0) * 100,
     ) / 100;
   // Goods → GST → total, rebuilt from the rows rather than trusting the reader
-  // to have got the printed grand total right. GST applies to the goods only;
-  // freight and other charges are added after tax, which is how the bill's own
-  // arithmetic works. Rounded to the rupee like the bill's "Rounding Off" row.
+  // to have got the printed grand total right. Rounded to the rupee like the
+  // bill's "Rounding Off" row.
   const gstPct = toNum(draft.billGstPct) ?? 0;
   const otherCharges = toNum(draft.otherCharges) ?? 0;
+  // Whether freight is taxed varies by bill, so it follows the bill rather than
+  // a fixed rule: charged as a service line ("Freight (GST)", its own HSN and
+  // rate) it joins the taxable value; billed as a bare add-on it doesn't.
+  const taxedBase =
+    Math.round((linesSum + (draft.otherChargesTaxed ? otherCharges : 0)) * 100) /
+    100;
   // Intrastate bills levy the slab as two equal halves — CGST + SGST — and
   // print them as separate rows, so show it the same way. Each half is rounded
   // to paise on its own, exactly as the bill computes them.
   const halfPct = gstPct / 2;
-  const halfGst = Math.round(linesSum * halfPct) / 100;
+  const halfGst = Math.round(taxedBase * halfPct) / 100;
   const gstAmount = Math.round(halfGst * 2 * 100) / 100;
   const computedTotal = Math.round(linesSum + gstAmount + otherCharges);
 
@@ -369,12 +379,34 @@ export function BillReview({
           </div>
         </div>
 
+        {otherCharges > 0 && (
+          <label className="flex items-start gap-2 text-[13px]">
+            <input
+              type="checkbox"
+              className="mt-0.5 shrink-0"
+              checked={draft.otherChargesTaxed}
+              onChange={(e) => set({ otherChargesTaxed: e.target.checked })}
+            />
+            <span>
+              GST is charged on the freight too — tick this if the bill shows
+              freight with its own HSN and rate (e.g. <b>Freight (GST)</b>),
+              rather than as a plain add-on below the tax.
+            </span>
+          </label>
+        )}
+
         {/* Goods → GST → total, computed from the rows. */}
         <div className="px-3 py-2 rounded-md border border-rule bg-surface text-[13px] money space-y-0.5">
           <div className="flex justify-between">
             <span>Items ({draft.items.length})</span>
             <span>{inr(linesSum)}</span>
           </div>
+          {draft.otherChargesTaxed && otherCharges > 0 && (
+            <div className="flex justify-between text-ink-soft">
+              <span>Taxable value (incl. freight)</span>
+              <span>{inr(taxedBase)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-ink-soft">
             <span>CGST @ {halfPct}%</span>
             <span>{inr(halfGst)}</span>

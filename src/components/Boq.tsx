@@ -42,6 +42,7 @@ export function Boq() {
       // calculator input, so re-derive it from the first row that has one.
       billGstPct: String(rows.find((r) => r.gstPct != null)?.gstPct ?? 18),
       otherCharges: "",
+      otherChargesTaxed: false,
       items: rows.map((r) => ({
         item: r.item,
         hsn: r.hsn ?? "",
@@ -109,6 +110,7 @@ export function Boq() {
         invoiceTotal: scan.invoiceTotal,
         billGstPct: scan.gstPct || "18",
         otherCharges: scan.otherCharges,
+        otherChargesTaxed: scan.otherChargesTaxed,
         items: scan.items.length
           ? scan.items.map((it) => ({
               item: it.item,

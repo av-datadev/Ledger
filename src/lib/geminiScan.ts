@@ -37,6 +37,7 @@ interface GeminiBillResponse {
   invoiceTotal: number;
   gstPct: number;
   otherCharges: number;
+  otherChargesTaxed: boolean;
   items: { item: string; qty: number; unit: string; rate: number; amount: number }[];
   error?: string;
 }
@@ -73,6 +74,7 @@ export async function scanBillWithGemini(file: File): Promise<ScannedBill> {
     invoiceTotal: data.invoiceTotal != null ? String(data.invoiceTotal) : "",
     gstPct: data.gstPct != null ? String(data.gstPct) : "18",
     otherCharges: data.otherCharges ? String(data.otherCharges) : "",
+    otherChargesTaxed: data.otherChargesTaxed === true,
     items: data.items.map((it) => ({
       item: it.item ?? "",
       qty: it.qty != null ? String(it.qty) : "",

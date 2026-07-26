@@ -26,6 +26,7 @@ const RESPONSE_SCHEMA = {
     invoiceTotal: { type: "number", description: "The final amount actually payable (the grand total row), not a mid-table subtotal." },
     gstPct: { type: "number", description: "The overall GST slab for the bill (5, 12, 18 or 28). If CGST+SGST are printed as two 9% rows, report 18, not 9." },
     otherCharges: { type: "number", description: "Freight, packing, cartage or loading charges — paid, but not goods. 0 if none are printed." },
+    otherChargesTaxed: { type: "boolean", description: "True only if GST is charged ON the freight — i.e. the freight row carries its own HSN/SAC code and rate (e.g. 'Freight (GST) 996511 18 %'), or the tax summary's taxable value includes the freight amount. False when freight is a plain add-on with no HSN and no rate." },
     items: {
       type: "array",
       items: {
@@ -41,7 +42,7 @@ const RESPONSE_SCHEMA = {
       },
     },
   },
-  required: ["vendor", "invoiceNo", "date", "invoiceTotal", "gstPct", "otherCharges", "items"],
+  required: ["vendor", "invoiceNo", "date", "invoiceTotal", "gstPct", "otherCharges", "otherChargesTaxed", "items"],
 };
 
 const PROMPT = `This is a photo of an Indian GST tax invoice / bill. Read it and return the goods only.
@@ -49,6 +50,7 @@ const PROMPT = `This is a photo of an Indian GST tax invoice / bill. Read it and
 Rules:
 - "items" is ONLY the goods/materials rows from the main table. Never include CGST, SGST, IGST, tax-summary rows, "Rounding Off", "Taxable Value", or the printed grand total as an item.
 - Freight, packing, cartage, transport, or loading charges are real charges but are NOT goods — put their amount in "otherCharges", not in "items".
+- Bills treat freight two different ways, so read this one carefully and set "otherChargesTaxed" accordingly. If the freight row has its own HSN/SAC code and GST rate (e.g. "Freight (GST) 996511 18 %"), or the tax summary's total taxable value equals the goods subtotal PLUS the freight, then GST is charged on the freight — set it true. If freight is just a plain line with no HSN and no rate, and the taxable value equals the goods subtotal alone, set it false.
 - If a row's quantity is split across two lines (e.g. "150.00 Mtr" on one line, "2 Bundal" as a note below), use the actual quantity/unit columns, not the note.
 - invoiceTotal is the final amount payable — usually the largest number on the bill, near a "Total" or "Rs" label at the bottom of the goods table, in words nearby ("Rupees ... Only"). It is NOT a per-item HSN/tax-summary subtotal.
 - vendor is the company issuing the bill (the letterhead at the top), never the "Buyer" / "Bill to" name.
