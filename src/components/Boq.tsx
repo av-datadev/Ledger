@@ -6,7 +6,8 @@ import { inr, num, todayStr, formatDate } from "../lib/format";
 import { fileToOcrImage } from "../lib/scanImage";
 import { recognizeText } from "../lib/ocr";
 import { pdfToText } from "../lib/pdf";
-import { parseScannedBill } from "../lib/scanParse";
+import { parseScannedBill, type ScannedBill } from "../lib/scanParse";
+import { scanBillWithGemini } from "../lib/geminiScan";
 import { BillReview, type DraftBill, emptyDraft, blankItem } from "./BillReview";
 import { BillStockPanel } from "./BillStockPanel";
 import type { BoqItem } from "../types";
@@ -74,18 +75,29 @@ export function Boq() {
         );
         return;
       }
-      let text: string;
+      let scan: ScannedBill;
       if (isPdf) {
-        text = await pdfToText(file, setBusy);
+        const text = await pdfToText(file, setBusy);
+        scan = parseScannedBill(text);
       } else {
-        setBusy("Preparing the photo…");
-        const image = await fileToOcrImage(file);
-        setBusy("Reading the bill on this phone… 0%");
-        text = await recognizeText(image, (pct) =>
-          setBusy(`Reading the bill on this phone… ${pct}%`),
-        );
+        // Gemini reads the photo directly (no OCR step) and handles skew,
+        // low light, and mangled columns far better than Tesseract. It needs
+        // the network, so fall back to on-device OCR on any failure —
+        // offline, quota, or a bad response — rather than surface the error.
+        try {
+          setBusy("Reading the bill…");
+          scan = await scanBillWithGemini(file);
+        } catch (geminiErr) {
+          console.warn("Gemini scan failed, using on-device OCR:", geminiErr);
+          setBusy("Preparing the photo…");
+          const image = await fileToOcrImage(file);
+          setBusy("Reading the bill on this phone… 0%");
+          const text = await recognizeText(image, (pct) =>
+            setBusy(`Reading the bill on this phone… ${pct}%`),
+          );
+          scan = parseScannedBill(text);
+        }
       }
-      const scan = parseScannedBill(text);
       setScanned(true);
       setEditing(false);
       setDraft({
