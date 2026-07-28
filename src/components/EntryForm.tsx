@@ -3,8 +3,10 @@ import { db } from "../db";
 import { PAYERS } from "../../shared/constants";
 import { useCategories } from "../hooks/useCategories";
 import { usePayers, useModes } from "../hooks/useFacets";
+import { useNoteAiConsent } from "../hooks/useNoteAiConsent";
 import { todayStr } from "../lib/format";
 import { fileToAttachment, type ProcessedImage } from "../lib/attach";
+import { scanNoteWithGemini, matchMode, type ScannedNote } from "../lib/noteScan";
 import type { Entry, Attachment } from "../types";
 
 // A photo shown in the form: either already saved to the DB (edit mode) or
@@ -79,6 +81,15 @@ export function EntryForm({
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
 
+  // --- handwritten-note reader (opt-in, sends the photo off-device) ---
+  const noteAi = useNoteAiConsent();
+  const noteRef = useRef<HTMLInputElement>(null);
+  const [askConsent, setAskConsent] = useState(false);
+  const [reading, setReading] = useState(false);
+  const [noteError, setNoteError] = useState<string | null>(null);
+  const [read, setRead] = useState<ScannedNote | null>(null);
+  const [showOriginal, setShowOriginal] = useState(false);
+
   // Keep the latest photo list in a ref so the unmount cleanup can revoke every
   // object URL without re-running on each change.
   const photosRef = useRef<LocalPhoto[]>([]);
@@ -119,7 +130,10 @@ export function EntryForm({
   const set = (k: keyof ReturnType<typeof formFrom>, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
 
-  const addFiles = async (files: FileList) => {
+  // Takes File[] as well as a FileList: the note reader hands over a snapshot
+  // it took before awaiting, because the picker's onChange clears the input
+  // (and with it the live FileList) while that await is still in flight.
+  const addFiles = async (files: FileList | File[]) => {
     setPhotoError(null);
     setProcessing(true);
     try {
@@ -141,6 +155,57 @@ export function EntryForm({
       );
     } finally {
       setProcessing(false);
+    }
+  };
+
+  /**
+   * Read a photographed handwritten note into the form. The photo is attached
+   * to the entry as well as read — for a kaccha slip there is no invoice
+   * behind the payment, so that photo is the only record of it.
+   *
+   * Only fields the reader actually found are written, so a re-read never
+   * blanks something already typed. The amount is deliberately left for the
+   * person to confirm against the banner (see below) rather than trusted.
+   */
+  const readNote = async (files: FileList) => {
+    setNoteError(null);
+    setRead(null);
+    setShowOriginal(false);
+    setReading(true);
+    try {
+      const picked = Array.from(files);
+      const scan = await scanNoteWithGemini(picked);
+      setRead(scan);
+
+      setForm((f) => {
+        const mode = matchMode(scan.mode, modes);
+        // A kaccha slip has no tax invoice behind it — record that in the notes
+        // so it's visible later which payments lack formal paperwork.
+        const informalNote = scan.isInformal ? "No GST bill (handwritten slip)" : "";
+        const notes = [scan.notes, informalNote].filter(Boolean).join(" · ");
+        return {
+          ...f,
+          date: scan.date || f.date,
+          category: scan.category || f.category,
+          event: scan.description || f.event,
+          detail: scan.detail || f.detail,
+          amount: scan.amount || f.amount,
+          mode: mode ?? f.mode,
+          notes: notes || f.notes,
+        };
+      });
+
+      // Keep the paper itself with the entry — `picked`, not `files`: the
+      // input has been cleared by now (see addFiles).
+      await addFiles(picked);
+    } catch (err) {
+      console.error("Note read failed:", err);
+      setNoteError(
+        (err instanceof Error ? err.message : "Could not read that note.") +
+          " Fill the entry in by hand instead.",
+      );
+    } finally {
+      setReading(false);
     }
   };
 
@@ -212,6 +277,9 @@ export function EntryForm({
     setRemovedIds([]);
     setEntryId(crypto.randomUUID());
     setForm(formFrom(undefined, presetCategory));
+    setRead(null);
+    setNoteError(null);
+    setShowOriginal(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
@@ -228,6 +296,74 @@ export function EntryForm({
           </button>
         )}
       </div>
+
+      {!editing && (
+        <div className="mb-4">
+          <button
+            type="button"
+            className="btn w-full !py-2.5 !text-[13px]"
+            disabled={reading}
+            onClick={() =>
+              noteAi.granted ? noteRef.current?.click() : setAskConsent(true)
+            }
+          >
+            {reading ? "Reading the note…" : "✍️ Read a handwritten note"}
+          </button>
+          <p className="text-[11px] text-ink-soft mt-1.5">
+            For a vendor's kaccha slip, a cheque, or a Hindi diary page — fills
+            the form below and keeps the photo as proof. Always check the amount.
+          </p>
+          <input
+            ref={noteRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) void readNote(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          {noteError && (
+            <div className="text-[12px] text-crimson mt-2">{noteError}</div>
+          )}
+          {read && (
+            <div className="mt-2 rounded-md border border-rule bg-surface p-2.5 text-[12px]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">
+                  {read.confidence === "low"
+                    ? "⚠️ Hard to read — check every field"
+                    : read.confidence === "medium"
+                      ? "Read — check the amount"
+                      : "✓ Read clearly — check the amount"}
+                </span>
+                {read.isInformal && <span className="badge">No GST bill</span>}
+              </div>
+              {read.amountInWords && (
+                <div className="mt-1.5 text-ink-soft">
+                  Written in words:{" "}
+                  <span className="text-ink font-medium">{read.amountInWords}</span>
+                </div>
+              )}
+              {read.originalText && (
+                <>
+                  <button
+                    type="button"
+                    className="mt-1.5 underline text-ink-soft"
+                    onClick={() => setShowOriginal((v) => !v)}
+                  >
+                    {showOriginal ? "Hide" : "Show"} what was written
+                  </button>
+                  {showOriginal && (
+                    <pre className="mt-1.5 whitespace-pre-wrap font-sans text-ink-soft">
+                      {read.originalText}
+                    </pre>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
@@ -451,6 +587,48 @@ export function EntryForm({
           </div>
         )}
       </div>
+
+      {askConsent && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-surface rounded-lg border border-rule p-4 max-w-sm w-full">
+            <h3 className="text-[15px] font-semibold mb-2">
+              Send the photo to be read?
+            </h3>
+            <p className="text-[13px] text-ink-soft leading-relaxed">
+              Handwriting can't be read on the phone itself, so the photo is
+              sent to an AI reader over the internet, and what it reads comes
+              back into the form. Nothing else in this app leaves your phone
+              except the ledger sync you've already set up.
+            </p>
+            <p className="text-[13px] text-ink-soft leading-relaxed mt-2">
+              This choice is for this phone only. You can turn it off later in
+              Settings.
+            </p>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <button
+                type="button"
+                className="btn !py-2 !text-[13px]"
+                onClick={() => setAskConsent(false)}
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary !py-2 !text-[13px]"
+                onClick={() => {
+                  noteAi.grant();
+                  setAskConsent(false);
+                  // Let the dialog unmount before opening the file picker —
+                  // iOS Safari ignores a picker opened from a closing overlay.
+                  setTimeout(() => noteRef.current?.click(), 0);
+                }}
+              >
+                Allow &amp; pick photo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {viewer && (
         <div

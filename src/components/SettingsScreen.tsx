@@ -6,6 +6,7 @@ import { withBalances } from "../lib/stock";
 import { toCsv, downloadFile, timestampSlug } from "../lib/csv";
 import { currentHouseholdId } from "../lib/sync";
 import { useTextScale, TEXT_SCALES } from "../hooks/useTextScale";
+import { useNoteAiConsent } from "../hooks/useNoteAiConsent";
 
 export function SettingsScreen() {
   const settings = useLiveQuery(() => db.settings.get("app"), []);
@@ -22,6 +23,7 @@ export function SettingsScreen() {
   );
   const importRef = useRef<HTMLInputElement>(null);
   const { scale, setScale } = useTextScale();
+  const noteAi = useNoteAiConsent();
   // While the shared cloud ledger is active, restoring/resetting local data
   // fights the live sync (and isn't needed — the cloud already holds it).
   const synced = currentHouseholdId() != null;
@@ -158,6 +160,27 @@ export function SettingsScreen() {
         </div>
         <p className="text-[13px] text-ink-soft">
           Scales the whole app so text is easier to read. Saved on this device.
+        </p>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+          Reading handwritten notes
+        </h2>
+        <button
+          className={`btn w-full !py-2.5 ${
+            noteAi.granted ? "!bg-ink !text-paper !border-ink" : ""
+          }`}
+          aria-pressed={noteAi.granted}
+          onClick={() => (noteAi.granted ? noteAi.revoke() : noteAi.grant())}
+        >
+          {noteAi.granted ? "On — photos are sent to be read" : "Off"}
+        </button>
+        <p className="text-[13px] text-ink-soft">
+          Lets New Entry read a vendor's handwritten slip, a cheque, or a Hindi
+          diary page. Handwriting can't be read on the phone itself, so that
+          photo is sent over the internet to an AI reader. Applies to this
+          device only — not the others sharing this ledger.
         </p>
       </section>
 

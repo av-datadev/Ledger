@@ -10,8 +10,9 @@ const TIMEOUT_MS = 40_000; // multi-page PDFs send several images in one call
 
 /** Downscale + re-encode a bill photo for upload. Keeps color (unlike the
  * OCR path's grayscale prep) — Gemini reads a natural photo better than a
- * contrast-stretched one built for Tesseract. */
-async function fileToGeminiImage(
+ * contrast-stretched one built for Tesseract. Shared with the handwritten-note
+ * reader (noteScan.ts), which needs the same preparation. */
+export async function fileToGeminiImage(
   file: File,
 ): Promise<{ base64: string; mimeType: string }> {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
