@@ -6,7 +6,7 @@ import { guessCategory } from "./scanParse";
 import type { ScannedBill } from "./scanParse";
 
 const MAX_EDGE = 1600;
-const TIMEOUT_MS = 25_000;
+const TIMEOUT_MS = 40_000; // multi-page PDFs send several images in one call
 
 /** Downscale + re-encode a bill photo for upload. Keeps color (unlike the
  * OCR path's grayscale prep) — Gemini reads a natural photo better than a
@@ -46,15 +46,32 @@ interface GeminiBillResponse {
  * failure (offline, quota, bad response) — callers should fall back to
  * on-device OCR rather than surface this error directly. */
 export async function scanBillWithGemini(file: File): Promise<ScannedBill> {
-  const { base64, mimeType } = await fileToGeminiImage(file);
+  const image = await fileToGeminiImage(file);
+  return scanImagesWithGemini([image]);
+}
 
+/** Send one or more already-prepared page images (base64 + mime, in reading
+ * order) to the Gemini Edge Function and map its structured reply into a
+ * ScannedBill. Shared by the photo path (one image, fileToGeminiImage) and
+ * the PDF path (pdf.ts renders each page to a JPEG) — a multi-page call is
+ * read as one continuous document, so a bill split across pages or a
+ * multi-section BOQ still comes back as one merged item list. Throws on any
+ * failure so callers can fall back. */
+export async function scanImagesWithGemini(
+  images: { base64: string; mimeType: string }[],
+): Promise<ScannedBill> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let data: GeminiBillResponse;
   try {
     const { data: result, error } = await supabase.functions.invoke<GeminiBillResponse>(
       "scan-bill",
-      { body: { imageBase64: base64, mimeType }, signal: controller.signal },
+      {
+        body: {
+          images: images.map((im) => ({ imageBase64: im.base64, mimeType: im.mimeType })),
+        },
+        signal: controller.signal,
+      },
     );
     if (error) throw error;
     if (!result) throw new Error("Empty response from scan-bill.");

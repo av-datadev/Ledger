@@ -5,9 +5,9 @@ import { useCategories } from "../hooks/useCategories";
 import { inr, num, todayStr, formatDate } from "../lib/format";
 import { fileToOcrImage } from "../lib/scanImage";
 import { recognizeText } from "../lib/ocr";
-import { pdfToText } from "../lib/pdf";
+import { pdfToText, pdfPagesToImages } from "../lib/pdf";
 import { parseScannedBill, type ScannedBill } from "../lib/scanParse";
-import { scanBillWithGemini } from "../lib/geminiScan";
+import { scanBillWithGemini, scanImagesWithGemini } from "../lib/geminiScan";
 import { BillReview, type DraftBill, emptyDraft, blankItem } from "./BillReview";
 import { BillStockPanel } from "./BillStockPanel";
 import type { BoqItem } from "../types";
@@ -78,8 +78,20 @@ export function Boq() {
       }
       let scan: ScannedBill;
       if (isPdf) {
-        const text = await pdfToText(file, setBusy);
-        scan = parseScannedBill(text);
+        // Same as the photo path: Gemini reads the bill first (render every
+        // page — up to MAX_GEMINI_PAGES — to images and send them together,
+        // so a multi-annexure BOQ still comes back as one merged item list),
+        // and the on-device text-extraction path (embedded text layer, or OCR
+        // for scanned PDFs) stays as the offline fallback on any Gemini failure.
+        try {
+          setBusy("Reading the bill…");
+          const images = await pdfPagesToImages(file, setBusy);
+          scan = await scanImagesWithGemini(images);
+        } catch (geminiErr) {
+          console.warn("Gemini PDF scan failed, using on-device extraction:", geminiErr);
+          const text = await pdfToText(file, setBusy);
+          scan = parseScannedBill(text);
+        }
       } else {
         // Gemini reads the photo directly (no OCR step) and handles skew,
         // low light, and mangled columns far better than Tesseract. It needs

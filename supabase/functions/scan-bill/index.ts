@@ -45,15 +45,16 @@ const RESPONSE_SCHEMA = {
   required: ["vendor", "invoiceNo", "date", "invoiceTotal", "gstPct", "otherCharges", "otherChargesTaxed", "items"],
 };
 
-const PROMPT = `This is a photo of an Indian GST tax invoice / bill. Read it and return the goods only.
+const PROMPT = `This is one Indian bill, quotation, or Bill of Quantities (BOQ) — either a single photo, or a sequence of page images in reading order from one PDF. Read it and return the goods/services only.
 
 Rules:
-- "items" is ONLY the goods/materials rows from the main table. Never include CGST, SGST, IGST, tax-summary rows, "Rounding Off", "Taxable Value", or the printed grand total as an item.
+- If more than one page image is given, treat them as one continuous document — merge every goods/services row from every page into a single "items" array. A multi-section BOQ (e.g. a "supply of equipment" annexure followed by a separate "installation/labour" annexure) is still one document: include line items from every section.
+- "items" is ONLY the goods/materials/service rows from the main tables. Never include CGST, SGST, IGST, tax-summary rows, "Rounding Off", "Taxable Value", section subtotals (e.g. "SUB GROUP", "Basic Price For ..."), or the printed grand total as an item.
 - Freight, packing, cartage, transport, or loading charges are real charges but are NOT goods — put their amount in "otherCharges", not in "items".
 - Bills treat freight two different ways, so read this one carefully and set "otherChargesTaxed" accordingly. If the freight row has its own HSN/SAC code and GST rate (e.g. "Freight (GST) 996511 18 %"), or the tax summary's total taxable value equals the goods subtotal PLUS the freight, then GST is charged on the freight — set it true. If freight is just a plain line with no HSN and no rate, and the taxable value equals the goods subtotal alone, set it false.
 - If a row's quantity is split across two lines (e.g. "150.00 Mtr" on one line, "2 Bundal" as a note below), use the actual quantity/unit columns, not the note.
-- invoiceTotal is the final amount payable — usually the largest number on the bill, near a "Total" or "Rs" label at the bottom of the goods table, in words nearby ("Rupees ... Only"). It is NOT a per-item HSN/tax-summary subtotal.
-- vendor is the company issuing the bill (the letterhead at the top), never the "Buyer" / "Bill to" name.
+- invoiceTotal is the final amount actually payable across the WHOLE document — if there are several sections each with their own subtotal, use the single combined bottom-line total (e.g. "TOTAL A + B", "Grand Total"), not any one section's subtotal.
+- vendor is the company issuing the document (the letterhead at the top), never the "Buyer" / "Bill to" / "Project" name.
 - If you can't read a field confidently, make your best reasonable estimate — the user reviews and corrects every field before saving, so a best guess is far more useful than an empty value.`;
 
 function errorResponse(message: string, status = 500): Response {
@@ -70,15 +71,18 @@ Deno.serve(async (req: Request) => {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) return errorResponse("Server is not configured with a Gemini API key.", 500);
 
-  let body: { imageBase64?: string; mimeType?: string };
+  let body: { images?: { imageBase64?: string; mimeType?: string }[] };
   try {
     body = await req.json();
   } catch {
-    return errorResponse("Expected JSON body with imageBase64 and mimeType.", 400);
+    return errorResponse("Expected JSON body with an images array.", 400);
   }
-  const { imageBase64, mimeType } = body;
-  if (!imageBase64 || !mimeType) {
-    return errorResponse("Missing imageBase64 or mimeType.", 400);
+  const images = body.images ?? [];
+  if (
+    images.length === 0 ||
+    images.some((im) => !im.imageBase64 || !im.mimeType)
+  ) {
+    return errorResponse("Missing images, or an image is missing imageBase64/mimeType.", 400);
   }
 
   let upstream: Response;
@@ -94,7 +98,7 @@ Deno.serve(async (req: Request) => {
         model: MODEL,
         input: [
           { type: "text", text: PROMPT },
-          { type: "image", data: imageBase64, mime_type: mimeType },
+          ...images.map((im) => ({ type: "image", data: im.imageBase64, mime_type: im.mimeType })),
         ],
         response_format: {
           type: "text",

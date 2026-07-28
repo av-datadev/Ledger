@@ -6,10 +6,11 @@
 // so this works offline like everything else.
 
 import { recognizeText } from "./ocr";
-import type { TextItem } from "pdfjs-dist/types/src/display/api";
+import type { PDFPageProxy, TextItem } from "pdfjs-dist/types/src/display/api";
 
 const MAX_PAGES = 8; // text-extraction cap — bills are short documents
 const MAX_OCR_PAGES = 4; // OCR is slow, cap the fallback harder
+const MAX_GEMINI_PAGES = 6; // covers multi-annexure BOQs (equipment + install + terms)
 const RENDER_EDGE = 1800; // match scanImage's MAX_EDGE
 const LINE_Y_TOLERANCE = 4; // PDF units — items closer than this share a line
 
@@ -78,6 +79,55 @@ function pageLines(items: TextItem[]): string {
 }
 
 /**
+ * Render one PDF page to a canvas at roughly RENDER_EDGE on its long side.
+ * Shared by the OCR fallback and the Gemini image path.
+ */
+async function renderPageToCanvas(page: PDFPageProxy): Promise<HTMLCanvasElement> {
+  const base = page.getViewport({ scale: 1 });
+  const scale = Math.min(3, RENDER_EDGE / Math.max(base.width, base.height));
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  await page.render({ canvas, viewport }).promise;
+  return canvas;
+}
+
+/**
+ * Render a PDF's pages to JPEGs for the Gemini vision path — the same way a
+ * bill photo is prepared (see geminiScan.ts), one image per page in reading
+ * order. A construction BOQ is often several pages (e.g. a "supply of
+ * equipment" annexure followed by a separate "installation" annexure with its
+ * own subtotal) — sending every page in one Gemini call lets it merge line
+ * items across the whole document instead of only seeing page 1. Capped at
+ * MAX_GEMINI_PAGES; the multi-page text-layer path (pdfToText) stays as the
+ * offline/failure fallback. Returns bare base64 (no data-URL prefix) per page.
+ */
+export async function pdfPagesToImages(
+  file: File,
+  onProgress: (msg: string) => void,
+): Promise<{ base64: string; mimeType: string }[]> {
+  onProgress("Opening the PDF…");
+  const pdfjs = await getPdfjs();
+  const task = pdfjs.getDocument({ data: await file.arrayBuffer() });
+  try {
+    const doc = await task.promise;
+    const pageCount = Math.min(doc.numPages, MAX_GEMINI_PAGES);
+    const images: { base64: string; mimeType: string }[] = [];
+    for (let p = 1; p <= pageCount; p++) {
+      onProgress(`Preparing the bill… page ${p}/${pageCount}`);
+      const page = await doc.getPage(p);
+      const canvas = await renderPageToCanvas(page);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      images.push({ base64: dataUrl.split(",")[1], mimeType: "image/jpeg" });
+    }
+    return images;
+  } finally {
+    void task.destroy();
+  }
+}
+
+/**
  * Extract the text of a PDF bill for the scan parser. Tries the embedded text
  * layer first; falls back to render + OCR when there is none (scanned PDFs).
  */
@@ -108,13 +158,7 @@ export async function pdfToText(
     const ocrChunks: string[] = [];
     for (let p = 1; p <= ocrPages; p++) {
       const page = await doc.getPage(p);
-      const base = page.getViewport({ scale: 1 });
-      const scale = Math.min(3, RENDER_EDGE / Math.max(base.width, base.height));
-      const viewport = page.getViewport({ scale });
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(viewport.width);
-      canvas.height = Math.round(viewport.height);
-      await page.render({ canvas, viewport }).promise;
+      const canvas = await renderPageToCanvas(page);
       const pageText = await recognizeText(canvas.toDataURL("image/png"), (pct) =>
         onProgress(`Scanned PDF — reading page ${p}/${ocrPages}… ${pct}%`),
       );
