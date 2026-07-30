@@ -4,7 +4,7 @@ import {
   contractorPhotoUrl,
   type Contractor,
 } from "../lib/contractors";
-import { inr } from "../lib/format";
+import { inr, formatDate } from "../lib/format";
 
 const AVAILABILITY_LABEL: Record<Contractor["availability"], string> = {
   available: "Available now",
@@ -63,72 +63,159 @@ export function FindContractor() {
   );
 }
 
+/**
+ * One directory listing. Collapsed it shows only the name and number — the two
+ * things you need to make contact — so a long list stays scannable. Tapping it
+ * opens the full record: every rate, references, terms and photos, which had no
+ * way to be seen before (the rate card was cut off at three lines and the
+ * references, advance % and payment terms were never rendered at all).
+ */
 function ContractorCard({ contractor: c }: { contractor: Contractor }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <div className="bg-surface border border-rule rounded-md p-3 space-y-2">
-      <div className="flex justify-between items-start">
-        <div>
-          <div className="font-semibold text-sm">{c.name}</div>
+    <div className="bg-surface border border-rule rounded-md overflow-hidden">
+      <button
+        type="button"
+        className="w-full text-left p-3 flex items-start justify-between gap-2"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <div className="min-w-0">
+          <div className="font-semibold text-sm truncate">{c.name}</div>
+          <div className="text-[12px] text-ink-soft money">{c.phone}</div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className={`text-[11px] font-medium ${AVAILABILITY_CLASS[c.availability]}`}
+          >
+            {AVAILABILITY_LABEL[c.availability]}
+          </span>
+          <span
+            className={`text-ink-soft transition-transform ${open ? "rotate-90" : ""}`}
+            aria-hidden
+          >
+            ›
+          </span>
+        </div>
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3 space-y-2 border-t border-rule pt-2.5">
           <div className="text-[12px] text-ink-soft">
             {c.contractorType === "general" ? "General Contractor" : "Specialist"}
             {c.area ? ` · ${c.area}` : ""}
+            {c.city ? ` · ${c.city}` : ""}
           </div>
-        </div>
-        <span className={`text-[11px] font-medium ${AVAILABILITY_CLASS[c.availability]}`}>
-          {AVAILABILITY_LABEL[c.availability]}
-        </span>
-      </div>
 
-      {c.trades.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {c.trades.map((t) => (
-            <span key={t} className="badge">{t}</span>
-          ))}
-        </div>
-      )}
-
-      {c.photos.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1">
-          {c.photos.map((p) => (
-            <img
-              key={p}
-              src={contractorPhotoUrl(p)}
-              alt=""
-              className="w-20 h-20 object-cover rounded shrink-0 border border-rule"
-            />
-          ))}
-        </div>
-      )}
-
-      {c.rateCard.length > 0 && (
-        <div className="text-[12px] text-ink-soft space-y-0.5">
-          {c.rateCard.slice(0, 3).map((r, i) => (
-            <div key={i} className="flex justify-between">
-              <span>{r.item}{r.materialIncluded ? "" : " (labour only)"}</span>
-              <span className="money">{inr(r.rate)}/{r.unit}</span>
+          {c.trades.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {c.trades.map((t) => (
+                <span key={t} className="badge">
+                  {t}
+                </span>
+              ))}
             </div>
-          ))}
-          {c.rateCard.length > 3 && (
-            <div>+{c.rateCard.length - 3} more</div>
           )}
+
+          {c.photos.length > 0 && (
+            <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1">
+              {c.photos.map((p) => (
+                <img
+                  key={p}
+                  src={contractorPhotoUrl(p)}
+                  alt=""
+                  className="w-20 h-20 object-cover rounded shrink-0 border border-rule"
+                />
+              ))}
+            </div>
+          )}
+
+          {(c.yearsExperience || c.teamSize) && (
+            <div className="text-[12px] text-ink-soft">
+              {c.yearsExperience ? `${c.yearsExperience} yrs experience` : ""}
+              {c.yearsExperience && c.teamSize ? " · " : ""}
+              {c.teamSize ? `team of ${c.teamSize}` : ""}
+            </div>
+          )}
+
+          {c.rateCard.length > 0 && (
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-ink-soft mb-1">
+                Rates
+              </div>
+              <div className="text-[12px] space-y-0.5">
+                {c.rateCard.map((r, i) => (
+                  <div key={i} className="flex justify-between gap-2">
+                    <span className="text-ink-soft">
+                      {r.item}
+                      {r.materialIncluded ? " (with material)" : " (labour only)"}
+                    </span>
+                    <span className="money shrink-0">
+                      {inr(r.rate)}/{r.unit}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(c.advancePct != null || c.paymentTerms) && (
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-ink-soft mb-1">
+                Payment
+              </div>
+              {c.advancePct != null && (
+                <div className="text-[12px] text-ink-soft">
+                  Advance: {c.advancePct}%
+                </div>
+              )}
+              {c.paymentTerms && (
+                <div className="text-[12px] text-ink-soft">{c.paymentTerms}</div>
+              )}
+            </div>
+          )}
+
+          {c.references.length > 0 && (
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-ink-soft mb-1">
+                References
+              </div>
+              <div className="space-y-0.5">
+                {c.references.map((r, i) => (
+                  <a
+                    key={i}
+                    href={`tel:${r.phone}`}
+                    className="flex justify-between gap-2 text-[12px]"
+                  >
+                    <span>{r.name}</span>
+                    <span className="money text-ink-soft">{r.phone}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {c.freeFrom && (
+            <div className="text-[12px] text-ink-soft">
+              Free from {formatDate(c.freeFrom)}
+            </div>
+          )}
+
+          {c.vouchedBy && (
+            <div className="text-[11px] text-moss">
+              Vouched for by {c.vouchedBy}
+            </div>
+          )}
+
+          <a
+            href={`tel:${c.phone}`}
+            className="btn btn-primary w-full !py-2 block text-center"
+          >
+            Call {c.phone}
+          </a>
         </div>
       )}
-
-      {(c.yearsExperience || c.teamSize) && (
-        <div className="text-[12px] text-ink-soft">
-          {c.yearsExperience ? `${c.yearsExperience} yrs experience` : ""}
-          {c.yearsExperience && c.teamSize ? " · " : ""}
-          {c.teamSize ? `team of ${c.teamSize}` : ""}
-        </div>
-      )}
-
-      {c.vouchedBy && (
-        <div className="text-[11px] text-moss">Vouched for by {c.vouchedBy}</div>
-      )}
-
-      <a href={`tel:${c.phone}`} className="btn btn-primary w-full !py-2 block text-center">
-        Call {c.phone}
-      </a>
     </div>
   );
 }

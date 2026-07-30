@@ -20,7 +20,7 @@ import {
 } from "./lib/sync";
 import { AccountSection } from "./components/Auth";
 import { RoleGate } from "./components/RoleGate";
-import { ContractorLeadForm } from "./components/ContractorLeadForm";
+import { ContractorHome } from "./components/ContractorHome";
 import { FindContractor } from "./components/FindContractor";
 import { AddContractorAdmin } from "./components/AddContractorAdmin";
 import { DIRECTORY_ADMIN_EMAIL } from "./lib/contractors";
@@ -71,7 +71,7 @@ export default function App() {
 
   if (!settled) return null; // near-instant local check — avoids a flash
   if (mode === "contractor") {
-    return <ContractorLeadForm onSwitchToBuilder={() => choose("builder")} />;
+    return <ContractorHome onSwitchToBuilder={() => choose("builder")} />;
   }
   if (mode === null) return <RoleGate onChoose={choose} />;
 

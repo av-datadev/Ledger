@@ -145,6 +145,52 @@ export interface Attachment {
   createdAt: number;
 }
 
+/**
+ * A site a contractor is working on. The contractor side of the app is
+ * multi-site by nature — a contractor runs several houses at once, and the
+ * whole problem is keeping each one's money separate.
+ *
+ * Device-local and never synced: sync is built around a household (the owners
+ * of one house), and a contractor belongs to none. Keeping these out of the
+ * sync engine also means a contractor's own books are never visible to any
+ * homeowner, which is the only version of this they'd actually use.
+ */
+export interface ContractorSite {
+  id: string;
+  name: string; // "Verma house — Civil Lines"
+  ownerName: string;
+  ownerPhone: string;
+  address: string;
+  contractAmount: number | null; // agreed price for the whole job, if fixed
+  startDate: string; // YYYY-MM-DD
+  status: "active" | "done";
+  notes: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * One money movement on a contractor's site: cash taken from the owner, or
+ * money spent on the job. `proof` is what turns a claim into a record — the
+ * photographed bill, challan or weighment slip behind a spend.
+ */
+export interface SiteLedgerRow {
+  id: string;
+  siteId: string;
+  date: string; // YYYY-MM-DD
+  /** "received" = money in from the owner; the rest are money out. */
+  kind: "received" | "material" | "labour" | "other";
+  description: string;
+  amount: number;
+  /** Photographed bill/slip backing a spend. Held inline rather than in the
+   * `attachments` table, which is entry-scoped and part of household sync. */
+  proof: Blob | null;
+  proofName: string;
+  notes: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 /** One quantity movement: received into stock, or given out to labour. */
 export interface StockMove {
   id: string;

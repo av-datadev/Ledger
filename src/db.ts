@@ -8,6 +8,8 @@ import type {
   CustomCategory,
   PersonDetails,
   Attachment,
+  ContractorSite,
+  SiteLedgerRow,
 } from "./types";
 import { CATEGORIES } from "../shared/constants";
 
@@ -23,6 +25,8 @@ export const db = new Dexie("house-ledger") as Dexie & {
   categories: EntityTable<CustomCategory, "id">;
   people: EntityTable<PersonDetails, "id">;
   attachments: EntityTable<Attachment, "id">;
+  sites: EntityTable<ContractorSite, "id">;
+  siteLedger: EntityTable<SiteLedgerRow, "id">;
 };
 
 db.version(1).stores({
@@ -175,6 +179,23 @@ db.version(8)
         if (!Array.isArray(p.contractLines)) p.contractLines = [];
       });
   });
+
+// v9 adds the contractor side's own books: the sites a contractor is working
+// on and each site's money movements. Purely additive — nothing on the builder
+// side changes, and these two tables are excluded from household sync by
+// design (see the ContractorSite doc comment).
+db.version(9).stores({
+  entries: "id, date, category, paidBy, createdAt, updatedAt",
+  boqItems: "id, invoiceNo, category, date, vendor, billId",
+  settings: "id",
+  stockItems: "id, category, name, createdAt",
+  stockMoves: "id, stockId, date, createdAt, billId",
+  categories: "id, name",
+  people: "id, name",
+  attachments: "id, entryId, createdAt",
+  sites: "id, status, createdAt",
+  siteLedger: "id, siteId, date, createdAt",
+});
 
 const SETTINGS_ID = "app";
 

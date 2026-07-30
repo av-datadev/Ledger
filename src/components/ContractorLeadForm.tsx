@@ -24,8 +24,12 @@ const TRADES = [
  */
 export function ContractorLeadForm({
   onSwitchToBuilder,
+  embedded = false,
 }: {
   onSwitchToBuilder: () => void;
+  /** Rendered inside ContractorHome, which already supplies the app shell and
+   * header — drop this component's own so there aren't two. */
+  embedded?: boolean;
 }) {
   const [sent, setSent] = useState(
     () => localStorage.getItem(SENT_KEY) === "1",
@@ -64,17 +68,19 @@ export function ContractorLeadForm({
   };
 
   return (
-    <div className="min-h-dvh bg-paper text-ink">
-      <header className="bg-header text-onhead sticky top-0 z-30 px-4 h-12 flex items-center justify-between border-b border-black/30">
-        <h1 className="text-sm font-semibold tracking-[0.18em]">BRICK FLOW</h1>
-        <button
-          onClick={onSwitchToBuilder}
-          className="text-onhead/90 active:text-onhead text-[11px] border border-onhead/30 rounded px-2 py-1"
-          title="Switch back to the home builder side"
-        >
-          Home builder view
-        </button>
-      </header>
+    <div className={embedded ? "" : "min-h-dvh bg-paper text-ink"}>
+      {!embedded && (
+        <header className="bg-header text-onhead sticky top-0 z-30 px-4 h-12 flex items-center justify-between border-b border-black/30">
+          <h1 className="text-sm font-semibold tracking-[0.18em]">BRICK FLOW</h1>
+          <button
+            onClick={onSwitchToBuilder}
+            className="text-onhead/90 active:text-onhead text-[11px] border border-onhead/30 rounded px-2 py-1"
+            title="Switch back to the home builder side"
+          >
+            Home builder view
+          </button>
+        </header>
+      )}
 
       <div className="px-6 py-5 mx-auto max-w-sm space-y-5">
 
@@ -149,10 +155,13 @@ export function ContractorLeadForm({
       </div>
 
       {/* The live public directory — the same list homeowners browse, so a
-          newly added listing can be verified from this side too. */}
-      <div className="border-t border-rule">
-        <FindContractor />
-      </div>
+          newly added listing can be verified from this side too. Skipped when
+          embedded: ContractorHome already shows the directory above this form. */}
+      {!embedded && (
+        <div className="border-t border-rule">
+          <FindContractor />
+        </div>
+      )}
     </div>
   );
 }

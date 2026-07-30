@@ -6,6 +6,7 @@ import { inr, num } from "../lib/format";
 import { withBalances } from "../lib/stock";
 import { BudgetCard } from "./BudgetCard";
 import { AddressCard } from "./AddressCard";
+import { UnbackedCard } from "./UnbackedCard";
 
 export function Dashboard({
   onOpenCategory,
@@ -60,6 +61,8 @@ export function Dashboard({
       </div>
 
       <BudgetCard spent={total} />
+
+      <UnbackedCard onOpenCategory={onOpenCategory} />
 
       <AddressCard />
 
