@@ -36,8 +36,12 @@ export interface SharedEntry {
   description: string;
   amount: number;
   notes: string;
+  /** Storage path of the bill/slip photo backing this row, if one was shared. */
+  proofPath: string | null;
   createdAt: string;
 }
+
+const PROOF_BUCKET = "shared-proofs";
 
 function linkFromRow(r: Record<string, unknown>): SiteLink {
   return {
@@ -63,6 +67,7 @@ function entryFromRow(r: Record<string, unknown>): SharedEntry {
     description: (r.description as string) ?? "",
     amount: Number(r.amount) || 0,
     notes: (r.notes as string) ?? "",
+    proofPath: (r.proof_path as string) ?? null,
     createdAt: r.created_at as string,
   };
 }
@@ -162,13 +167,31 @@ export async function addSharedEntry(input: {
   description: string;
   amount: number;
   notes?: string;
+  /** The bill/slip photo behind this row. Uploaded before the row is written,
+   * so a row never claims a proof that failed to reach storage. */
+  proof?: Blob | null;
 }): Promise<SharedEntry> {
   const { data: session } = await supabase.auth.getUser();
   const uid = session.user?.id;
   if (!uid) throw new Error("Sign in to share this with the other side.");
 
+  const id = input.id ?? crypto.randomUUID();
+
+  let proofPath: string | null = null;
+  if (input.proof) {
+    // Path is <link_id>/<entry_id>.jpg — the storage policies re-derive access
+    // from that first segment, so a photo is reachable by exactly the two
+    // parties on that link and nobody else.
+    const path = `${input.linkId}/${id}.jpg`;
+    const { error: upErr } = await supabase.storage
+      .from(PROOF_BUCKET)
+      .upload(path, input.proof, { contentType: "image/jpeg", upsert: true });
+    if (upErr) throw upErr;
+    proofPath = path;
+  }
+
   const row = {
-    id: input.id ?? crypto.randomUUID(),
+    id,
     link_id: input.linkId,
     author_role: input.authorRole,
     author_user_id: uid,
@@ -177,24 +200,48 @@ export async function addSharedEntry(input: {
     description: input.description,
     amount: input.amount,
     notes: input.notes ?? "",
+    proof_path: proofPath,
   };
   const { data, error } = await supabase
     .from("shared_entries")
     .insert(row)
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    // Don't leave an orphan photo in the bucket if the row itself is rejected.
+    if (proofPath) {
+      await supabase.storage.from(PROOF_BUCKET).remove([proofPath]).catch(() => {});
+    }
+    throw error;
+  }
   return entryFromRow(data as Record<string, unknown>);
 }
 
+/**
+ * A short-lived URL for a shared bill photo. The bucket is private, so there is
+ * no public link — every view is signed for the person asking, and the storage
+ * policy checks the link again on the way through.
+ */
+export async function sharedProofUrl(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from(PROOF_BUCKET)
+    .createSignedUrl(path, 60 * 60);
+  if (error) return null;
+  return data?.signedUrl ?? null;
+}
+
 /** Withdraw a row you shared. Soft-deleted so the other side's view settles
- * rather than a row vanishing mid-conversation. */
-export async function unshareEntry(id: string): Promise<void> {
+ * rather than a row vanishing mid-conversation; the photo goes for real,
+ * since an unreachable row shouldn't keep an image alive in the bucket. */
+export async function unshareEntry(id: string, proofPath?: string | null): Promise<void> {
   const { error } = await supabase
     .from("shared_entries")
     .update({ deleted: true })
     .eq("id", id);
   if (error) throw error;
+  if (proofPath) {
+    await supabase.storage.from(PROOF_BUCKET).remove([proofPath]).catch(() => {});
+  }
 }
 
 // ---------- reconciliation ----------

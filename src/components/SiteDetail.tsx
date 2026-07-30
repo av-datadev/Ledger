@@ -8,8 +8,10 @@ import {
   deleteSite,
   updateSite,
   balanceOf,
+  markRowShared,
   LEDGER_KINDS,
 } from "../lib/sites";
+import { addSharedEntry } from "../lib/siteLink";
 import { SiteBalanceCard } from "./SiteBalanceCard";
 import { SiteLinkPanel } from "./SiteLinkPanel";
 import type { ContractorSite, SiteLedgerRow } from "../types";
@@ -113,7 +115,12 @@ export function SiteDetail({
 
         <div className="space-y-1.5 mt-2">
           {sorted.map((r) => (
-            <LedgerRowCard key={r.id} row={r} onView={setViewer} />
+            <LedgerRowCard
+              key={r.id}
+              row={r}
+              onView={setViewer}
+              linkId={site.linkStatus === "approved" ? site.linkId : null}
+            />
           ))}
         </div>
       </div>
@@ -167,11 +174,16 @@ export function SiteDetail({
 function LedgerRowCard({
   row,
   onView,
+  linkId,
 }: {
   row: SiteLedgerRow;
   onView: (url: string) => void;
+  /** Set when this site is linked and approved — enables sharing a row up. */
+  linkId: string | null;
 }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [shareErr, setShareErr] = useState<string | null>(null);
   useEffect(() => {
     if (!row.proof) return;
     const u = URL.createObjectURL(row.proof);
@@ -180,6 +192,34 @@ function LedgerRowCard({
   }, [row.proof]);
 
   const isIn = row.kind === "received";
+
+  /**
+   * Push a row he's already logged — bill photo and all — up to the shared
+   * ledger, rather than making him type it a second time. Sharing stays
+   * per-row and opt-in: his margins and his other sites are nobody's business.
+   */
+  const share = async () => {
+    if (!linkId) return;
+    setSharing(true);
+    setShareErr(null);
+    try {
+      const shared = await addSharedEntry({
+        linkId,
+        authorRole: "contractor",
+        date: row.date,
+        kind: isIn ? "payment" : "spend",
+        description: row.description || KIND_LABEL[row.kind],
+        amount: row.amount,
+        notes: row.notes,
+        proof: row.proof,
+      });
+      await markRowShared(row.id, shared.id);
+    } catch (err) {
+      setShareErr(err instanceof Error ? err.message : "Could not share that.");
+    } finally {
+      setSharing(false);
+    }
+  };
   return (
     <div className="card p-2.5 flex gap-2.5">
       {url ? (
@@ -223,6 +263,26 @@ function LedgerRowCard({
         </div>
         {row.notes && (
           <div className="text-[11px] text-ink-soft mt-0.5">{row.notes}</div>
+        )}
+
+        {linkId && (
+          <div className="mt-1">
+            {row.sharedId ? (
+              <span className="text-[11px] text-moss">✓ owner can see this</span>
+            ) : (
+              <button
+                type="button"
+                className="text-[11px] underline text-ink-soft"
+                disabled={sharing}
+                onClick={() => void share()}
+              >
+                {sharing ? "Sharing…" : "Show this to the owner"}
+              </button>
+            )}
+            {shareErr && (
+              <div className="text-[11px] text-crimson mt-0.5">{shareErr}</div>
+            )}
+          </div>
         )}
       </div>
 

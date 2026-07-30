@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { inr, todayStr, formatDate } from "../lib/format";
+import { fileToAttachment } from "../lib/attach";
 import {
   listSharedEntries,
   addSharedEntry,
   unshareEntry,
+  sharedProofUrl,
   reconcile,
   type SharedEntry,
   type AuthorRole,
@@ -31,6 +33,7 @@ export function SharedLedgerPanel({
   const [rows, setRows] = useState<SharedEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [viewer, setViewer] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -122,49 +125,122 @@ export function SharedLedgerPanel({
 
       <div className="space-y-1.5">
         {rows?.map((r) => (
-          <div key={r.id} className="card p-2.5">
-            <div className="flex justify-between gap-2">
-              <span className="text-[13px] truncate">
-                {r.description || (r.kind === "payment" ? "Payment" : "Spend")}
-              </span>
-              <span
-                className={`money text-[13px] shrink-0 ${
-                  r.kind === "payment" ? "text-moss" : ""
-                }`}
-              >
-                {inr(r.amount)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center gap-2 mt-0.5">
-              <span className="text-[11px] text-ink-soft">
-                {formatDate(r.date)} ·{" "}
-                {r.authorRole === mine ? (
-                  "you"
-                ) : (
-                  <span>{counterpartyName || r.authorRole}</span>
-                )}{" "}
-                · {r.kind === "payment" ? "money moved" : "spent on site"}
-              </span>
-              {r.authorRole === mine && (
-                <button
-                  className="text-[11px] text-crimson underline shrink-0"
-                  onClick={() => void unshareEntry(r.id).then(load)}
-                >
-                  remove
-                </button>
-              )}
-            </div>
-            {r.notes && (
-              <div className="text-[11px] text-ink-soft mt-0.5">{r.notes}</div>
-            )}
-          </div>
+          <SharedRow
+            key={r.id}
+            row={r}
+            mine={mine}
+            counterpartyName={counterpartyName}
+            onChanged={load}
+            onViewProof={setViewer}
+          />
         ))}
       </div>
+
+      {viewer && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setViewer(null)}
+        >
+          <img
+            src={viewer}
+            alt="Shared bill"
+            className="max-w-full max-h-full object-contain"
+          />
+        </div>
+      )}
 
       <p className="text-[11px] text-ink-soft">
         Each side can only add or remove its own rows — neither can change the
         other's figure.
       </p>
+    </div>
+  );
+}
+
+function SharedRow({
+  row,
+  mine,
+  counterpartyName,
+  onChanged,
+  onViewProof,
+}: {
+  row: SharedEntry;
+  mine: AuthorRole;
+  counterpartyName: string;
+  onChanged: () => void;
+  onViewProof: (url: string) => void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  // The bucket is private, so a thumbnail needs a signed URL fetched per row.
+  useEffect(() => {
+    if (!row.proofPath) return;
+    let alive = true;
+    void sharedProofUrl(row.proofPath).then((u) => {
+      if (alive) setUrl(u);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [row.proofPath]);
+
+  const isMine = row.authorRole === mine;
+
+  return (
+    <div className="card p-2.5 flex gap-2.5">
+      {row.proofPath ? (
+        <button
+          type="button"
+          className="w-11 h-11 shrink-0 rounded overflow-hidden border border-rule bg-paper-2"
+          onClick={() => url && onViewProof(url)}
+          aria-label="View the shared bill"
+        >
+          {url ? (
+            <img src={url} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-[9px] text-ink-soft">…</span>
+          )}
+        </button>
+      ) : (
+        <div
+          className="w-11 h-11 shrink-0 rounded border border-dashed border-rule grid place-items-center text-[9px] text-ink-soft text-center leading-tight px-1"
+          title="No bill attached to this row"
+        >
+          No bill
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1">
+        <div className="flex justify-between gap-2">
+          <span className="text-[13px] truncate">
+            {row.description || (row.kind === "payment" ? "Payment" : "Spend")}
+          </span>
+          <span
+            className={`money text-[13px] shrink-0 ${
+              row.kind === "payment" ? "text-moss" : ""
+            }`}
+          >
+            {inr(row.amount)}
+          </span>
+        </div>
+        <div className="flex justify-between items-center gap-2 mt-0.5">
+          <span className="text-[11px] text-ink-soft">
+            {formatDate(row.date)} · {isMine ? "you" : counterpartyName || row.authorRole}{" "}
+            · {row.kind === "payment" ? "money moved" : "spent on site"}
+          </span>
+          {isMine && (
+            <button
+              className="text-[11px] text-crimson underline shrink-0"
+              onClick={() => void unshareEntry(row.id, row.proofPath).then(onChanged)}
+            >
+              remove
+            </button>
+          )}
+        </div>
+        {row.notes && (
+          <div className="text-[11px] text-ink-soft mt-0.5">{row.notes}</div>
+        )}
+      </div>
     </div>
   );
 }
@@ -185,8 +261,10 @@ function AddSharedForm({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
+  const [proof, setProof] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const save = async () => {
     const value = parseFloat(amount);
@@ -197,6 +275,10 @@ function AddSharedForm({
     setError(null);
     setBusy(true);
     try {
+      // Compress before upload, the same as every other photo in the app — a
+      // straight camera JPEG is several MB and this is going over a site's
+      // mobile data.
+      const img = proof ? await fileToAttachment(proof) : null;
       await addSharedEntry({
         linkId,
         authorRole: role,
@@ -205,6 +287,7 @@ function AddSharedForm({
         description: description.trim(),
         amount: value,
         notes: notes.trim(),
+        proof: img?.blob ?? null,
       });
       onDone();
     } catch (err) {
@@ -277,6 +360,35 @@ function AddSharedForm({
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
         />
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="field-label !mb-0">Bill / slip photo</label>
+          {proof && <span className="text-[11px] text-moss">attached</span>}
+        </div>
+        <button
+          type="button"
+          className="btn w-full !py-2 !text-[13px]"
+          onClick={() => fileRef.current?.click()}
+        >
+          {proof ? `✓ ${proof.name}` : "📷 Attach the bill"}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            setProof(e.target.files?.[0] ?? null);
+            e.target.value = "";
+          }}
+        />
+        <p className="text-[11px] text-ink-soft mt-1">
+          {role === "contractor"
+            ? "The owner sees this photo. It's the fastest way to settle a question about what was bought."
+            : "A cheque photo or receipt, so there's no doubt what this payment was."}
+        </p>
       </div>
 
       {error && <div className="text-[12px] text-crimson">{error}</div>}

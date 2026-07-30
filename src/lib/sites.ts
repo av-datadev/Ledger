@@ -97,6 +97,14 @@ export async function addLedgerRow(input: {
   });
 }
 
+/** Record that a local row now has a twin in the shared ledger. */
+export async function markRowShared(
+  rowId: string,
+  sharedId: string | null,
+): Promise<void> {
+  await db.siteLedger.update(rowId, { sharedId, updatedAt: Date.now() });
+}
+
 /** Remember the outcome of a link request against the local site. */
 export async function setSiteLink(
   siteId: string,
