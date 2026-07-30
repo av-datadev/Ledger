@@ -11,6 +11,7 @@ import {
   LEDGER_KINDS,
 } from "../lib/sites";
 import { SiteBalanceCard } from "./SiteBalanceCard";
+import { SiteLinkPanel } from "./SiteLinkPanel";
 import type { ContractorSite, SiteLedgerRow } from "../types";
 
 const KIND_LABEL = Object.fromEntries(
@@ -79,6 +80,8 @@ export function SiteDetail({
       </div>
 
       <SiteBalanceCard balance={balance} />
+
+      <SiteLinkPanel site={site} />
 
       <div>
         <div className="flex items-center justify-between mb-2">

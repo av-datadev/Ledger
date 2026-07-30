@@ -37,6 +37,8 @@ export async function createSite(input: {
     id: crypto.randomUUID(),
     ...input,
     status: "active",
+    linkId: null,
+    linkStatus: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -89,9 +91,19 @@ export async function addLedgerRow(input: {
     proof,
     proofName,
     notes: input.notes,
+    sharedId: null,
     createdAt: now,
     updatedAt: now,
   });
+}
+
+/** Remember the outcome of a link request against the local site. */
+export async function setSiteLink(
+  siteId: string,
+  linkId: string | null,
+  linkStatus: ContractorSite["linkStatus"],
+): Promise<void> {
+  await db.sites.update(siteId, { linkId, linkStatus, updatedAt: Date.now() });
 }
 
 export async function deleteLedgerRow(id: string): Promise<void> {

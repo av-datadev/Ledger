@@ -92,9 +92,20 @@ export async function readSiteBackupFile(file: File): Promise<ParsedSiteBackup> 
     throw new Error("That file doesn't look like a Brick Flow sites backup.");
   }
 
-  const sites = data.sites.filter(
-    (s): s is ContractorSite => !!s && typeof s.id === "string" && typeof s.name === "string",
-  );
+  // Backups written before site linking existed have no linkId/linkStatus.
+  // Default them rather than letting `undefined` reach Dexie, and keep a real
+  // link on restore — it lives on the server against this contractor's
+  // account, so a new phone should pick his approved sites back up.
+  const sites = data.sites
+    .filter(
+      (s): s is ContractorSite =>
+        !!s && typeof s.id === "string" && typeof s.name === "string",
+    )
+    .map((s) => ({
+      ...s,
+      linkId: s.linkId ?? null,
+      linkStatus: s.linkStatus ?? null,
+    }));
   // Drop rows pointing at a site the file doesn't contain — they'd be
   // unreachable in the UI and would silently distort no balance at all.
   const siteIds = new Set(sites.map((s) => s.id));
@@ -106,6 +117,7 @@ export async function readSiteBackupFile(file: File): Promise<ParsedSiteBackup> 
     .map(({ proofData, ...rest }) => ({
       ...rest,
       amount: Number(rest.amount) || 0,
+      sharedId: rest.sharedId ?? null,
       proof: proofData ? base64ToBlob(proofData, PROOF_MIME) : null,
     }));
 

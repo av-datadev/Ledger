@@ -197,6 +197,38 @@ db.version(9).stores({
   siteLedger: "id, siteId, date, createdAt",
 });
 
+// v10 lets a contractor's site be linked to the owner's household, and a
+// ledger row be shown to that owner. Backfilled to null/unlinked so every
+// existing site stays exactly as private as it was.
+db.version(10)
+  .stores({
+    entries: "id, date, category, paidBy, createdAt, updatedAt",
+    boqItems: "id, invoiceNo, category, date, vendor, billId",
+    settings: "id",
+    stockItems: "id, category, name, createdAt",
+    stockMoves: "id, stockId, date, createdAt, billId",
+    categories: "id, name",
+    people: "id, name",
+    attachments: "id, entryId, createdAt",
+    sites: "id, status, createdAt, linkId",
+    siteLedger: "id, siteId, date, createdAt, sharedId",
+  })
+  .upgrade(async (tx) => {
+    await tx
+      .table("sites")
+      .toCollection()
+      .modify((s: ContractorSite) => {
+        s.linkId ??= null;
+        s.linkStatus ??= null;
+      });
+    await tx
+      .table("siteLedger")
+      .toCollection()
+      .modify((r: SiteLedgerRow) => {
+        r.sharedId ??= null;
+      });
+  });
+
 const SETTINGS_ID = "app";
 
 // Custom categories sort after every built-in (which occupy 0..N-1).

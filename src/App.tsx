@@ -21,6 +21,7 @@ import {
 import { AccountSection } from "./components/Auth";
 import { RoleGate } from "./components/RoleGate";
 import { ContractorHome } from "./components/ContractorHome";
+import { LinkedContractors } from "./components/LinkedContractors";
 import { FindContractor } from "./components/FindContractor";
 import { AddContractorAdmin } from "./components/AddContractorAdmin";
 import { DIRECTORY_ADMIN_EMAIL } from "./lib/contractors";
@@ -230,6 +231,9 @@ function LedgerApp({
               />
             </div>
             <SettingsScreen />
+            <div className="border-t border-rule mt-2">
+              <LinkedContractors />
+            </div>
             <div className="border-t border-rule mt-2">
               <FindContractor />
             </div>

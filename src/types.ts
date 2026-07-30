@@ -165,6 +165,12 @@ export interface ContractorSite {
   startDate: string; // YYYY-MM-DD
   status: "active" | "done";
   notes: string;
+  /** When the owner has approved a link, the `site_links.id` joining this site
+   * to their household. null = a private site kept on this phone only. */
+  linkId: string | null;
+  /** Mirrors the link's server-side status so the UI can say "waiting for the
+   * owner" without a round trip on every render. */
+  linkStatus: "pending" | "approved" | "revoked" | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -187,6 +193,10 @@ export interface SiteLedgerRow {
   proof: Blob | null;
   proofName: string;
   notes: string;
+  /** Set once this row has been shown to the site owner — the id of its
+   * `shared_entries` counterpart. null = private to this phone. Sharing is
+   * per-row and opt-in: a contractor's own margin notes stay his. */
+  sharedId: string | null;
   createdAt: number;
   updatedAt: number;
 }
