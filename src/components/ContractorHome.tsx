@@ -4,6 +4,7 @@ import { db } from "../db";
 import { inr, todayStr } from "../lib/format";
 import { createSite, balancesBySite } from "../lib/sites";
 import { SiteDetail } from "./SiteDetail";
+import { SiteBackupPanel } from "./SiteBackupPanel";
 import { ContractorLeadForm } from "./ContractorLeadForm";
 import { FindContractor } from "./FindContractor";
 import type { ContractorSite } from "../types";
@@ -141,6 +142,8 @@ function SitesList({
           ))}
         </>
       )}
+
+      <SiteBackupPanel siteCount={sites.length} />
     </div>
   );
 }

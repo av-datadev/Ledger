@@ -94,7 +94,16 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
   } catch {
     throw new Error("That file is not valid JSON.");
   }
-  const data = raw as Partial<BackupFile>;
+  // `app` widened to string: the file is untrusted input, so it has to be
+  // comparable against another format's tag, not just this one's literal.
+  const data = raw as Omit<Partial<BackupFile>, "app"> & { app?: string };
+  // Name the likely mix-up before the generic shape check, so picking the
+  // contractor-side file here says what actually went wrong.
+  if (data.app === "brick-flow-contractor") {
+    throw new Error(
+      "That's a sites backup from the contractor side, not a ledger backup. Restore it from My sites there instead.",
+    );
+  }
   if (!Array.isArray(data.entries) || !Array.isArray(data.boqItems)) {
     throw new Error(
       "That file doesn't look like a Brick Flow backup (missing entries/boqItems arrays).",
