@@ -37,14 +37,14 @@ export function UnbackedCard({
 
   return (
     <section className="px-4 pt-5">
-      <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-1">
+      <h2 className="eyebrow mb-1">
         Paid vs billed
       </h2>
       <div className="text-[11px] text-ink-soft mb-3">
         Money handed over that no bill accounts for yet.
       </div>
 
-      <div className="bg-surface border border-rule rounded-md p-3">
+      <div className="card p-3">
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
             <div className="text-[10px] uppercase tracking-wider text-ink-soft">

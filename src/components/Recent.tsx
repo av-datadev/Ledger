@@ -57,7 +57,7 @@ export function Recent() {
         Tap any entry to edit it.
       </p>
 
-      <div className="bg-surface border border-rule rounded-md divide-y divide-rule">
+      <div className="card overflow-hidden divide-y divide-rule">
         {entries?.map((e) => {
           const edited = e.updatedAt - e.createdAt > EDIT_GAP_MS;
           return (

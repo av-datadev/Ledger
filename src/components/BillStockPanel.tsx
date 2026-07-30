@@ -105,7 +105,7 @@ export function BillStockPanel({
                 {material ? (
                   <input
                     type="checkbox"
-                    className="mt-0.5 w-4 h-4 accent-[#2F6D4F] shrink-0"
+                    className="mt-0.5 w-4 h-4 accent-moss shrink-0"
                     checked={isChecked}
                     onChange={() => toggle(line)}
                   />

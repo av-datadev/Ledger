@@ -14,7 +14,7 @@ export function SiteBalanceCard({ balance }: { balance: SiteBalance }) {
   const { received, spentWithProof, spentNoProof, toAccountFor } = balance;
 
   return (
-    <div className="bg-surface border border-rule rounded-md p-3">
+    <div className="card p-3">
       <div className="grid grid-cols-3 gap-2 text-center">
         <div>
           <div className="text-[10px] uppercase tracking-wider text-ink-soft">

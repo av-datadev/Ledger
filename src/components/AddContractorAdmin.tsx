@@ -125,7 +125,7 @@ export function AddContractorAdmin({ adminName }: { adminName: string }) {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+        <h2 className="eyebrow">
           Admin: Add contractor (Moradabad)
         </h2>
         <p className="text-[12px] text-ink-soft mt-0.5">

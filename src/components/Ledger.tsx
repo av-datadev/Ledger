@@ -172,7 +172,7 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
               className="fixed inset-0 z-40"
               onClick={() => setOpenFilter(null)}
             />
-            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-surface border border-rule rounded-md max-h-64 overflow-y-auto shadow-lg">
+            <div className="absolute z-50 left-0 right-0 top-full mt-1 card max-h-64 overflow-y-auto shadow-lg">
               <div className="flex items-center justify-between px-3 py-1.5 border-b border-rule sticky top-0 bg-surface">
                 <span className="text-[11px] uppercase tracking-[0.1em] text-ink-soft">
                   {active.label} — tick any
@@ -203,7 +203,7 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
                   >
                     <input
                       type="checkbox"
-                      className="w-4 h-4 accent-[#182b3a]"
+                      className="w-4 h-4 accent-ink"
                       checked={checked}
                       onChange={() => toggleOption(active, opt)}
                     />
@@ -242,7 +242,7 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
         </div>
       </div>
 
-      <div className="bg-surface border border-rule rounded-md divide-y divide-rule">
+      <div className="card overflow-hidden divide-y divide-rule">
         {visible.map((e) => (
           <div key={e.id} className="px-3 py-2.5">
             <div className="flex items-start justify-between gap-2">

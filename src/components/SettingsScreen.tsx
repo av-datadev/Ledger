@@ -138,7 +138,7 @@ export function SettingsScreen() {
   return (
     <div className="px-4 py-4 max-w-lg mx-auto space-y-5">
       <section className="space-y-2">
-        <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+        <h2 className="eyebrow">
           Text size
         </h2>
         <div className="flex gap-2">
@@ -164,7 +164,7 @@ export function SettingsScreen() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+        <h2 className="eyebrow">
           Reading handwritten notes
         </h2>
         <button
@@ -189,7 +189,7 @@ export function SettingsScreen() {
           backupStale ? "border-crimson bg-crimson/5" : "border-rule bg-surface"
         }`}
       >
-        <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+        <div className="eyebrow">
           Last backup
         </div>
         <div
@@ -212,7 +212,7 @@ export function SettingsScreen() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+        <h2 className="eyebrow">
           Backup &amp; restore
         </h2>
         <p className="text-[13px] text-ink-soft">
@@ -255,7 +255,7 @@ export function SettingsScreen() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+        <h2 className="eyebrow">
           CSV export
         </h2>
         <div className="grid grid-cols-3 gap-2">
@@ -272,7 +272,7 @@ export function SettingsScreen() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+        <h2 className="eyebrow">
           Danger zone
         </h2>
         <button

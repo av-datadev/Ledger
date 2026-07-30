@@ -36,7 +36,7 @@ export function FindContractor() {
   return (
     <div className="px-4 py-4 max-w-lg mx-auto space-y-3">
       <div>
-        <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+        <h2 className="eyebrow">
           Contractors in Moradabad
         </h2>
         <p className="text-[12px] text-ink-soft mt-0.5">
@@ -74,7 +74,7 @@ function ContractorCard({ contractor: c }: { contractor: Contractor }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="bg-surface border border-rule rounded-md overflow-hidden">
+    <div className="card overflow-hidden">
       <button
         type="button"
         className="w-full text-left p-3 flex items-start justify-between gap-2"

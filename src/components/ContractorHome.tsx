@@ -104,7 +104,7 @@ function SitesList({
     <div className="px-4 py-4 max-w-lg mx-auto space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+          <h2 className="eyebrow">
             My sites
           </h2>
           <p className="text-[12px] text-ink-soft mt-0.5">
@@ -134,7 +134,7 @@ function SitesList({
 
       {done.length > 0 && (
         <>
-          <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft pt-2">
+          <div className="eyebrow pt-2">
             Finished
           </div>
           {done.map((s) => (
@@ -161,7 +161,7 @@ function SiteCard({
   return (
     <button
       type="button"
-      className={`w-full text-left bg-surface border border-rule rounded-md p-3 ${
+      className={`w-full text-left card p-3 ${
         site.status === "done" ? "opacity-60" : ""
       }`}
       onClick={() => onOpen(site.id)}
@@ -226,7 +226,7 @@ function AddSiteForm({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <div className="bg-surface border border-rule rounded-md p-3 space-y-2.5">
+    <div className="card p-3 space-y-2.5">
       <div>
         <label className="field-label" htmlFor="n-name">Site name</label>
         <input

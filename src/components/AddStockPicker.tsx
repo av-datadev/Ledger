@@ -173,7 +173,7 @@ export function AddStockPicker({ onClose }: { onClose: () => void }) {
                   </button>
                 </div>
 
-                <div className="bg-surface border border-rule rounded-md divide-y divide-rule mb-3">
+                <div className="card overflow-hidden divide-y divide-rule mb-3">
                   {lines.map((line) => {
                     const added = isAdded(line);
                     return (
@@ -183,7 +183,7 @@ export function AddStockPicker({ onClose }: { onClose: () => void }) {
                       >
                         <input
                           type="checkbox"
-                          className="w-4 h-4 accent-[#2F6D4F]"
+                          className="w-4 h-4 accent-moss"
                           checked={selected.has(line.id)}
                           onChange={() => toggle(line.id)}
                         />

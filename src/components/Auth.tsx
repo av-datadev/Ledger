@@ -25,7 +25,7 @@ async function signOutAndClear(): Promise<void> {
 /** Bordered surface card used for the account blocks on the Data tab. */
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-surface border border-rule rounded-md p-3 mb-4">
+    <div className="card p-3 mb-4">
       {children}
     </div>
   );
@@ -113,7 +113,7 @@ function SignInCard() {
 
   return (
     <Card>
-      <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
+      <div className="eyebrow mb-2">
         Shared ledger
       </div>
       {status === "sent" || status === "verifying" ? (
@@ -220,7 +220,7 @@ function HouseholdSetupCard({ onReady }: { onReady: (h: Household) => void }) {
 
   return (
     <Card>
-      <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
+      <div className="eyebrow mb-2">
         Set up your shared ledger
       </div>
       <div className="space-y-3">
@@ -315,7 +315,7 @@ function AccountPanel({
 
   return (
     <Card>
-      <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
+      <div className="eyebrow mb-2">
         Shared ledger
       </div>
       <div className="text-sm font-medium">{household.name}</div>

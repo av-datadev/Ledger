@@ -41,7 +41,7 @@ export function AddressCard() {
   if (editing) {
     return (
       <div className="px-4 pt-4">
-        <div className="bg-surface border border-rule rounded-md p-3 space-y-3">
+        <div className="card p-3 space-y-3">
           <div>
             <label className="field-label" htmlFor="addr-line">
               House address
@@ -128,10 +128,10 @@ export function AddressCard() {
   return (
     <div className="px-4 pt-4">
       <button
-        className="w-full bg-surface border border-rule rounded-md p-3 text-left active:bg-ink/5"
+        className="w-full card p-3 text-left active:bg-ink/5"
         onClick={openEditor}
       >
-        <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-1">
+        <div className="eyebrow mb-1">
           House address
         </div>
         <div className="text-sm">🏠 {line}</div>

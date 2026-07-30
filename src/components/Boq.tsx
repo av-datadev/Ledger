@@ -274,10 +274,10 @@ export function Boq() {
       )}
 
       <section className="mt-2">
-        <h3 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
+        <h3 className="eyebrow mb-2">
           Coverage: BOQ vs ledger
         </h3>
-        <div className="bg-surface border border-rule rounded-md overflow-hidden">
+        <div className="card overflow-hidden">
           <table className="w-full text-[12px]">
             <thead>
               <tr className="border-b border-rule text-left text-ink-soft">
@@ -306,7 +306,7 @@ export function Boq() {
       </section>
 
       <section className="mt-5 pb-4">
-        <h3 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
+        <h3 className="eyebrow mb-2">
           Bills on record
         </h3>
         <div className="space-y-2">
@@ -314,7 +314,7 @@ export function Boq() {
             const head = rows[0];
             const open = expanded === key;
             return (
-              <div key={key} className="bg-surface border border-rule rounded-md">
+              <div key={key} className="card">
                 <button
                   className="w-full px-3 py-2.5 flex items-center justify-between gap-2 text-left"
                   onClick={() => setExpanded(open ? null : key)}

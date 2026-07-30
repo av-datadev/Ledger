@@ -29,7 +29,7 @@ export function BudgetCard({ spent }: { spent: number }) {
   if (editing) {
     return (
       <div className="px-4 pt-4">
-        <div className="bg-surface border border-rule rounded-md p-3">
+        <div className="card p-3">
           <label className="field-label" htmlFor="budget-input">
             Total budget (₹)
           </label>
@@ -90,11 +90,11 @@ export function BudgetCard({ spent }: { spent: number }) {
   return (
     <div className="px-4 pt-4">
       <button
-        className="w-full bg-surface border border-rule rounded-md p-3 text-left active:bg-ink/5"
+        className="w-full card p-3 text-left active:bg-ink/5"
         onClick={openEditor}
       >
         <div className="flex items-baseline justify-between mb-1">
-          <span className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+          <span className="eyebrow">
             Budget
           </span>
           <span

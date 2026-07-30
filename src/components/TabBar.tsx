@@ -41,7 +41,7 @@ export function TabBar({
               key={t.id}
               onClick={() => onChange(t.id)}
               className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[9.5px] tracking-wide ${
-                active ? "text-onhead" : "text-[#8fa1b0]"
+                active ? "text-onhead" : "text-onhead/55"
               }`}
               aria-current={active ? "page" : undefined}
             >

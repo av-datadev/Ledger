@@ -472,7 +472,7 @@ export function BillReview({
           <label className="flex items-start gap-2 text-[13px]">
             <input
               type="checkbox"
-              className="mt-0.5 shrink-0 accent-[#2F6D4F]"
+              className="mt-0.5 shrink-0 accent-moss"
               checked={addToStock}
               onChange={(e) => setAddToStock(e.target.checked)}
             />
@@ -573,7 +573,7 @@ function LineItem({
       : "";
 
   return (
-    <div className="bg-surface border border-rule rounded-md p-2 space-y-1.5">
+    <div className="card p-2 space-y-1.5">
       <div className="flex gap-1.5">
         <input
           className="input !py-1.5 !text-[13px] flex-1"

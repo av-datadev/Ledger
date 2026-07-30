@@ -159,7 +159,7 @@ export function People({
         </div>
       )}
 
-      <div className="bg-surface border border-rule rounded-md divide-y divide-rule mt-2">
+      <div className="card overflow-hidden divide-y divide-rule mt-2">
         {stats.map(({ cat, count, total }) => {
           const details = detailsFor(cat);
           return (

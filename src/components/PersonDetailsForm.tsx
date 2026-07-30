@@ -679,7 +679,7 @@ function Fields({
         </div>
 
         <div className="pt-1">
-          <div className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
+          <div className="eyebrow mb-2">
             Bank details
           </div>
 

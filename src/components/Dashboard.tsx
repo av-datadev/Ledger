@@ -54,7 +54,7 @@ export function Dashboard({
   return (
     <div>
       <div className="sticky top-12 z-20 bg-header text-onhead px-4 pb-4 pt-1 border-b-2 border-crimson">
-        <div className="text-[10px] uppercase tracking-[0.2em] text-[#8fa1b0]">
+        <div className="text-[10px] uppercase tracking-[0.2em] text-onhead/55">
           Total spent · {entries.length} transactions
         </div>
         <div className="money text-4xl font-bold mt-1">{inr(total)}</div>
@@ -67,7 +67,7 @@ export function Dashboard({
       <AddressCard />
 
       <section className="px-4 pt-5">
-        <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-1">
+        <h2 className="eyebrow mb-1">
           Spend by category
         </h2>
         <div className="text-[11px] text-ink-soft mb-3">
@@ -101,10 +101,10 @@ export function Dashboard({
       </section>
 
       <section className="px-4 pt-6">
-        <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
+        <h2 className="eyebrow mb-2">
           Paid by <span className="normal-case tracking-normal">(tap for details)</span>
         </h2>
-        <div className="bg-surface border border-rule rounded-md divide-y divide-rule">
+        <div className="card overflow-hidden divide-y divide-rule">
           {byPayer.map(({ payer, total: t }) => (
             <button
               key={payer}
@@ -120,10 +120,10 @@ export function Dashboard({
 
       {openStock.length > 0 && (
         <section className="px-4 pt-6 pb-6">
-          <h2 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft mb-2">
+          <h2 className="eyebrow mb-2">
             Stock in hand ({openStock.length} materials)
           </h2>
-          <div className="bg-surface border border-rule rounded-md divide-y divide-rule">
+          <div className="card overflow-hidden divide-y divide-rule">
             {openStock
               .filter((s) => s.balance !== 0)
               .sort((a, b) => a.category.localeCompare(b.category))

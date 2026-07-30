@@ -82,7 +82,7 @@ export function SiteDetail({
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+          <h3 className="eyebrow">
             Money log
           </h3>
           <button
@@ -178,7 +178,7 @@ function LedgerRowCard({
 
   const isIn = row.kind === "received";
   return (
-    <div className="bg-surface border border-rule rounded-md p-2.5 flex gap-2.5">
+    <div className="card p-2.5 flex gap-2.5">
       {url ? (
         <button
           type="button"
@@ -281,7 +281,7 @@ function AddRowForm({
   };
 
   return (
-    <div className="bg-surface border border-rule rounded-md p-3 space-y-2.5 mb-2">
+    <div className="card p-3 space-y-2.5 mb-2">
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="field-label" htmlFor="s-date">Date</label>

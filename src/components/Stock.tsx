@@ -283,7 +283,7 @@ export function Stock() {
             ))}
           </select>
           {selectedBill ? (
-            <div className="bg-surface border border-rule rounded-md overflow-hidden">
+            <div className="card overflow-hidden">
               <div className="px-3 py-2 text-sm font-medium">
                 {selectedBill.label}
                 <span className="badge ml-2">{selectedBill.category}</span>
@@ -326,12 +326,12 @@ export function Stock() {
             {rows.map((it) => (
               <div
                 key={it.id}
-                className={`bg-surface border border-rule rounded-md px-3 py-2.5 ${it.done ? "opacity-55" : ""}`}
+                className={`card px-3 py-2.5 ${it.done ? "opacity-55" : ""}`}
               >
                 <div className="flex items-start gap-2.5">
                   <input
                     type="checkbox"
-                    className="mt-1 w-4 h-4 accent-[#2F6D4F]"
+                    className="mt-1 w-4 h-4 accent-moss"
                     checked={it.done}
                     title="Tick when this material is fully used / settled"
                     onChange={(e) =>

@@ -1,39 +1,83 @@
 @import "tailwindcss";
 
+/* Design language lifted from design/brickflow-landing.html: a warm paper
+   ground, one terracotta accent, serif headings against a system sans, and a
+   single soft shadow instead of hard rules. Every value lives here so the 25
+   components stay unaware of it — see the note on the dark block below. */
 @theme {
   /* --- FLIP with theme (light values here; dark overrides below) --- */
-  --color-ink: #182b3a; /* primary text + borders + "selected" chips */
-  --color-ink-soft: #3d5266; /* secondary text */
-  --color-paper: #f2f3ef; /* page background + light text on dark chips */
-  --color-rule: #d8d9d2; /* hairline borders / dividers */
+  --color-ink: #15232e; /* primary text */
+  --color-ink-soft: #41525e; /* secondary text */
+  /* Design's ink-3 is #6b7a85, which measures 3.98:1 on paper — under AA for
+     the 11px eyebrows and captions it's used on. Darkened to 4.66:1. */
+  --color-ink-faint: #616f7a;
+  --color-paper: #f5f3ec; /* page background */
+  --color-paper-2: #fbfaf4; /* inset panels sitting on a card */
+  --color-rule: rgba(21, 35, 46, 0.1); /* hairline dividers */
+  --color-rule-strong: rgba(21, 35, 46, 0.16); /* input & button outlines */
   --color-surface: #ffffff; /* cards, inputs, buttons */
 
   /* --- STAY constant across themes --- */
-  --color-header: #182b3a; /* top bar, tab bar, sticky total (always dark navy) */
-  --color-onhead: #f2f3ef; /* text/icons sitting on the header */
-  --color-crimson: #a63a2b; /* primary action / warning accent */
-  --color-moss: #2f6d4f; /* confirm / positive accent */
+  --color-header: #15232e; /* top bar + tab bar (always dark) */
+  --color-onhead: #f5f3ec; /* text/icons on the header */
+  /* Named `crimson` for continuity — every component already asks for it by
+     that name. The value is now the design's terracotta accent, nudged from
+     its #c0562f: that measures 4.10:1 on paper and this colour carries real
+     body text (amounts, warnings), not just button fills. 4.73:1 here. */
+  --color-crimson: #b44c26;
+  --color-accent-deep: #a2431f; /* pressed state, badge text */
+  --color-accent-soft: #f3e3d8; /* badge fill, progress track */
+  --color-brass: #a98544; /* secondary accent, used sparingly */
+  --color-moss: #3e6b52; /* confirm / positive */
 
   --font-sans:
     system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  /* All system faces — the PWA must keep working with no network, so a webfont
+     from a CDN is not an option here. */
+  --font-serif:
+    "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia,
+    serif;
   --font-mono:
     ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
     "Liberation Mono", monospace;
+
+  /* Softer corners across the app: overriding Tailwind's own scale lifts every
+     existing `rounded-md` / `rounded-lg` at once, without touching a component. */
+  --radius-md: 0.625rem; /* 10px */
+  --radius-lg: 0.875rem; /* 14px */
+
+  --shadow-card:
+    0 1px 2px rgba(21, 35, 46, 0.04), 0 8px 24px -12px rgba(21, 35, 46, 0.18);
+  --shadow-float:
+    0 2px 4px rgba(21, 35, 46, 0.05), 0 30px 60px -25px rgba(21, 35, 46, 0.4);
 }
 
 /* Dark mode: redefine only the flipping tokens. Every utility that reads them
    (bg-surface, text-ink, border-rule, bg-paper …) updates automatically, so no
-   component needs its own dark: classes. The header/tab-bar keep their own
-   constant tokens and stay dark navy. */
+   component needs its own dark: classes.
+
+   Hand-authored, not derived: the source design is light-only, so nothing here
+   falls out of it for free. The accent is lifted and desaturated so terracotta
+   still reads against a near-black ground, and the shadows are dropped to
+   near-nothing because a dark surface separates by lightness, not by shade. */
 :root[data-theme="dark"] {
-  --color-ink: #e7eae6;
-  --color-ink-soft: #9fb1bf;
-  --color-paper: #0f151b;
-  --color-rule: #2b3a48;
-  --color-surface: #1a232e;
+  --color-ink: #e8e6e1;
+  --color-ink-soft: #a0aeb8;
+  --color-ink-faint: #7d8b95;
+  --color-paper: #10161c;
+  --color-paper-2: #141c24;
+  --color-rule: rgba(255, 255, 255, 0.1);
+  --color-rule-strong: rgba(255, 255, 255, 0.18);
+  --color-surface: #18212b;
   --color-header: #0b1015;
-  --color-crimson: #c65442; /* brightened for contrast on dark */
-  --color-moss: #4b9e77;
+  --color-crimson: #d2703f;
+  --color-accent-deep: #e0895c;
+  --color-accent-soft: rgba(210, 112, 63, 0.18);
+  --color-brass: #c4a165;
+  --color-moss: #4e9e76;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 8px 30px -12px rgba(0, 0, 0, 0.7);
 }
 
 html,
@@ -41,48 +85,87 @@ body {
   background-color: var(--color-paper);
   color: var(--color-ink);
   overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Headings carry the serif — the single strongest signal of the new direction,
+   and it costs nothing to apply globally since every heading in the app is a
+   real h1/h2/h3. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 /* Money figures are always monospace with tabular digits. */
 .money {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
-/* Category badge: small caps, letter-spaced, thin rule. */
+/* Section label: the design's "eyebrow". Explicitly sans — these are h2/h3
+   elements, so without this they'd inherit the serif above, and a serif at 11px
+   with wide tracking turns muddy on a low-DPI Android screen.
+   Kept ink-faint rather than the design's accent: a landing page has three of
+   these, the app has twenty-four, and in terracotta they shout over the data. */
+.eyebrow {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+
+/* A raised surface. Replaces the old flat border-only card; the border stays as
+   a hairline so the edge survives on dark, where the shadow nearly vanishes. */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+/* Category badge: a soft accent pill, per the design (was a bordered box). */
 .badge {
   font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  border: 1px solid color-mix(in srgb, var(--color-ink) 30%, transparent);
-  color: var(--color-ink-soft);
-  background: var(--color-surface);
-  padding: 1px 6px;
-  border-radius: 4px;
+  color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  border: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
   white-space: nowrap;
 }
 
 .field-label {
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-ink-soft);
+  letter-spacing: 0.12em;
+  color: var(--color-ink-faint);
   display: block;
   margin-bottom: 4px;
 }
 
 .input {
   width: 100%;
-  border: 1px solid color-mix(in srgb, var(--color-ink) 30%, transparent);
-  border-radius: 6px;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: 8px;
   background: var(--color-surface);
-  padding: 8px 10px;
+  padding: 9px 11px;
   font-size: 16px;
   color: var(--color-ink);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .input:focus {
-  outline: 2px solid var(--color-ink);
-  outline-offset: -1px;
+  outline: none;
+  border-color: var(--color-crimson);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-crimson) 18%, transparent);
 }
 /* Native controls (date picker, select arrow) follow the theme. */
 .input {
@@ -90,30 +173,48 @@ body {
 }
 
 .btn {
-  border: 1px solid color-mix(in srgb, var(--color-ink) 30%, transparent);
-  border-radius: 6px;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
-  padding: 8px 14px;
+  padding: 9px 15px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-ink);
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 .btn:active {
-  background: color-mix(in srgb, var(--color-ink) 8%, var(--color-surface));
+  background: color-mix(in srgb, var(--color-ink) 6%, var(--color-surface));
+  border-color: var(--color-ink);
 }
 .btn-primary {
   background: var(--color-crimson);
   border-color: var(--color-crimson);
   color: #fff;
+  /* The design's signature: a coloured lift under the primary action only. */
+  box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--color-crimson) 70%, transparent);
 }
 .btn-primary:active {
-  background: color-mix(in srgb, var(--color-crimson) 85%, #000);
+  background: var(--color-accent-deep);
+  border-color: var(--color-accent-deep);
 }
 .btn-primary:disabled {
   opacity: 0.5;
+  box-shadow: none;
 }
 .btn-green {
   background: var(--color-moss);
   border-color: var(--color-moss);
   color: #fff;
+}
+
+/* The design leans on hover lifts and eased transitions; honour a user who has
+   asked the OS for less movement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

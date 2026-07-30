@@ -79,7 +79,7 @@ export function SiteBackupPanel({ siteCount }: { siteCount: number }) {
 
   return (
     <div className="pt-4 mt-2 border-t border-rule space-y-2">
-      <h3 className="text-[11px] uppercase tracking-[0.15em] text-ink-soft">
+      <h3 className="eyebrow">
         Back up my sites
       </h3>
       <p className="text-[12px] text-ink-soft">
