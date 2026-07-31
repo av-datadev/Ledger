@@ -7,6 +7,7 @@ import { toCsv, downloadFile, timestampSlug } from "../lib/csv";
 import { currentHouseholdId } from "../lib/sync";
 import { useTextScale, TEXT_SCALES } from "../hooks/useTextScale";
 import { useNoteAiConsent } from "../hooks/useNoteAiConsent";
+import { PushToggle } from "./PushToggle";
 
 export function SettingsScreen() {
   const settings = useLiveQuery(() => db.settings.get("app"), []);
@@ -162,6 +163,8 @@ export function SettingsScreen() {
           Scales the whole app so text is easier to read. Saved on this device.
         </p>
       </section>
+
+      <PushToggle />
 
       <section className="space-y-2">
         <h2 className="eyebrow">

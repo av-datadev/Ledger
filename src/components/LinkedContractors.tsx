@@ -7,6 +7,7 @@ import {
   type SiteLink,
 } from "../lib/siteLink";
 import { SharedLedgerPanel } from "./SharedLedgerPanel";
+import { notifyCounterparty } from "../lib/push";
 
 /**
  * The homeowner's end of site linking: the code to hand out, and the decision
@@ -45,6 +46,10 @@ export function LinkedContractors() {
     setBusyId(id);
     try {
       await decideLink(id, approve);
+      // Only on approval: a rejected contractor doesn't need a push about it.
+      if (approve) {
+        notifyCounterparty(id, "link_approved", "You can now see the shared ledger");
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update that.");

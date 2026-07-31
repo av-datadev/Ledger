@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { requestLink, getLink } from "../lib/siteLink";
+import { notifyCounterparty } from "../lib/push";
 import { setSiteLink } from "../lib/sites";
 import { SharedLedgerPanel } from "./SharedLedgerPanel";
 import { ContractorAuth } from "./ContractorAuth";
@@ -133,6 +134,13 @@ function RequestForm({
         label: site.name,
       });
       await setSiteLink(site.id, link.id, link.status);
+      // Tell the owner someone is waiting — otherwise the request sits unseen
+      // until they next happen to open the Data tab.
+      notifyCounterparty(
+        link.id,
+        "link_requested",
+        `${name.trim() || "A contractor"} asked to link to your site`,
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not send that request.",

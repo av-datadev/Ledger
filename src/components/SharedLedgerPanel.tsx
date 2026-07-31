@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { inr, todayStr, formatDate } from "../lib/format";
 import { fileToAttachment } from "../lib/attach";
+import { notifyCounterparty } from "../lib/push";
 import {
   listSharedEntries,
   addSharedEntry,
@@ -289,6 +290,11 @@ function AddSharedForm({
         notes: notes.trim(),
         proof: img?.blob ?? null,
       });
+      notifyCounterparty(
+        linkId,
+        "entry_shared",
+        `${inr(value)} — ${description.trim() || (role === "owner" ? "payment" : "spend")}`,
+      );
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not share that.");

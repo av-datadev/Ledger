@@ -41,6 +41,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Push + notification-click handlers, pulled into the generated worker.
+        // Adding them this way keeps the precache/update behaviour below exactly
+        // as tuned, instead of hand-writing the whole worker to gain a listener.
+        importScripts: ["/push-sw.js"],
         // Precache the app shell (including the pdf.js worker) but NOT the
         // /tesseract assets: those are ~14 MB of OCR cores, of which the
         // browser only ever loads the ONE matching its SIMD support. Precaching
