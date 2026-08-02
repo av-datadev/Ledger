@@ -363,6 +363,40 @@ story.append(Paragraph(
     "received inventory — see Section 8.",
     note_style,
 ))
+story.append(Paragraph(
+    "Scanning a handwritten size list (timber, marble)", h2_style))
+story.append(Paragraph(
+    "A timber or marble dealer usually hands over a rough handwritten slip "
+    "instead of a printed bill, and prices it by <b>size</b> rather than by "
+    "quantity — a heading like \"Teak\", then lines reading "
+    "<b>8&#188; x 9 x 8 - III</b>, then a total and a rate. The ordinary "
+    "scanner cannot read that: there is no invoice number, no quantity column, "
+    "and the amount is worked out from the measurements. Use <b>Size list</b> "
+    "for these.",
+    body_style,
+))
+story.append(numbered([
+    "Tap the <b>BOQ</b> tab, then tap <b>Size list</b> and photograph the slip.",
+    "Each size becomes one row: <b>length in feet</b>, <b>width in inches</b>, "
+    "<b>thickness in inches</b>, and how many <b>pieces</b> of that size. The "
+    "tally marks after the dash (I, II, III) are the piece count.",
+    "The app works out the cubic feet for each row itself "
+    "(length &#215; width &#215; thickness &#247; 144 &#215; pieces) and adds "
+    "them up.",
+    "Check the <b>quantity panel</b>: it shows what the sizes measure next to "
+    "the total the dealer wrote. If the two agree it turns green. If they "
+    "differ it turns red and will not save until you have either fixed a size "
+    "or ticked to accept the difference.",
+    "Each row shows the line as written on the slip underneath it, so you can "
+    "check a size against the photo without re-reading the whole paper.",
+]))
+story.append(Paragraph(
+    "Reading handwriting needs an internet connection — unlike a printed bill, "
+    "there is no on-device fallback for it. The <b>Handwritten slip</b> "
+    "checkbox is ticked automatically; it tells the app not to demand an "
+    "invoice number the paper never had.",
+    note_style,
+))
 story.append(Paragraph("Typing a bill manually", h2_style))
 story.append(numbered([
     "Tap the <b>BOQ</b> tab, then tap <b>Type manually</b>.",

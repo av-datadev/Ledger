@@ -142,6 +142,10 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
       basis: b.basis ?? "qty",
       length: b.length ?? null,
       width: b.width ?? null,
+      // Pre-v11 rows predate the timber (cft) columns.
+      thickness: b.thickness ?? null,
+      pieces: b.pieces ?? null,
+      writtenQty: b.writtenQty ?? null,
     };
   });
 

@@ -28,7 +28,15 @@ shared/constants.ts category / mode / payer enums + scanner keyword→category m
 src/                the PWA
 public/tesseract/   self-hosted OCR worker, wasm core, English language data
 scripts/            icon + user-guide generators
+supabase/functions/ Edge Functions: scan-bill, scan-note, scan-sizes, send-push
+supabase/migrations/ SQL for columns the sync engine pushes — apply before deploy
 ```
+
+**Sync pushes whole rows** (`upsert({...obj})` in `src/lib/sync.ts`), so any new
+field on a synced type needs its column added remotely *first* — PostgREST
+rejects the upsert otherwise, and sync.ts only `console.error`s that, which
+looks like a saved bill that silently never syncs. Apply anything new in
+`supabase/migrations/` before shipping a build that writes the field.
 
 Seed data is imported **only when the tables are empty** (first launch), from
 the JSON files at the repo root — never hardcoded in components. "Reset to
@@ -87,6 +95,10 @@ connection):
 - [ ] **BOQ**: "Scan bill" reads a photo with on-device OCR (works offline —
       the OCR engine is precached); "Type manually" opens the same form; the
       lines-sum-vs-total check works; saving stores the bill
+- [ ] **BOQ → Size list**: needs a connection, so this one is checked *before*
+      airplane mode — a timber slip reads into one `cft` row per size, the
+      measured total matches the dealer's written figure, and saving with a
+      deliberately wrong dimension is blocked until acknowledged
 - [ ] **BOQ → Stock**: saving a bill with "Add the material rows to Stock"
       ticked creates inventory items with received quantities
 - [ ] **Stock**: add an item, log "+ Received" and "− Given out" quantities,
@@ -108,6 +120,18 @@ BOQ items restored exactly.
   line items sum to the printed total (or you explicitly acknowledge a
   mismatch). Good light + flat bill + filling the frame improves results a
   lot.
+- **Size lists are read separately** (BOQ → *Size list*, `scan-sizes`). Timber
+  and stone dealers hand over a handwritten slip priced by size, not quantity
+  — `Teak / 8¼ x 9 x 8 - III / 38.987 x 2451`. The printed-invoice reader
+  can't take it (no invoice number, no quantity column, and the quantity is
+  *derived* from the dimensions), and reading it as a plain note would throw
+  the sizes away. Each size becomes one `cft` BOQ row and the app computes the
+  volume itself — **length in feet × width in inches × thickness in inches ÷
+  144 × pieces** — then reconciles its total against the dealer's own written
+  figure, which is stored beside it as `writtenQty`. The reader transcribes;
+  it never does the arithmetic, because two independent figures are the only
+  thing that makes the check worth anything. Handwriting needs a connection —
+  there's no Tesseract fallback for a superscript ¼ or a tally mark.
 - **Scanned bills auto-categorize** (paint keywords → Paint, pipes → Plumbing,
   tiles → Tiles, etc.) via the keyword map in `shared/constants.ts` — edit
   that file to tune it.

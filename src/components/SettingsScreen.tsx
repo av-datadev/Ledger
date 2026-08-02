@@ -81,7 +81,7 @@ export function SettingsScreen() {
     downloadFile(
       `brick-flow-boq-${timestampSlug()}.csv`,
       toCsv(
-        ["date", "category", "vendor", "invoiceNo", "invoiceTotal", "item", "hsn", "gstPct", "basis", "length", "width", "qty", "unit", "rate", "discPct", "amount"],
+        ["date", "category", "vendor", "invoiceNo", "invoiceTotal", "item", "hsn", "gstPct", "basis", "length", "width", "thickness", "pieces", "qty", "writtenQty", "unit", "rate", "discPct", "amount"],
         rows as unknown as Record<string, unknown>[],
       ),
       "text/csv",

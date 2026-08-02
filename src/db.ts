@@ -229,6 +229,34 @@ db.version(10)
       });
   });
 
+// v11 adds the timber columns on BOQ rows: a `cft` line is a size (length in
+// feet × width and thickness in inches) bought some number of times, so it
+// needs two inputs the area bases never had. Backfilled to null, which is
+// exactly what every non-cft row means by them.
+db.version(11)
+  .stores({
+    entries: "id, date, category, paidBy, createdAt, updatedAt",
+    boqItems: "id, invoiceNo, category, date, vendor, billId",
+    settings: "id",
+    stockItems: "id, category, name, createdAt",
+    stockMoves: "id, stockId, date, createdAt, billId",
+    categories: "id, name",
+    people: "id, name",
+    attachments: "id, entryId, createdAt",
+    sites: "id, status, createdAt, linkId",
+    siteLedger: "id, siteId, date, createdAt, sharedId",
+  })
+  .upgrade(async (tx) => {
+    await tx
+      .table("boqItems")
+      .toCollection()
+      .modify((r: BoqItem) => {
+        r.thickness ??= null;
+        r.pieces ??= null;
+        r.writtenQty ??= null;
+      });
+  });
+
 const SETTINGS_ID = "app";
 
 // Custom categories sort after every built-in (which occupy 0..N-1).
