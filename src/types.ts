@@ -18,8 +18,11 @@ export interface Entry {
  *   rft  — running feet: a length × a rate-per-foot
  *   sqft — square feet: length × width × a rate-per-sqft
  *   sqm  — square metre: length × width × a rate-per-sqm
+ *   wt   — weight in kg
+ *   cft  — cubic feet: how sawn timber is sold. Length in FEET, width and
+ *          thickness in INCHES, × pieces — see cftFrom() in lib/measure.
  */
-export type MeasureBasis = "qty" | "rft" | "sqft" | "sqm" | "wt";
+export type MeasureBasis = "qty" | "rft" | "sqft" | "sqm" | "wt" | "cft";
 
 export interface BoqItem {
   id: string;
@@ -34,12 +37,26 @@ export interface BoqItem {
   item: string;
   hsn: string | null;
   gstPct: number | null;
-  // For area/length bases, `qty` holds the derived measure (length, or
-  // length×width) so every existing consumer keeps working; `unit` mirrors the
-  // basis. `length`/`width` retain the raw inputs so the calculator can reopen.
+  // For area/length/volume bases, `qty` holds the derived measure (length,
+  // length×width, or the cubic feet) so every existing consumer keeps working;
+  // `unit` mirrors the basis. The raw inputs are retained so the calculator can
+  // reopen: `length`/`width` for every measured basis, plus `thickness` and
+  // `pieces` for `cft`, where one row is a timber size bought N times over
+  // ("8¼ ft × 9 in × 8 in — 3 pieces").
   basis: MeasureBasis;
   length: number | null;
   width: number | null;
+  /** cft only: thickness in inches. null on every other basis. */
+  thickness: number | null;
+  /** cft only: how many pieces of this exact size. null on every other basis. */
+  pieces: number | null;
+  /**
+   * The total quantity the dealer wrote on the slip, repeated on every row of
+   * the bill (like `invoiceTotal`). Kept alongside the measured `qty` rather
+   * than replacing it: the two were arrived at independently, so keeping both
+   * is what lets the bill be re-checked months later.
+   */
+  writtenQty: number | null;
   qty: number | null;
   unit: string | null;
   rate: number | null;

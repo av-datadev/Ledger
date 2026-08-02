@@ -8,7 +8,14 @@ import { recognizeText } from "../lib/ocr";
 import { pdfToText, pdfPagesToImages } from "../lib/pdf";
 import { parseScannedBill, type ScannedBill } from "../lib/scanParse";
 import { scanBillWithGemini, scanImagesWithGemini } from "../lib/geminiScan";
-import { BillReview, type DraftBill, emptyDraft, blankItem } from "./BillReview";
+import { scanSizesWithGemini } from "../lib/sizeScan";
+import {
+  BillReview,
+  recalcItem,
+  type DraftBill,
+  emptyDraft,
+  blankItem,
+} from "./BillReview";
 import { BillStockPanel } from "./BillStockPanel";
 import type { BoqItem } from "../types";
 
@@ -25,6 +32,7 @@ export function Boq() {
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const sizesRef = useRef<HTMLInputElement>(null);
 
   const editBill = (rows: BoqItem[]) => {
     const head = rows[0];
@@ -43,6 +51,11 @@ export function Boq() {
       billGstPct: String(rows.find((r) => r.gstPct != null)?.gstPct ?? 18),
       otherCharges: "",
       otherChargesTaxed: false,
+      // A saved bill with no invoice number came off a handwritten slip —
+      // re-open it under the same relaxed rules it was saved under, or editing
+      // it would demand a number the paper never had.
+      informal: !head.invoiceNo,
+      writtenQty: head.writtenQty != null ? String(head.writtenQty) : "",
       items: rows.map((r) => ({
         item: r.item,
         hsn: r.hsn ?? "",
@@ -50,6 +63,8 @@ export function Boq() {
         basis: r.basis,
         length: r.length != null ? String(r.length) : "",
         width: r.width != null ? String(r.width) : "",
+        thickness: r.thickness != null ? String(r.thickness) : "",
+        pieces: r.pieces != null ? String(r.pieces) : "",
         qty: r.qty != null ? String(r.qty) : "",
         unit: r.unit ?? "",
         rate: r.rate != null ? String(r.rate) : "",
@@ -123,6 +138,8 @@ export function Boq() {
         billGstPct: scan.gstPct || "18",
         otherCharges: scan.otherCharges,
         otherChargesTaxed: scan.otherChargesTaxed,
+        informal: false,
+        writtenQty: "",
         items: scan.items.length
           ? scan.items.map((it) => ({
               item: it.item,
@@ -131,6 +148,8 @@ export function Boq() {
               basis: "qty" as const,
               length: "",
               width: "",
+              thickness: "",
+              pieces: "",
               qty: it.qty,
               unit: it.unit,
               rate: it.rate,
@@ -144,6 +163,73 @@ export function Boq() {
       setError(
         (err instanceof Error ? err.message : "Could not read that file.") +
           " You can still enter the bill manually.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /**
+   * Read a handwritten size list — a timber or marble dealer's kaccha slip —
+   * into a bill of `cft` rows, one per size. Kept separate from onScanFile
+   * because the two papers share nothing: there is no invoice number to find,
+   * no GST to apportion, and the quantity has to be computed from dimensions
+   * rather than read off a column. The dealer's own total comes across as
+   * `writtenQty` so the review screen can check the sizes against it.
+   */
+  const onScanSizes = async (file: File) => {
+    setError(null);
+    try {
+      setBusy("Reading the sizes…");
+      const scan = await scanSizesWithGemini([file]);
+      const material = scan.material.trim();
+      setScanned(true);
+      setEditing(false);
+      setDraft({
+        billId: crypto.randomUUID(),
+        vendor: scan.vendor,
+        invoiceNo: "",
+        date: scan.date || todayStr(),
+        category: scan.category || "Wood",
+        // A kaccha slip's bottom line already includes any labour/cartage, so
+        // it is the total payable — freight is captured separately below and
+        // must not be added on top of it a second time.
+        invoiceTotal: scan.writtenTotal || scan.writtenLineAmount,
+        // Handwritten slips carry no tax; a 0% slab keeps the calculated total
+        // equal to goods + extras rather than inventing 18% on top.
+        billGstPct: "0",
+        otherCharges: scan.otherCharges,
+        otherChargesTaxed: false,
+        informal: true,
+        writtenQty: scan.writtenQty,
+        // recalcItem turns each size into its cubic feet and its amount — a
+        // scanned slip has neither until the app computes them.
+        items: scan.lines.map((l) => recalcItem({
+          // Name each row by its size so Stock and the CSV stay readable —
+          // "Teak 8.25 × 9 × 8" is the only useful name a size line has.
+          item: [material, `${l.length} × ${l.width} × ${l.thickness}`]
+            .filter(Boolean)
+            .join(" "),
+          hsn: "",
+          gstPct: "",
+          basis: "cft" as const,
+          length: l.length,
+          width: l.width,
+          thickness: l.thickness,
+          pieces: l.pieces,
+          qty: "",
+          unit: "cft",
+          rate: scan.rate,
+          discPct: "",
+          amount: "",
+          raw: l.raw,
+        })),
+      });
+    } catch (err) {
+      console.error("Size scan failed:", err);
+      setError(
+        (err instanceof Error ? err.message : "Could not read that photo.") +
+          " Handwriting can only be read online — you can also enter the sizes manually.",
       );
     } finally {
       setBusy(null);
@@ -199,7 +285,7 @@ export function Boq() {
     <div className="px-4 py-4">
       <h2 className="text-base font-semibold mb-3">Bills (BOQ)</h2>
 
-      <div className="grid grid-cols-3 gap-2 mb-2">
+      <div className="grid grid-cols-2 gap-2 mb-2">
         <button
           className="btn btn-primary"
           disabled={!!busy}
@@ -217,6 +303,13 @@ export function Boq() {
         <button
           className="btn"
           disabled={!!busy}
+          onClick={() => sizesRef.current?.click()}
+        >
+          📐 Size list
+        </button>
+        <button
+          className="btn"
+          disabled={!!busy}
           onClick={() => {
             setError(null);
             setScanned(false);
@@ -229,9 +322,14 @@ export function Boq() {
       </div>
       <div className="text-[11px] text-ink-soft mb-2">
         <b>Take photo</b> opens the camera. <b>Photo / PDF</b> lets you pick an
-        existing photo or a PDF bill. Scanning happens on this phone — free,
-        offline, nothing uploaded. Always check the rows against the bill
-        before saving.
+        existing photo or a PDF bill. Both read on this phone when there's no
+        signal — nothing has to be uploaded.{" "}
+        <b>Size list</b> is for a dealer's handwritten slip that prices by size
+        instead of quantity — a timber bill written{" "}
+        <span className="money">8¼ × 9 × 8 — 3 pc</span>. It works out the cubic
+        feet from the sizes and checks them against the dealer's own total.
+        Reading handwriting needs a connection. Always check the rows against
+        the paper before saving.
       </div>
       {/* Straight to the camera — `capture` makes the OS skip the picker. */}
       <input
@@ -258,6 +356,20 @@ export function Boq() {
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (f) void onScanFile(f);
+          e.target.value = "";
+        }}
+      />
+      {/* A size list is always a photo of a scrap of paper, never a PDF, so
+          unlike the picker above this one can safely filter to images — which
+          also lets the OS offer the camera directly. */}
+      <input
+        ref={sizesRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void onScanSizes(f);
           e.target.value = "";
         }}
       />
