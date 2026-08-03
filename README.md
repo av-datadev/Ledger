@@ -1,145 +1,187 @@
 # Brick Flow
 
-Offline-first PWA for tracking construction expenses on the house project.
-Replaces the Excel workbook and the browser-only prototype.
+A PWA for tracking the money, materials and people involved in building a
+house. Formerly "House Ledger". Built for one real project in Moradabad, UP,
+and shaped by what actually goes wrong there — vendors who hand over a
+handwritten slip instead of an invoice, and a contractor whose figures don't
+match yours.
 
-Pure client-side app — everything lives in IndexedDB (Dexie) on the device.
-No server, no API key, no network calls of any kind. Works fully offline the
-moment it's installed — **including the bill scanner**, which runs Tesseract
-OCR entirely on the device (assets self-hosted under `public/tesseract/` and
-precached by the service worker).
+**Live:** https://ledger-nu-ashen.vercel.app
 
-Screens: Dashboard · + Entry · Ledger · BOQ (with photo scanning) ·
-Stock (inventory: received / given to labour / balance, with done-checkboxes)
-· Data (backup, restore, CSV, reset).
+Data lives on-device in IndexedDB (Dexie) and works offline. Sign in and it
+also syncs across a household via Supabase, so several people share one live
+ledger. There is no seed data — a fresh install starts blank.
+
+## Two apps in one
+
+A role gate on first launch picks a side, switchable any time from the header.
+
+**Owner** (building a house) — 8 tabs: Dash · Entry · Ledger · Recent · BOQ ·
+Stock · People · Data.
+
+**Contractor** (building it for someone) — multiple sites, each with its own
+money log and a balance that splits spend-with-a-bill from spend-with-nothing.
+Site books are device-local and deliberately outside household sync: a
+contractor has no household, and his other sites must not be visible to any
+homeowner. They have their own backup/restore because of that.
+
+The two meet through a **site link**: the owner shares a site code, the
+contractor asks to link, the owner approves. That opens a third,
+separately-scoped space — one site, visible to exactly one household and one
+contractor. It is *not* household membership; a linked contractor reads none
+of the private ledger. Both sides record their own rows and neither can edit
+the other's, so "owner says ₹70,000, contractor logged ₹50,000" surfaces as a
+flagged disagreement instead of one side quietly restating the other.
+
+## What needs the network
+
+Most of the app works in airplane mode. Three things don't:
+
+| Feature | Why |
+| --- | --- |
+| Bill / note / size-list scanning | Gemini vision, via Supabase Edge Functions |
+| Household sync + sign-in | Supabase |
+| Push notifications | Web Push via the `send-push` function |
+
+Printed English bills fall back to on-device Tesseract OCR when Gemini can't
+be reached. **Handwriting and Hindi have no fallback** — Tesseract ships
+English-only training data and cannot read Devanagari at all. When the good
+reader is unavailable the review screen says so, loudly, rather than
+presenting Tesseract's guess as if it were a scan.
+
+> **Gemini free tier is 20 requests/day.** Hit it and every scan silently
+> falls back to the weaker reader. If more than one person is scanning, enable
+> billing on the API key.
 
 ## Stack
 
-Vite + React + TypeScript (strict) + Tailwind CSS · Dexie.js ·
-vite-plugin-pwa (Workbox) for the offline app shell · tesseract.js for
-on-device bill OCR.
+React 19 · Vite · TypeScript (strict) · Tailwind v4 · Dexie/IndexedDB ·
+vite-plugin-pwa (Workbox) · tesseract.js (on-device OCR) · pdfjs · jsQR ·
+write-excel-file / read-excel-file (lazy-loaded) · Supabase (Postgres + RLS +
+Edge Functions + Storage + Auth).
 
 ## Repo layout
 
 ```
-seed-entries.json   82 migrated ledger rows (₹65,07,837) — replace & rebuild to re-seed
-seed-boq.json       25 BOQ rows (Gopal Jee invoices #4275 + #2310)
-shared/constants.ts category / mode / payer enums + scanner keyword→category map
-src/                the PWA
-public/tesseract/   self-hosted OCR worker, wasm core, English language data
-scripts/            icon + user-guide generators
-supabase/functions/ Edge Functions: scan-bill, scan-note, scan-sizes, send-push
-supabase/migrations/ SQL for columns the sync engine pushes — apply before deploy
+shared/constants.ts    category enum + scanner keyword→category map
+src/                   the PWA
+src/lib/               sync, scanning, backup, stock, measures, push
+public/tesseract/      self-hosted OCR worker, wasm cores, English data
+scripts/               icon generator, tesseract vendoring, user-guide build
+supabase/functions/    scan-bill, scan-note, scan-sizes, send-push
+supabase/migrations/   SQL for columns the sync engine pushes
+design/                HTML mockups the current skin came from
+files/                 the build spec (ClaudeCode_HouseLedger_Prompt.md)
+Ref_img/               real bills used as scanner test fixtures
 ```
 
-**Sync pushes whole rows** (`upsert({...obj})` in `src/lib/sync.ts`), so any new
-field on a synced type needs its column added remotely *first* — PostgREST
-rejects the upsert otherwise, and sync.ts only `console.error`s that, which
-looks like a saved bill that silently never syncs. Apply anything new in
-`supabase/migrations/` before shipping a build that writes the field.
+Two things that will bite you:
 
-Seed data is imported **only when the tables are empty** (first launch), from
-the JSON files at the repo root — never hardcoded in components. "Reset to
-seed data" in the Data tab restores it.
+**Sync pushes whole rows** (`upsert({...obj})` in `src/lib/sync.ts`), so any
+new field on a synced type needs its column added remotely *first*. PostgREST
+rejects the upsert otherwise and sync.ts only `console.error`s it, which looks
+exactly like a bill that saved fine and silently never synced. Apply anything
+in `supabase/migrations/` before shipping a build that writes the field.
+
+**OCR needs all three Tesseract core variants** vendored, including
+relaxed-SIMD. Miss one and every scan fails on the devices that pick it.
+`npm run vendor:tesseract` runs as part of `npm run build` and enforces this.
 
 ## Local development
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173
+npm run dev
 ```
 
-That's the whole setup — no environment variables, no second process to run.
+No environment variables. The Supabase URL and publishable key are in
+`src/lib/supabase.ts` by design — they're meant to ship in client code, and
+access is protected by login plus row-level security, not by hiding them.
 
-Other scripts: `npm run build` (typecheck + production bundle + service
-worker), `npm run preview` (serve the built bundle), `npm run icons`
-(regenerate PWA icons), `npm run typecheck`.
+Secrets that must **never** reach the client (`GEMINI_API_KEY`,
+`VAPID_PRIVATE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) live only as Supabase Edge
+Function secrets.
+
+Other scripts: `npm run build` · `npm run preview` · `npm run typecheck` ·
+`npm run icons`.
 
 ## Deploy
 
-Any static host works (Vercel, Netlify, GitHub Pages, Cloudflare Pages) —
-`npm run build` produces a plain static `dist/` folder. No server, no
-environment variables, no serverless functions.
+Pushing to `main` triggers a Vercel production deploy. Edge Functions deploy
+separately (`supabase functions deploy <name>`) and are **not** part of the
+Vercel build.
 
-**Vercel:**
+The service worker precaches aggressively, so an installed app keeps serving
+the old bundle until reopened. The Data tab shows the build timestamp as **App
+version** with a **check for update** link that unregisters the worker, clears
+caches and hard-reloads.
 
-1. Push the repo to GitHub:
-   ```bash
-   git init && git add -A && git commit -m "Brick Flow"
-   git remote add origin <your-repo-url> && git push -u origin main
-   ```
-2. Go to [vercel.com](https://vercel.com) → **Add New → Project** → import the
-   repo. Vercel auto-detects Vite; keep the defaults (build `npm run build`,
-   output `dist`). Click **Deploy** — nothing else to configure.
+## Install on a phone
 
-Vercel serves over HTTPS, which the PWA install requires.
+Open the URL in Chrome (Android) or Safari (iOS), let it fully load once, then
+**Add to Home Screen**. It launches standalone with no browser chrome.
 
-## Install on your Android phone
+iOS only exposes push to an app added to the home screen, so notifications
+cannot be enabled from a browser tab there — the toggle says so instead of
+failing silently.
 
-1. Open the deployed URL in **Chrome** on the phone.
-2. Wait for the first full load (this precaches the app shell for offline use).
-3. Tap the **⋮ menu → "Add to Home Screen"** (or the "Install app" prompt).
-4. Confirm. A **Brick Flow** icon appears on the home screen; launching it
-   opens full-screen with no browser chrome (standalone display mode).
+## Feature notes
 
-## Offline behavior — manual test checklist
+- **Bills** — photo or PDF, read by Gemini into editable line items. Line
+  items are goods only; GST, freight and rounding are computed, not itemised.
+  Rows summing to *more* than the printed total blocks saving, since that means
+  a duplicated or misread row.
+- **Handwritten kaccha bills** carry something printed invoices don't: what was
+  actually paid and what's still owed. After scanning, choose **Bill only**,
+  **Payment only**, or **Both**. The ledger entry takes the *paid* figure, not
+  the invoice total, dated the day the money moved.
+- **Size lists** (BOQ → *Size list*) — timber and stone dealers price by size,
+  not quantity: `Teak / 8¼ × 9 × 8 — 3 pc`. Each size becomes one `cft` row and
+  the app computes the volume itself — **length ft × width in × thickness in ÷
+  144 × pieces** — then checks its total against the dealer's own written
+  figure, stored beside it as `writtenQty`. The reader transcribes and never
+  does the arithmetic: two independent figures are the only thing that makes
+  the check worth anything.
+- **Handwritten notes** (Entry) — a kaccha slip, cheque or Hindi diary page
+  fills the entry form and keeps the photo as proof. Opt-in per device, since
+  the photo leaves the phone.
+- **Paid vs billed** (Ledger) — money handed over that no bill accounts for
+  yet. A gap isn't proof of anything; labour never has a bill. It's worth a
+  question when the payment was for material.
+- **Backups** — JSON is the complete one and the only format carrying entry
+  photos. Excel (.xlsx) opens anywhere and can be corrected by hand and
+  uploaded back, but holds no photos, so restoring one deliberately leaves the
+  photos already on the device untouched.
+- **Categories** are editable rows, not an enum. Built-ins seed on first run:
+  Contractor, Architect, Wood, Electrical, Paint, Plumbing, Tiles, Marble,
+  Aluminium, Govt Fee/Chalan, MDA/Mutation, Gift, Site Prep, Legal, Utility
+  Bill, Misc.
+- The Android back button goes tab → dashboard → exit, and closes an open
+  review screen rather than leaving the app.
 
-After installing and opening the app once, turn on **airplane mode** and
-verify (everything should work — there's nothing in this app that needs a
-connection):
+## Manual test checklist
 
-- [ ] App launches from the home-screen icon (app shell is precached)
-- [ ] Dashboard shows the total, category bars, and paid-by list
-- [ ] **+ Entry**: add a manual entry → it appears in Ledger and Dashboard
-- [ ] **Ledger**: search, filter, delete (with confirm), Backup CSV download
-- [ ] **BOQ**: "Scan bill" reads a photo with on-device OCR (works offline —
-      the OCR engine is precached); "Type manually" opens the same form; the
-      lines-sum-vs-total check works; saving stores the bill
-- [ ] **BOQ → Size list**: needs a connection, so this one is checked *before*
-      airplane mode — a timber slip reads into one `cft` row per size, the
-      measured total matches the dealer's written figure, and saving with a
-      deliberately wrong dimension is blocked until acknowledged
-- [ ] **BOQ → Stock**: saving a bill with "Add the material rows to Stock"
-      ticked creates inventory items with received quantities
-- [ ] **Stock**: add an item, log "+ Received" and "− Given out" quantities,
-      balance updates; done-checkbox greys the item out
-- [ ] **Data**: export full JSON backup; import/restore it; CSV exports work
-      (entries, BOQ, and stock)
+Offline (airplane mode, after one full load):
 
-Round-trip test (acceptance): export backup → Data → *Reset to seed data*
-(double confirm) → import the backup file → confirm counts → all entries and
-BOQ items restored exactly.
+- [ ] Launches from the home-screen icon
+- [ ] Dashboard totals, category bars, paid-by list
+- [ ] Entry: add manually → appears in Ledger, Recent and Dashboard
+- [ ] Ledger: search, the four filters (category / mode / payer / **date
+      range**), note expand-on-tap, edit, delete, CSV
+- [ ] BOQ: "Type manually" saves; a printed English bill still scans via
+      on-device OCR; the lines-vs-total check holds
+- [ ] Stock: received / given out, balance, done-checkbox
+- [ ] Data: JSON and Excel backups download; both restore
 
-## Notes
+Online only:
 
-- **Backups are your safety net.** All data is on-device only; there is no
-  cloud sync. Export the JSON backup regularly (the Data tab nags in red when
-  the last backup is older than 7 days). Backups include stock/inventory.
-- **The scanner is best-effort.** OCR on phone photos misreads numbers —
-  every scan lands in a review screen, and the bill can't be saved unless the
-  line items sum to the printed total (or you explicitly acknowledge a
-  mismatch). Good light + flat bill + filling the frame improves results a
-  lot.
-- **Size lists are read separately** (BOQ → *Size list*, `scan-sizes`). Timber
-  and stone dealers hand over a handwritten slip priced by size, not quantity
-  — `Teak / 8¼ x 9 x 8 - III / 38.987 x 2451`. The printed-invoice reader
-  can't take it (no invoice number, no quantity column, and the quantity is
-  *derived* from the dimensions), and reading it as a plain note would throw
-  the sizes away. Each size becomes one `cft` BOQ row and the app computes the
-  volume itself — **length in feet × width in inches × thickness in inches ÷
-  144 × pieces** — then reconciles its total against the dealer's own written
-  figure, which is stored beside it as `writtenQty`. The reader transcribes;
-  it never does the arithmetic, because two independent figures are the only
-  thing that makes the check worth anything. Handwriting needs a connection —
-  there's no Tesseract fallback for a superscript ¼ or a tally mark.
-- **Scanned bills auto-categorize** (paint keywords → Paint, pipes → Plumbing,
-  tiles → Tiles, etc.) via the keyword map in `shared/constants.ts` — edit
-  that file to tune it.
-- **Categories**: Sharik, Nitin, Wood, Electrical, Paint, Plumbing, Tiles,
-  Marble, Aluminium, Govt Fee/Chalan, MDA/Mutation, Gift, Site Prep, Legal,
-  Utility Bill, Misc — shared by the ledger, dashboard, BOQ and stock.
-- The Android back button navigates tab → dashboard → exit, and closes the
-  bill review screen instead of leaving the app.
-- Replacing the seed: regenerate `seed-entries.json` / `seed-boq.json`,
-  rebuild, redeploy — the JSON is bundled so first-run seeding also works
-  offline.
+- [ ] BOQ scan of a photo/PDF via Gemini
+- [ ] BOQ → Size list on a timber slip; measured total matches the written one
+- [ ] A handwritten kaccha bill offers Bill / Payment / Both
+- [ ] Sign in, sync across two devices
+- [ ] Site link: share code, approve, both sides post to the shared ledger
+- [ ] Push arrives on a real phone
+
+Round trip: export a backup → clear all data → import it → counts match.
+Worth doing for **both** formats; the Excel path is verified to preserve
+nulls-as-nulls, a `gstPct` of 0, and nested contract lines.

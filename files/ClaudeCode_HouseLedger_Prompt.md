@@ -1,127 +1,214 @@
-# Claude Code Build Prompt — House Construction Ledger PWA
+# Brick Flow — build spec
 
-Paste everything below into Claude Code as the initial instruction.
+Originally the prompt that created this app as "House Ledger". Kept current as
+a specification of what it now is, so it can be rebuilt or handed to someone
+new. Where the original brief was overtaken by reality, this says so — those
+reversals are the most useful part of the document.
+
+Last updated: 2026-08-03.
 
 ---
 
-Build an installable, offline-first Progressive Web App called **House Ledger** for tracking construction expenses on a house-building project. This replaces an Excel workbook and a prior browser-only prototype. Target platform: Android Chrome, installed via "Add to Home Screen" (manifest-based PWA, not React Native). I want a home-screen icon that opens full-screen with no browser chrome, works with zero internet connection for all core features, and syncs AI features only when online.
+Build an installable, offline-first PWA called **Brick Flow** for tracking the
+money, materials and people involved in building a house. It replaces an Excel
+workbook. Target: Android Chrome and iOS Safari, installed to the home screen,
+full-screen with no browser chrome.
 
-## 1. Tech stack (use exactly this unless you have a strong reason not to — tell me if you deviate)
+## 1. Stack
 
-- **Frontend**: Vite + React + TypeScript + Tailwind CSS
-- **Local storage**: Dexie.js (IndexedDB wrapper) — not localStorage, it's too small and fragile for this data volume long-term
-- **Offline/installability**: `vite-plugin-pwa` (Workbox under the hood) — precache the app shell, manifest.json with icons (generate a simple icon: dark navy background, a stacked-coins or ledger-line glyph, no photographic assets)
-- **Backend**: a minimal Node/Express server (or Vercel serverless functions if you deploy there) with exactly two routes:
-  - `POST /api/parse-voice` — takes transcribed text, returns structured transaction JSON
-  - `POST /api/extract-bill` — takes a base64 image or PDF, returns structured BOQ JSON
-  Both routes call the Anthropic API server-side using an API key from an environment variable (`ANTHROPIC_API_KEY`), never sent to or stored in the client.
-- **Deployment**: assume Vercel (frontend + serverless functions together) unless I say otherwise. Give me exact deploy steps at the end.
+- **Frontend** — Vite + React + TypeScript (strict) + Tailwind v4
+- **Local storage** — Dexie.js (IndexedDB). Not localStorage: too small and too
+  fragile for years of a build.
+- **Offline** — `vite-plugin-pwa` (Workbox), precached app shell
+- **Backend** — Supabase: Postgres with row-level security, Auth (email OTP),
+  Storage, and Edge Functions. No Express server.
+- **AI** — Gemini vision, called *only* from Edge Functions so the key never
+  reaches a device
+- **Deployment** — Vercel for the client (auto-deploys from `main`), Supabase
+  CLI for functions
+
+> **Reversed from the original brief.** It specified an Express/Vercel
+> serverless backend calling the Anthropic API, and "no cloud sync, on-device
+> only". Both changed: several family members needed one shared ledger, which
+> forced a real database with row-level security, and once Supabase was there
+> the Edge Functions were the natural home for the AI calls. The instinct the
+> original got right — *never put the API key in the client* — is unchanged and
+> is why every model call still goes through a function.
 
 ## 2. Data model
 
-Two tables in Dexie, plus a settings table.
+Dexie tables: `entries`, `boqItems`, `stockItems`, `stockMoves`, `categories`,
+`people`, `attachments`, `settings`, plus contractor-side `contractorSites` and
+`siteLedgerRows`.
 
-**entries** (the payment ledger):
+**entries** — the payment ledger:
 ```
-id: string (uuid)
-date: string (YYYY-MM-DD)
-category: string — one of: Sharik, Nitin, Wood, Electrical, Govt Fee/Chalan, MDA/Mutation, Gift, Site Prep, Legal, Utility Bill, Misc
-event: string (short description, e.g. "Payment to Sharik")
-detail: string (optional sub-vendor/detail, e.g. "Kisan Treders")
-amount: number
-mode: string — one of: Cash, GPay (SBI - 8101), GPay (DCB 0003), GPay (Deutsche Bank), GPay (PNB), SBI 8101, Cheque, SBI FD MDA, Other
-paidBy: string — one of: Rajesh Verma, Sanjeev Verma, Sachin Verma, Chitra Verma, Apoorv Verma
-notes: string (optional)
-createdAt: number (timestamp, for sort/audit)
+id, date (YYYY-MM-DD), category, event, detail, amount,
+mode, paidBy, notes, createdAt, updatedAt
 ```
 
-**boqItems** (itemized bill line items, many-to-one with an invoice):
+**boqItems** — bill line items, many-to-one with an invoice via `billId`:
 ```
-id: string (uuid)
-date: string
-category: string (same enum as above)
-vendor: string
-invoiceNo: string
-invoiceTotal: number (printed grand total on the bill — same for every line item under one invoice)
-item: string (description)
-hsn: string | null
-gstPct: number | null
-qty: number | null
-unit: string | null
-rate: number | null
-discPct: number | null
-amount: number (pre-tax line amount as printed; SGST/CGST/Freight/Rounding are their own rows with item="SGST" etc. and null hsn/qty/unit/rate)
+id, billId, date, category, vendor, invoiceNo, invoiceTotal,
+item, hsn, gstPct,
+basis ("qty" | "rft" | "sqft" | "sqm" | "wt" | "cft"),
+length, width, thickness, pieces, writtenQty,
+qty, unit, rate, discPct, amount
 ```
+`basis` drives how `qty` is derived. For `cft` it's
+`length ft × width in × thickness in ÷ 144 × pieces`. `writtenQty` holds the
+dealer's own written total, purely so the app's figure can be checked against
+it — it is never used in a calculation.
 
-**settings**: single row — `lastBackupDate`, `apiEndpoint` (defaults to same-origin `/api`).
+**Categories are editable rows, not an enum.** Built-ins seed on first run;
+each is also a person/vendor with contact details, bank details and contract
+pricing (including per-floor contract lines).
 
-## 3. Seed data — import on first launch only
+> **Reversed from the original brief.** It specified a fixed 11-value category
+> enum with real names hardcoded. Real use broke that within a week — an
+> "Electrician" as a payee is a different thing from "Electrical" as a material
+> cost, and the list has to be editable per project.
 
-On first run (empty database), seed `entries` with the migrated data from the source Excel workbook (82 transactions, ₹65,07,837 total). I will attach `seed-entries.json` in the repo root — read it and load it via a one-time migration if the `entries` table is empty.
+**No seed data.** A fresh install starts blank; a signed-in one pulls the
+household's data down. The original brief specified seeding 82 migrated rows
+from `seed-entries.json` on first launch — that was right for the first user
+and wrong for everyone after, so the seed files were removed from the bundle.
 
-Also seed `boqItems` with the 25 line items across the two Gopal Jee Electricals invoices (#4275, ₹6,090 and #2310, ₹22,981) — read from `seed-boq.json` in the repo root, same first-run-only migration logic.
+## 3. Two roles
 
-Do not hardcode the seed data inline in a component. Load it from the JSON files so I can regenerate/replace them later without touching app code.
+A role gate on first launch, switchable from the header.
 
-## 4. Screens / navigation
+**Owner** — 8 tabs: Dash · Entry · Ledger · Recent · BOQ · Stock · People · Data.
 
-Bottom tab bar, 5 tabs, persists across the whole app:
+**Contractor** — multiple sites, each with its own money log and a balance
+splitting spend-with-a-bill from spend-with-nothing. Device-local and outside
+household sync by design: a contractor has no household, and his other sites
+must never be visible to a homeowner. That means a lost phone loses the books,
+so the contractor side has its own JSON backup/restore.
 
-1. **Dashboard** — running total in a sticky header (large, bold, formatted `₹XX,XX,XXX` Indian digit grouping). Below: horizontal bar chart of spend by category (11 categories), and a simple list of totals by "Paid By" person. All numbers computed live from Dexie, not cached.
+**Site linking** joins them. The owner shares a site code (separate from the
+family invite code, so revoking a contractor never disturbs family sync); the
+contractor requests; the owner approves. This is deliberately **not** household
+membership — that would hand him all entries, every other vendor, the budget,
+bank details, and family transfers. It's a third, separately-scoped space:
+one site, one household, one contractor. Both sides record their own rows,
+`author_role` is enforced server-side, and neither can edit the other's, so a
+mismatch is *flagged* rather than silently overwritten. Surfacing the
+disagreement is the entire point of the feature.
 
-2. **+ Entry** — the transaction form: Date (date picker, defaults today), Category (select, the 11-item enum), Description (text), Sub-vendor/detail (text, optional), Amount (numeric input, big and bold), Payment mode (select), Paid by (select), Notes (text, optional). A microphone button next to the header:
-   - Tap to start Web Speech API (`SpeechRecognition`/`webkitSpeechRecognition`) listening, `lang = 'en-IN'`.
-   - On result, if online: POST the transcript to `/api/parse-voice`, receive structured JSON, populate the form fields for the user to review (never auto-save).
-   - If offline or the API call fails: run a local regex/keyword fallback parser (detect category keywords, "lakh"/"hazar"/"thousand" multipliers, payer first names, "gpay"/"cash"/"cheque" for mode) and populate what it can, with a visible "offline parse — please check the amount" warning.
-   - Validate before save: amount > 0, description non-empty.
+## 4. Screens
 
-3. **Ledger** — searchable, filterable (by category) list of all entries, newest first, each row showing description, date, category badge, mode, paid by, amount, and a delete button with a confirm step. A "Backup CSV" button that generates and downloads/shares a CSV of all visible (filtered) entries.
+1. **Dashboard** — sticky total in Indian digit grouping, budget bar, spend by
+   category (tap to drill into the Ledger), paid-by breakdown, stock in hand,
+   house address.
 
-4. **BOQ** — bill tracking:
-   - Two add-bill paths: **Camera** (`<input type="file" accept="image/*" capture="environment">`) and **Upload file** (`<input type="file" accept="image/*,application/pdf">`).
-   - On file selected, if online: convert to base64, POST to `/api/extract-bill`, receive `{ vendor, invoiceNo, date, category, invoiceTotal, items: [...] }`.
-   - Show a review screen: editable vendor/invoice/date/category fields, an editable list of line items (description, qty, unit, rate, amount all editable inline), and a running "lines sum vs invoice total" check — block save unless they match (or the user acknowledges a mismatch explicitly).
-   - If offline: skip AI extraction, go straight to a blank manual bill-entry form with the same structure and same reconciliation check.
-   - A checkbox, unchecked by default: "Also create a ledger entry for this bill's total" — only creates an `entries` row if checked, to avoid double-counting bills that are already logged as a ledger payment.
-   - Below: a **reconciliation table** — for each of the 11 categories, show BOQ-itemized total vs. ledger total for that category, so the user can see coverage.
-   - Below that: list of bills on record, grouped by invoice, expandable to show line items, each group deletable.
+2. **Entry** — date, category, description, detail, amount, mode, paid-by,
+   notes, plus photo attachments. Can read a handwritten slip, cheque or Hindi
+   diary page into the form (opt-in per device — the photo leaves the phone).
 
-5. **Data / Settings**:
-   - **Export backup**: dumps entire Dexie database (`entries` + `boqItems`) to a single timestamped `.json` file, downloaded to the device. This is the primary safety net — say so explicitly in the UI copy.
-   - **Import/restore**: file picker for a `.json` backup, confirms before overwriting current data, shows entry/BOQ counts before confirming.
-   - **CSV export** for both tables independently.
-   - Show "last backup: [date]" prominently, in red/warning color if more than 7 days old or never.
-   - **Reset to seed data** button (double confirm) for recovering from mistakes during testing.
+3. **Ledger** — search; four filters: category, mode, payer, and **date range**
+   (from, to, or either alone). Long notes fold behind a "note" chip. Inline
+   edit and delete. CSV export. **Paid vs billed** sits at the top: paid,
+   billed, and the gap no bill accounts for, with a per-payee breakdown that
+   filters the list beneath it.
 
-## 5. Offline behavior — be explicit about this, don't hand-wave it
+4. **Recent** — the 50 most recently added or edited entries.
 
-- Precache the entire app shell (JS/CSS/HTML/icons) so the app opens fully offline after first successful load.
-- Dexie/IndexedDB works fully offline by nature — Dashboard, Ledger, manual BOQ entry, backup/restore, CSV export must all work with airplane mode on. Write a manual test checklist into the README for me to verify this.
-- Only these two things require internet: voice→AI parsing, bill photo→AI extraction. Both must fail gracefully (network error caught, fallback UI shown, never a blank screen or unhandled promise rejection) and never block the rest of the app.
-- Show a persistent small "offline" indicator in the header when `navigator.onLine` is false, so the user knows why AI buttons are disabled/degraded.
+5. **BOQ** — four ways in: Take photo · Photo/PDF · Size list · Type manually.
+   Everything lands in a review screen before saving. Rows summing to *more*
+   than the printed total blocks the save; below it is fine, because that gap
+   is the tax. Two-way BOQ↔Stock linking. Coverage table vs the ledger.
 
-## 6. Visual design
+6. **Stock** — received vs given out to labour, balance, hard-linked to the
+   source bill.
 
-Not a generic Material Design template. Direction: dense, ledger/accounting aesthetic — think a physical accounts register, not a consumer fintech app. Dark ink-navy header (`#182B3A`), warm off-white background (`#F2F3EF`), a muted crimson accent (`#A63A2B`) for primary actions and warnings, a muted green (`#2F6D4F`) for confirmations/positive states, monospace font for all money figures, a humanist sans (system font is fine) for everything else. Category badges in small caps, letter-spaced. No rounded-pill buttons everywhere — rectangular with small corner radius (6-8px), thin 1px borders, no heavy shadows. Mobile-first, single column, bottom tab bar fixed.
+7. **People** — every category as an editable person: contact, contract
+   pricing (lump sum, area×rate, or per-floor lines), bank details scannable
+   from a UPI QR, per-person totals.
 
-## 7. Non-functional requirements
+8. **Data** — JSON and Excel backup/restore, CSV exports, notification toggle,
+   text size, site code and linked contractors, a folded FAQ, app version with
+   a force-update link, danger zone.
 
-- TypeScript strict mode on.
-- No console errors or warnings in normal use.
-- Handle the Android back button sanely (don't exit the app from a sub-screen).
-- Lighthouse PWA score should pass installability checks (manifest, service worker, HTTPS, icons at 192/512).
-- README must include: local dev instructions, environment variables needed (`ANTHROPIC_API_KEY`), Vercel deploy steps, and exact steps for me to install this on my Android phone once deployed (open URL in Chrome → menu → "Add to Home Screen" / "Install app").
-- Do not commit `.env` or the API key anywhere.
+## 5. Scanning
 
-## 8. What "done" looks like — acceptance checklist
+Three Edge Functions, deliberately separate because the outputs differ:
 
-- [ ] Fresh install on Android Chrome, "Add to Home Screen" produces a full-screen app icon
-- [ ] Airplane mode: can add a manual entry, view dashboard, add a manual BOQ bill, export/import backup — all work
-- [ ] Online: voice mic correctly parses at least "paid Sharik fifty thousand cash" into category=Sharik, amount=50000, mode=Cash
-- [ ] Online: uploading a clear photo of a GST tax invoice extracts line items whose sum matches the printed total, or clearly flags a mismatch
-- [ ] Backup JSON export → wipe app data → import same file → all entries and BOQ items restored exactly
-- [ ] No entry can be saved with a zero/blank amount or empty description
+| Function | Input | Output |
+| --- | --- | --- |
+| `scan-bill` | printed invoice **or** handwritten kaccha bill | line items + totals + payment |
+| `scan-note` | a slip that is *only* a payment | one ledger entry |
+| `scan-sizes` | a dealer's size list | one `cft` row per size |
 
----
+`scan-bill` also reads what a kaccha bill records and a printed invoice never
+does — जमा (paid) and शेष (balance) — so one sheet of paper can become a bill,
+a payment, or both, and the person chooses which.
 
-I disagree with skipping the backend proxy to save build time — the risk is a leaked API key racking up charges the moment someone opens dev tools on your phone. If you want to cut scope instead, cut the voice feature first, not the key security.
+Rules the prompts encode, each from a real misread:
+
+- Indian digit grouping is lakh-based: `1,00,000` is 100000
+- Handwriting is day-first: `21/7/26` is 21 July
+- Item names come back in **English** — untranslated Devanagari filed every
+  plumbing bill under Misc, because the category matcher is keyword-based
+- Vendor is left **empty** rather than guessed; the reader used to answer
+  "Hardware Store" for a paper naming no seller, and the review screen then
+  demanded that fiction before it would save
+- Vendors tick delivered rows, and the tick fuses with the digit it touches —
+  a tick plus `1` is indistinguishable from a `4`, so a written 10 read as 40.
+  The quantity column is read as a *column* for this reason.
+
+On-device Tesseract stays as the offline fallback for printed English bills.
+**It has no ability to read Devanagari or handwriting**, so when it stands in,
+the review screen says so and names the cause. Falling back silently produced a
+confidently wrong bill that looked exactly like a right one.
+
+> **Gemini's free tier allows 20 requests/day.** Exhaust it and every scan
+> degrades to the fallback. Enable billing if more than one person scans.
+
+## 6. Offline behaviour
+
+Precache the shell. Dexie works offline by nature: dashboard, ledger, manual
+entry, manual BOQ, stock, backup/restore and CSV must all work in airplane
+mode. Only sync, scanning and push need a connection, and each must fail
+visibly rather than blankly.
+
+## 7. Visual design
+
+A ledger/accounting aesthetic, not consumer fintech. Warm paper ground
+(`#F5F3EC`), ink navy (`#15232E`), one terracotta accent (`#C0562F`), muted
+moss for positives, serif headings against system sans, monospace for every
+money figure, small-caps letter-spaced badges, soft card shadows, 10px radii.
+Mobile-first, single column, fixed bottom tab bar.
+
+**Every colour is a token in `src/index.css`.** No component hardcodes one,
+which is what let the whole app be reskinned as a token swap in a single file.
+Dark mode is hand-authored — nothing dark falls out of a light-only mockup for
+free. Keep ≥44px tap targets, respect `prefers-reduced-motion`, and self-host
+any font: this app must not fetch from a CDN at runtime.
+
+## 8. Non-functional
+
+- TypeScript strict; no console errors in normal use
+- Android back button: tab → dashboard → exit, and closes a review screen
+  rather than leaving the app
+- Passes PWA installability (manifest, service worker, HTTPS, 192/512 icons)
+- **Never commit a secret.** `GEMINI_API_KEY`, `VAPID_PRIVATE_KEY` and the
+  service-role key exist only as Edge Function secrets. The Supabase URL and
+  publishable key are *meant* to ship — RLS is the protection, not obscurity.
+- Any new field on a synced type needs its remote column added **first**, or
+  the upsert is rejected and only `console.error`s — indistinguishable from a
+  save that worked.
+
+## 9. Acceptance
+
+- [ ] Installs to the home screen and launches standalone
+- [ ] Airplane mode: manual entry, dashboard, manual bill, backup/restore, CSV
+- [ ] A photographed GST invoice extracts line items summing to the printed
+      total, or flags the mismatch
+- [ ] A handwritten Hindi bill extracts its items **and** its payment, and
+      offers Bill / Payment / Both
+- [ ] A timber size list computes cubic feet matching the dealer's own figure
+- [ ] Backup → clear → restore, for **both** JSON and Excel
+- [ ] Two devices signed into one household see each other's entries
+- [ ] A linked contractor reads zero rows of the private ledger
+- [ ] No entry saves with a zero amount or empty description
