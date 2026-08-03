@@ -156,12 +156,16 @@ export function recalcItem(it: DraftItem): DraftItem {
 export function BillReview({
   draft,
   scanned = false,
+  degraded = null,
   editing = false,
   onChange,
   onClose,
 }: {
   draft: DraftBill;
   scanned?: boolean;
+  /** Why the weaker on-device reader stood in, when it did. Shown loudly: its
+   * output looks the same as a good scan but is far less trustworthy. */
+  degraded?: string | null;
   /** Editing an existing bill: replace its rows and skip the create-only helpers. */
   editing?: boolean;
   onChange: (d: DraftBill) => void;
@@ -413,7 +417,13 @@ export function BillReview({
         </button>
       </div>
 
-      {scanned && (
+      {scanned && degraded && (
+        <div className="text-[13px] px-3 py-2 rounded-md border border-crimson bg-crimson/10 text-crimson mb-3 font-medium">
+          {degraded}
+        </div>
+      )}
+
+      {scanned && !degraded && (
         <div className="text-[13px] px-3 py-2 rounded-md border border-crimson bg-crimson/5 text-crimson mb-3">
           Read from a photo — the reader makes mistakes, especially with
           numbers. Check every row and the total against the paper before

@@ -31,6 +31,38 @@ export async function fileToGeminiImage(
   }
 }
 
+/**
+ * The real reason a scan failed.
+ *
+ * supabase-js reports any non-2xx from an Edge Function as the same opaque
+ * "Edge Function returned a non-2xx status code" and keeps the body on the
+ * error as an unread Response — but the body is the only place the actual
+ * cause appears ("quota exceeded", "not configured with a Gemini API key").
+ * Without this every failure looks identical to the caller, so a bill that
+ * silently fell back to on-device OCR is indistinguishable from one that
+ * scanned fine.
+ */
+export async function edgeFunctionError(error: unknown): Promise<string> {
+  const context = (error as { context?: unknown }).context;
+  if (context instanceof Response) {
+    try {
+      const body = await context.clone().json();
+      if (typeof body?.error === "string") return body.error;
+    } catch {
+      const text = await context.clone().text().catch(() => "");
+      if (text) return text.slice(0, 300);
+    }
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** True when the reader is unavailable because the Gemini quota is spent —
+ * worth telling apart from a network failure, since waiting won't fix it
+ * today and the on-device fallback can't read handwriting or Devanagari. */
+export function isQuotaError(message: string): boolean {
+  return /quota|rate.?limit|too_many_requests|\b429\b|RESOURCE_EXHAUSTED/i.test(message);
+}
+
 interface GeminiBillResponse {
   vendor: string;
   invoiceNo: string;
@@ -78,7 +110,7 @@ export async function scanImagesWithGemini(
         signal: controller.signal,
       },
     );
-    if (error) throw error;
+    if (error) throw new Error(await edgeFunctionError(error));
     if (!result) throw new Error("Empty response from scan-bill.");
     data = result;
   } finally {

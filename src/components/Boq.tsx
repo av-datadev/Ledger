@@ -7,7 +7,12 @@ import { fileToOcrImage } from "../lib/scanImage";
 import { recognizeText } from "../lib/ocr";
 import { pdfToText, pdfPagesToImages } from "../lib/pdf";
 import { parseScannedBill, type ScannedBill } from "../lib/scanParse";
-import { scanBillWithGemini, scanImagesWithGemini } from "../lib/geminiScan";
+import {
+  scanBillWithGemini,
+  scanImagesWithGemini,
+  edgeFunctionError,
+  isQuotaError,
+} from "../lib/geminiScan";
 import { scanSizesWithGemini } from "../lib/sizeScan";
 import {
   BillReview,
@@ -19,6 +24,19 @@ import {
 import { BillStockPanel } from "./BillStockPanel";
 import type { BoqItem } from "../types";
 
+/**
+ * What to tell someone whose bill was read by the weaker on-device reader.
+ * Names the cause, because the two have different answers: a spent quota is
+ * fixed by waiting or by raising the limit, a dead network by reconnecting.
+ */
+function describeFallback(reason: string): string {
+  const shared =
+    "Read on this phone instead, which only manages printed English bills — it cannot read Hindi or handwriting, and it will not pick up a payment written on the bill. Check every row, or scan again later.";
+  return isQuotaError(reason)
+    ? `The AI reader has hit its daily limit. ${shared}`
+    : `The AI reader could not be reached. ${shared}`;
+}
+
 export function Boq() {
   const items = useLiveQuery(() => db.boqItems.toArray(), []);
   const entries = useLiveQuery(() => db.entries.toArray(), []);
@@ -28,6 +46,8 @@ export function Boq() {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Set when the good reader failed and the on-device one stood in. */
+  const [degraded, setDegraded] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -81,6 +101,7 @@ export function Boq() {
 
   const onScanFile = async (file: File) => {
     setError(null);
+    setDegraded(null);
     try {
       const isPdf =
         file.type === "application/pdf" || /\.pdf$/i.test(file.name);
@@ -109,6 +130,7 @@ export function Boq() {
           scan = await scanImagesWithGemini(images);
         } catch (geminiErr) {
           console.warn("Gemini PDF scan failed, using on-device extraction:", geminiErr);
+          setDegraded(describeFallback(await edgeFunctionError(geminiErr)));
           const text = await pdfToText(file, setBusy);
           scan = parseScannedBill(text);
         }
@@ -116,12 +138,16 @@ export function Boq() {
         // Gemini reads the photo directly (no OCR step) and handles skew,
         // low light, and mangled columns far better than Tesseract. It needs
         // the network, so fall back to on-device OCR on any failure —
-        // offline, quota, or a bad response — rather than surface the error.
+        // offline, quota, or a bad response.
         try {
           setBusy("Reading the bill…");
           scan = await scanBillWithGemini(file);
         } catch (geminiErr) {
           console.warn("Gemini scan failed, using on-device OCR:", geminiErr);
+          // The fallback is a genuinely weaker reader — English-only, and
+          // blind to the payment an informal bill records — so falling back
+          // silently produces a wrong bill that looks like a right one. Say so.
+          setDegraded(describeFallback(await edgeFunctionError(geminiErr)));
           setBusy("Preparing the photo…");
           const image = await fileToOcrImage(file);
           setBusy("Reading the bill on this phone… 0%");
@@ -285,12 +311,14 @@ export function Boq() {
       <BillReview
         draft={draft}
         scanned={scanned}
+        degraded={degraded}
         editing={editing}
         onChange={setDraft}
         onClose={() => {
           setDraft(null);
           setScanned(false);
           setEditing(false);
+          setDegraded(null);
         }}
       />
     );
