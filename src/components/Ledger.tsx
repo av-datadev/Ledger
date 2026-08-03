@@ -7,6 +7,7 @@ import { useBackClose } from "../hooks/useBackClose";
 import { inr, formatDate } from "../lib/format";
 import { toCsv, downloadFile, timestampSlug } from "../lib/csv";
 import { EntryForm } from "./EntryForm";
+import { UnbackedCard } from "./UnbackedCard";
 import type { Entry } from "../types";
 
 /** Filter hand-off from other tabs (dashboard drill-down, People tab). */
@@ -16,7 +17,15 @@ export interface LedgerPreset {
   seq: number; // changes on every hand-off so repeat taps re-apply
 }
 
-type FilterKey = "category" | "mode" | "paidBy";
+type FilterKey = "category" | "mode" | "paidBy" | "dates";
+
+/** "1 Jul – 15 Jul 26", "since 1 Jul 26", "up to 15 Jul 26", or "Dates: all". */
+function summarizeDates(from: string, to: string): string {
+  if (from && to) return `${formatDate(from)} – ${formatDate(to)}`;
+  if (from) return `since ${formatDate(from)}`;
+  if (to) return `up to ${formatDate(to)}`;
+  return "Dates: all";
+}
 
 function EditOverlay({ entry, onClose }: { entry: Entry; onClose: () => void }) {
   const requestClose = useBackClose(true, onClose);
@@ -54,9 +63,17 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
   const [cats, setCats] = useState<string[]>([]);
   const [modes, setModes] = useState<string[]>([]);
   const [payers, setPayers] = useState<string[]>([]);
+  // Inclusive YYYY-MM-DD bounds; either end can stand alone ("everything since
+  // 1 July" is as useful a question as a closed range).
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Entry | null>(null);
+  /** Which entry has its notes open. Notes are long — a teak-wood calculation
+   * runs three lines — so they stay folded until asked for rather than pushing
+   * every other row down the list. */
+  const [openNote, setOpenNote] = useState<string | null>(null);
 
   // Apply a hand-off filter whenever one arrives (seq changes each time).
   useEffect(() => {
@@ -65,6 +82,8 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
     setCats(preset.category ? [preset.category] : []);
     setPayers(preset.paidBy ? [preset.paidBy] : []);
     setModes([]);
+    setFrom("");
+    setTo("");
     setOpenFilter(null);
   }, [preset]);
 
@@ -75,6 +94,9 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
       .filter((e) => cats.length === 0 || cats.includes(e.category))
       .filter((e) => modes.length === 0 || modes.includes(e.mode))
       .filter((e) => payers.length === 0 || payers.includes(e.paidBy))
+      // Dates are stored as YYYY-MM-DD, so a string compare IS a date compare —
+      // no parsing, and no timezone to shift a payment onto the wrong day.
+      .filter((e) => (!from || e.date >= from) && (!to || e.date <= to))
       .filter((e) => {
         if (!q) return true;
         // Search matches text fields AND the date, both as typed (2026-07-03)
@@ -96,7 +118,7 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
       .sort((a, b) =>
         a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1,
       );
-  }, [entries, search, cats, modes, payers]);
+  }, [entries, search, cats, modes, payers, from, to]);
 
   const filters: {
     key: FilterKey;
@@ -134,10 +156,34 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
   };
 
   const visibleTotal = visible.reduce((s, e) => s + e.amount, 0);
-  const filtered = !!(search.trim() || cats.length || modes.length || payers.length);
+  const filtered = !!(
+    search.trim() ||
+    cats.length ||
+    modes.length ||
+    payers.length ||
+    from ||
+    to
+  );
 
   return (
     <div className="px-4 py-4">
+      {/* Paid vs billed sits here rather than on the Dashboard: the gap it
+          reports is a question about individual payments, and this is the tab
+          where those payments are — tapping a payee filters the list below. */}
+      <div className="-mx-4 -mt-4 mb-1">
+        <UnbackedCard
+          onOpenCategory={(cat) => {
+            setCats([cat]);
+            setSearch("");
+            setModes([]);
+            setPayers([]);
+            setFrom("");
+            setTo("");
+            setOpenFilter(null);
+          }}
+        />
+      </div>
+
       <input
         className="input mb-2"
         placeholder="Search — name, detail, date (e.g. 3 Jul), payer…"
@@ -145,13 +191,15 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
         onChange={(e) => setSearch(e.target.value)}
       />
 
-      {/* Multi-select filters: tick any combination in each dropdown. */}
+      {/* Multi-select filters: tick any combination in each dropdown. Two
+          columns rather than one row — a fourth chip squeezed into a 375px row
+          truncates every label down to "Categor…". */}
       <div className="relative mb-3">
-        <div className="flex gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
           {filters.map((f) => (
             <button
               key={f.key}
-              className={`input flex-1 !px-2 !text-[13px] flex items-center justify-between gap-1 ${
+              className={`input !px-2 !text-[13px] flex items-center justify-between gap-1 ${
                 f.sel.length ? "!border-ink" : ""
               }`}
               onClick={() =>
@@ -163,7 +211,80 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
               <span className="text-ink-soft shrink-0">▾</span>
             </button>
           ))}
+          <button
+            className={`input !px-2 !text-[13px] flex items-center justify-between gap-1 ${
+              from || to ? "!border-ink" : ""
+            }`}
+            onClick={() =>
+              setOpenFilter((o) => (o === "dates" ? null : "dates"))
+            }
+            aria-expanded={openFilter === "dates"}
+          >
+            <span className="truncate">{summarizeDates(from, to)}</span>
+            <span className="text-ink-soft shrink-0">▾</span>
+          </button>
         </div>
+
+        {openFilter === "dates" && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setOpenFilter(null)}
+            />
+            <div className="absolute z-50 left-0 right-0 top-full mt-1 card shadow-lg">
+              <div className="flex items-center justify-between px-3 py-1.5 border-b border-rule">
+                <span className="text-[11px] uppercase tracking-[0.1em] text-ink-soft">
+                  Date range
+                </span>
+                <div className="flex gap-2">
+                  {(from || to) && (
+                    <button
+                      className="text-[12px] text-crimson"
+                      onClick={() => {
+                        setFrom("");
+                        setTo("");
+                      }}
+                    >
+                      clear
+                    </button>
+                  )}
+                  <button
+                    className="text-[12px] text-ink-soft"
+                    onClick={() => setOpenFilter(null)}
+                  >
+                    done
+                  </button>
+                </div>
+              </div>
+              <div className="p-3 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="field-label">From</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={from}
+                    max={to || undefined}
+                    onChange={(e) => setFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="field-label">To</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={to}
+                    min={from || undefined}
+                    onChange={(e) => setTo(e.target.value)}
+                  />
+                </div>
+              </div>
+              {/* Either end alone is a valid question, so neither is required. */}
+              <div className="px-3 pb-3 text-[11px] text-ink-soft">
+                Leave one side empty for everything before or after a date.
+              </div>
+            </div>
+          </>
+        )}
 
         {active && (
           <>
@@ -230,6 +351,8 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
                 setCats([]);
                 setModes([]);
                 setPayers([]);
+                setFrom("");
+                setTo("");
                 setOpenFilter(null);
               }}
             >
@@ -246,7 +369,18 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
         {visible.map((e) => (
           <div key={e.id} className="px-3 py-2.5">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
+              {/* The whole left block is the note toggle when there is one —
+                  a bigger tap target than a caret, and it leaves edit/delete
+                  on the right untouched. */}
+              <button
+                type="button"
+                disabled={!e.notes}
+                aria-expanded={e.notes ? openNote === e.id : undefined}
+                className="min-w-0 text-left disabled:cursor-default"
+                onClick={() =>
+                  setOpenNote((id) => (id === e.id ? null : e.id))
+                }
+              >
                 <div className="text-sm font-medium truncate">{e.event}</div>
                 {e.detail && (
                   <div className="text-[12px] text-ink-soft truncate">
@@ -261,8 +395,13 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
                   {photoCount.get(e.id) && (
                     <span className="badge">📎 {photoCount.get(e.id)}</span>
                   )}
+                  {e.notes && (
+                    <span className="badge">
+                      {openNote === e.id ? "hide note" : "note"}
+                    </span>
+                  )}
                 </div>
-              </div>
+              </button>
               <div className="text-right shrink-0">
                 <div className="money font-semibold">{inr(e.amount)}</div>
                 {confirmId === e.id ? (
@@ -301,8 +440,8 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
                 )}
               </div>
             </div>
-            {e.notes && (
-              <div className="text-[12px] text-ink-soft mt-1 italic">
+            {e.notes && openNote === e.id && (
+              <div className="text-[12px] text-ink-soft mt-1.5 pt-1.5 border-t border-rule italic">
                 {e.notes}
               </div>
             )}

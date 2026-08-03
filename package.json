@@ -20,7 +20,9 @@
     "pdfjs-dist": "^6.1.200",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "tesseract.js": "^7.0.0"
+    "read-excel-file": "^9.3.5",
+    "tesseract.js": "^7.0.0",
+    "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.2",

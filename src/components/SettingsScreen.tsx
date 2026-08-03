@@ -2,12 +2,14 @@ import { useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, clearAllData } from "../db";
 import { exportBackup, readBackupFile, applyBackup } from "../lib/backup";
+import { exportExcelBackup, readExcelBackupFile } from "../lib/excelBackup";
 import { withBalances } from "../lib/stock";
-import { toCsv, downloadFile, timestampSlug } from "../lib/csv";
+import { toCsv, downloadFile, downloadBlob, timestampSlug } from "../lib/csv";
 import { currentHouseholdId } from "../lib/sync";
 import { useTextScale, TEXT_SCALES } from "../hooks/useTextScale";
 import { useNoteAiConsent } from "../hooks/useNoteAiConsent";
 import { PushToggle } from "./PushToggle";
+import { Faq } from "./Faq";
 
 export function SettingsScreen() {
   const settings = useLiveQuery(() => db.settings.get("app"), []);
@@ -23,6 +25,7 @@ export function SettingsScreen() {
     null,
   );
   const importRef = useRef<HTMLInputElement>(null);
+  const importExcelRef = useRef<HTMLInputElement>(null);
   const { scale, setScale } = useTextScale();
   const noteAi = useNoteAiConsent();
   // While the shared cloud ledger is active, restoring/resetting local data
@@ -60,6 +63,42 @@ export function SettingsScreen() {
       setMsg({
         kind: "err",
         text: err instanceof Error ? err.message : "Import failed.",
+      });
+    }
+  };
+
+  const onImportExcel = async (file: File) => {
+    setMsg(null);
+    if (synced) {
+      setMsg({
+        kind: "err",
+        text: "You're on the shared cloud ledger — restoring a backup here would conflict with live sync. Sign out first if you really need to restore an old file.",
+      });
+      return;
+    }
+    try {
+      const backup = await readExcelBackupFile(file);
+      const ok = window.confirm(
+        `This workbook contains ${backup.entries.length} ledger entries, ${backup.boqItems.length} BOQ items and ${backup.stockItems.length} stock items.\n\n` +
+          `Importing will REPLACE the current data (${counts?.entries ?? "?"} entries, ${counts?.boq ?? "?"} BOQ items, ${counts?.stock ?? "?"} stock items).\n\n` +
+          `Entry photos are NOT in an Excel file and will be left exactly as they are on this phone.\n\nContinue?`,
+      );
+      if (!ok) return;
+      // version 7 = the current shape, so none of the legacy re-seeding runs.
+      // keepAttachments because the workbook has no photos to restore and the
+      // ones on this phone still belong to these same entry ids.
+      await applyBackup(
+        { version: 7, ...backup, attachments: [] },
+        { keepAttachments: true },
+      );
+      setMsg({
+        kind: "ok",
+        text: `Restored ${backup.entries.length} entries and ${backup.boqItems.length} BOQ items from Excel. Photos on this phone were left untouched.`,
+      });
+    } catch (err) {
+      setMsg({
+        kind: "err",
+        text: err instanceof Error ? err.message : "Excel import failed.",
       });
     }
   };
@@ -219,29 +258,62 @@ export function SettingsScreen() {
           Backup &amp; restore
         </h2>
         <p className="text-[13px] text-ink-soft">
-          The JSON backup below is your <strong>primary safety net</strong>.
-          Your data lives only on this device — export regularly and keep the
-          file somewhere safe (Drive, email, etc.).
+          Keep a copy somewhere safe (Drive, email). <strong>JSON</strong> is
+          the complete one — it includes bill photos. <strong>Excel</strong>{" "}
+          opens anywhere and can be corrected by hand, but carries no photos.
         </p>
-        <button
-          className="btn btn-green w-full !py-3"
-          onClick={() => void exportBackup().then(() => setMsg({ kind: "ok", text: "Backup exported." }))}
-        >
-          Export full backup (.json)
-        </button>
-        <button
-          className="btn w-full !py-3"
-          disabled={synced}
-          onClick={() => importRef.current?.click()}
-        >
-          Import / restore from backup…
-        </button>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            className="btn btn-green !py-3"
+            onClick={() =>
+              void exportBackup().then(() =>
+                setMsg({ kind: "ok", text: "JSON backup downloaded." }),
+              )
+            }
+          >
+            Download .json
+          </button>
+          <button
+            className="btn !py-3"
+            disabled={synced}
+            onClick={() => importRef.current?.click()}
+          >
+            Upload .json
+          </button>
+          <button
+            className="btn !py-3"
+            onClick={() =>
+              void exportExcelBackup()
+                .then((blob) => {
+                  downloadBlob(`brick-flow-backup-${timestampSlug()}.xlsx`, blob);
+                  setMsg({ kind: "ok", text: "Excel backup downloaded." });
+                })
+                .catch((err) =>
+                  setMsg({
+                    kind: "err",
+                    text: err instanceof Error ? err.message : "Excel export failed.",
+                  }),
+                )
+            }
+          >
+            Download .xlsx
+          </button>
+          <button
+            className="btn !py-3"
+            disabled={synced}
+            onClick={() => importExcelRef.current?.click()}
+          >
+            Upload .xlsx
+          </button>
+        </div>
+
         {synced && (
           <p className="text-[12px] text-ink-soft">
             You're on the shared cloud ledger, so your data is already backed up
-            in the cloud. Restoring a local file is disabled here to avoid
-            conflicts with live sync — sign out (Data → account) first if you
-            truly need to restore an old backup.
+            in the cloud. Uploading a file is disabled here to avoid conflicts
+            with live sync — sign out (Data → account) first if you truly need
+            to restore an old backup.
           </p>
         )}
         <input
@@ -252,6 +324,17 @@ export function SettingsScreen() {
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (f) void onImportFile(f);
+            e.target.value = "";
+          }}
+        />
+        <input
+          ref={importExcelRef}
+          type="file"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void onImportExcel(f);
             e.target.value = "";
           }}
         />
@@ -273,6 +356,8 @@ export function SettingsScreen() {
           </button>
         </div>
       </section>
+
+      <Faq />
 
       <section className="space-y-2">
         <h2 className="eyebrow">

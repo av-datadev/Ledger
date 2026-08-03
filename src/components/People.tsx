@@ -125,11 +125,9 @@ export function People({
     <div className="px-4 py-4 max-w-lg mx-auto">
       <h2 className="text-base font-semibold mb-1">People &amp; categories</h2>
       <p className="text-[13px] text-ink-soft mb-3">
-        Add a new person or work type here — e.g. <b>Electrician</b> separate
-        from Electrical items, <b>Painter</b> separate from Paint, or{" "}
-        <b>Carpenter</b> separate from Wood. It becomes its own section
-        everywhere: the Entry form, Ledger filters, BOQ, Stock and the
-        Dashboard.
+        A person or work type — <b>Electrician</b> apart from Electrical items,
+        <b> Painter</b> apart from Paint. Each becomes its own section
+        everywhere.
       </p>
 
       <div className="flex gap-1.5 mb-2">

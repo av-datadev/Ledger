@@ -205,8 +205,18 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
   };
 }
 
-/** Overwrite the database with backup contents (single transaction). */
-export async function applyBackup(backup: ParsedBackup): Promise<void> {
+/**
+ * Overwrite the database with backup contents (single transaction).
+ *
+ * `keepAttachments` is for the Excel restore, whose file format cannot carry
+ * photos. Wiping them there would destroy the only copy of a kaccha slip in
+ * exchange for nothing — and because entry ids survive the round trip, leaving
+ * the photos in place re-attaches them to the very same entries.
+ */
+export async function applyBackup(
+  backup: ParsedBackup,
+  { keepAttachments = false }: { keepAttachments?: boolean } = {},
+): Promise<void> {
   // Pre-v5 backups predate categories-as-rows: the built-ins weren't stored.
   const isLegacy = backup.version < 5;
   const builtin = new Set<string>(CATEGORIES.map((c) => c.toLowerCase()));
@@ -259,7 +269,7 @@ export async function applyBackup(backup: ParsedBackup): Promise<void> {
       await db.stockMoves.clear();
       await db.categories.clear();
       await db.people.clear();
-      await db.attachments.clear();
+      if (!keepAttachments) await db.attachments.clear();
       await db.entries.bulkAdd(backup.entries);
       await db.boqItems.bulkAdd(backup.boqItems);
       await db.stockItems.bulkAdd(backup.stockItems);
@@ -270,7 +280,7 @@ export async function applyBackup(backup: ParsedBackup): Promise<void> {
         ...builtinRows,
       ]);
       await db.people.bulkAdd(backup.people);
-      await db.attachments.bulkAdd(backup.attachments);
+      if (!keepAttachments) await db.attachments.bulkAdd(backup.attachments);
     },
   );
 }

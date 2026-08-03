@@ -364,15 +364,8 @@ export function Boq() {
         </button>
       </div>
       <div className="text-[11px] text-ink-soft mb-2">
-        <b>Take photo</b> opens the camera. <b>Photo / PDF</b> lets you pick an
-        existing photo or a PDF bill. Both read on this phone when there's no
-        signal — nothing has to be uploaded.{" "}
-        <b>Size list</b> is for a dealer's handwritten slip that prices by size
-        instead of quantity — a timber bill written{" "}
-        <span className="money">8¼ × 9 × 8 — 3 pc</span>. It works out the cubic
-        feet from the sizes and checks them against the dealer's own total.
-        Reading handwriting needs a connection. Always check the rows against
-        the paper before saving.
+        <b>Size list</b> is for a dealer's slip priced by size (8¼ × 9 × 8 — 3
+        pc). Always check the rows against the paper.
       </div>
       {/* Straight to the camera — `capture` makes the OS skip the picker. */}
       <input

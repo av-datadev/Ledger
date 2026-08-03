@@ -15,12 +15,9 @@ export function toCsv(
   return lines.join("\r\n");
 }
 
-export function downloadFile(
-  filename: string,
-  content: string,
-  mime: string,
-): void {
-  const blob = new Blob([content], { type: mime });
+/** Save an already-built Blob. The text path below wraps this; a binary file
+ * (an .xlsx workbook) has to come in as a Blob and can't be stringified. */
+export function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -29,6 +26,14 @@ export function downloadFile(
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+export function downloadFile(
+  filename: string,
+  content: string,
+  mime: string,
+): void {
+  downloadBlob(filename, new Blob([content], { type: mime }));
 }
 
 export function timestampSlug(): string {

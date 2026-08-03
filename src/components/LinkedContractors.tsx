@@ -79,8 +79,7 @@ export function LinkedContractors() {
       <div>
         <h2 className="eyebrow mb-1">Your contractors</h2>
         <p className="text-[12px] text-ink-soft">
-          Give a contractor this code and approve him here. He'll see only the
-          money between you and him — never the rest of your ledger.
+          He sees only the money between you and him.
         </p>
       </div>
 
@@ -204,8 +203,7 @@ export function LinkedContractors() {
 
       {links?.length === 0 && (
         <p className="text-[13px] text-ink-soft">
-          No contractor is linked yet. Give one the code above and his request
-          will appear here.
+          No contractor linked yet — share the code above.
         </p>
       )}
 

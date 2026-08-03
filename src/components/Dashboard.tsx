@@ -6,7 +6,6 @@ import { inr, num } from "../lib/format";
 import { withBalances } from "../lib/stock";
 import { BudgetCard } from "./BudgetCard";
 import { AddressCard } from "./AddressCard";
-import { UnbackedCard } from "./UnbackedCard";
 
 export function Dashboard({
   onOpenCategory,
@@ -62,8 +61,8 @@ export function Dashboard({
 
       <BudgetCard spent={total} />
 
-      <UnbackedCard onOpenCategory={onOpenCategory} />
-
+      {/* Paid vs billed lives on the Ledger now — its gaps are questions about
+          individual payments, which is where those payments are. */}
       <AddressCard />
 
       <section className="px-4 pt-5">

@@ -40,7 +40,7 @@ export function FindContractor() {
           Contractors in Moradabad
         </h2>
         <p className="text-[12px] text-ink-soft mt-0.5">
-          A hand-picked list to start — more added as they're onboarded.
+          More added as they're onboarded.
         </p>
       </div>
 
