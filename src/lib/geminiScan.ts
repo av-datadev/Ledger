@@ -39,6 +39,10 @@ interface GeminiBillResponse {
   gstPct: number;
   otherCharges: number;
   otherChargesTaxed: boolean;
+  isInformal: boolean;
+  paidAmount: number;
+  balanceDue: number;
+  paymentDate: string;
   items: { item: string; qty: number; unit: string; rate: number; amount: number }[];
   error?: string;
 }
@@ -93,6 +97,13 @@ export async function scanImagesWithGemini(
     gstPct: data.gstPct != null ? String(data.gstPct) : "18",
     otherCharges: data.otherCharges ? String(data.otherCharges) : "",
     otherChargesTaxed: data.otherChargesTaxed === true,
+    isInformal: data.isInformal === true,
+    // Zero means "the paper says nothing about a payment", which is different
+    // from a payment of ₹0 — carried through as empty so the review screen can
+    // tell the two apart and only offer a ledger entry when there's one to make.
+    paidAmount: data.paidAmount ? String(data.paidAmount) : "",
+    balanceDue: data.balanceDue ? String(data.balanceDue) : "",
+    paymentDate: data.paymentDate ?? "",
     items: data.items.map((it) => ({
       item: it.item ?? "",
       qty: it.qty != null ? String(it.qty) : "",

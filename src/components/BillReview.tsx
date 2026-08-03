@@ -61,8 +61,23 @@ export interface DraftBill {
    * measured total can be checked against it. Empty when nothing was written.
    */
   writtenQty: string;
+  /** Money actually handed over against this bill, when the paper records it
+   * ("जमा 100000"), and what is still owed ("शेष 11160"). Blank when the paper
+   * says nothing — which is not the same as a payment of zero. */
+  paidAmount: string;
+  balanceDue: string;
+  /** Date of that payment when it differs from the bill's own date. */
+  paymentDate: string;
   items: DraftItem[];
 }
+
+/**
+ * Where a scanned paper should land. A printed tax invoice is only ever a bill;
+ * a handwritten one that records "जमा 100000 / शेष 11160" is a bill AND a
+ * payment on the same sheet, and the person is the one who knows whether that
+ * payment is already in their ledger.
+ */
+export type SaveTarget = "boq" | "entry" | "both";
 
 export const blankItem = (): DraftItem => ({
   item: "",
@@ -92,6 +107,9 @@ export const emptyDraft = (): DraftBill => ({
   otherChargesTaxed: false,
   informal: false,
   writtenQty: "",
+  paidAmount: "",
+  balanceDue: "",
+  paymentDate: "",
   items: [blankItem()],
 });
 
@@ -154,11 +172,19 @@ export function BillReview({
   const modes = useModes();
   const [ackMismatch, setAckMismatch] = useState(false);
   const [ackQty, setAckQty] = useState(false);
-  const [alsoLedger, setAlsoLedger] = useState(false);
   const [addToStock, setAddToStock] = useState(!editing);
   const [ledgerMode, setLedgerMode] = useState<string>("Cash");
   const [ledgerPayer, setLedgerPayer] = useState<string>("");
   const [errors, setErrors] = useState<string[]>([]);
+  // A payment read off the paper means this sheet is both documents at once,
+  // so "both" is the honest default there; anything else is just a bill.
+  const [target, setTarget] = useState<SaveTarget>(
+    draft.paidAmount ? "both" : "boq",
+  );
+  // Blank means "whatever the bill total turns out to be" — seeded from the
+  // PAID figure when the paper has one, because on a part-paid kaccha bill the
+  // two differ and posting the total would overstate the ledger by the balance.
+  const [ledgerAmount, setLedgerAmount] = useState<string>(draft.paidAmount);
 
   // Default the optional ledger entry's payer/mode to the user's own first real
   // option (data-derived) rather than a generic placeholder.
@@ -246,6 +272,14 @@ export function BillReview({
     0,
   );
 
+  // Editing an existing bill only ever rewrites its rows — the ledger entry it
+  // may have created is a separate record and is left alone.
+  const effectiveTarget: SaveTarget = editing ? "boq" : target;
+  const wantsBoq = effectiveTarget !== "entry";
+  const wantsEntry = effectiveTarget !== "boq";
+  const entryAmount = toNum(ledgerAmount) ?? total;
+  const balanceDue = toNum(draft.balanceDue) ?? 0;
+
   const save = async () => {
     const errs: string[] = [];
     if (!draft.vendor.trim() && !draft.informal)
@@ -254,20 +288,26 @@ export function BillReview({
     // what makes it informal, not a gap in the data entry.
     if (!draft.invoiceNo.trim() && !draft.informal)
       errs.push("Invoice number is required.");
-    if (!(total > 0)) errs.push("Invoice total must be greater than zero.");
     const validItems = draft.items.filter(
       (it) => it.item.trim() && toNum(it.amount) !== null,
     );
-    if (validItems.length === 0)
-      errs.push("At least one line item with a description and amount is required.");
-    if (overCounted && !ackMismatch)
-      errs.push(
-        "Line items add up to MORE than the invoice total — a row is probably duplicated or misread. Fix the rows or tick the acknowledgement.",
-      );
-    if (qtyDisagrees && !ackQty)
-      errs.push(
-        `The sizes measure ${measuredQty} ${measuredUnit}, but the bill says ${writtenQty}. Fix a size, or tick to save anyway.`,
-      );
+    // The row checks only bite when the rows are actually being saved: saving
+    // just the payment off a bill leaves the itemisation behind on purpose.
+    if (wantsBoq) {
+      if (!(total > 0)) errs.push("Invoice total must be greater than zero.");
+      if (validItems.length === 0)
+        errs.push("At least one line item with a description and amount is required.");
+      if (overCounted && !ackMismatch)
+        errs.push(
+          "Line items add up to MORE than the invoice total — a row is probably duplicated or misread. Fix the rows or tick the acknowledgement.",
+        );
+      if (qtyDisagrees && !ackQty)
+        errs.push(
+          `The sizes measure ${measuredQty} ${measuredUnit}, but the bill says ${writtenQty}. Fix a size, or tick to save anyway.`,
+        );
+    }
+    if (wantsEntry && !(entryAmount > 0))
+      errs.push("The ledger entry needs an amount greater than zero.");
     setErrors(errs);
     if (errs.length) return;
 
@@ -300,11 +340,13 @@ export function BillReview({
 
     // Editing replaces the bill's rows in place, keeping billId (and therefore
     // any linked stock receipts) intact.
-    await db.transaction("rw", db.boqItems, async () => {
-      if (editing)
-        await db.boqItems.where("billId").equals(draft.billId).delete();
-      await db.boqItems.bulkAdd(rows);
-    });
+    if (wantsBoq) {
+      await db.transaction("rw", db.boqItems, async () => {
+        if (editing)
+          await db.boqItems.where("billId").equals(draft.billId).delete();
+        await db.boqItems.bulkAdd(rows);
+      });
+    }
 
     // A slip with no invoice number and no shop name still needs a name to
     // appear under in the ledger and against stock receipts — build it from
@@ -314,22 +356,34 @@ export function BillReview({
         .filter(Boolean)
         .join(" ") || `${draft.category} bill — ${formatDate(date)}`;
 
-    if (alsoLedger) {
+    if (wantsEntry) {
       await db.entries.add({
         id: crypto.randomUUID(),
-        date,
+        // Money moves on the day it was handed over, which on a running account
+        // is often later than the bill: billed 18/07, part-paid 21/07.
+        date: draft.paymentDate || date,
         category: draft.category,
         event: label,
         detail: draft.vendor.trim(),
-        amount: total,
+        amount: entryAmount,
         mode: ledgerMode,
         paidBy: ledgerPayer,
-        notes: "Created from BOQ bill",
+        // Spell out the part-payment, so a ledger line that doesn't match the
+        // bill it came from explains itself months later.
+        notes: [
+          wantsBoq ? "Created from BOQ bill" : "Created from a scanned bill",
+          total > 0 && entryAmount !== total
+            ? `Part payment — bill total ${inr(total)}`
+            : null,
+          balanceDue ? `Balance due ${inr(balanceDue)}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
     }
-    if (addToStock) {
+    if (wantsBoq && addToStock) {
       await addBillRowsToStock(
         validItems.map((it) => ({
           name: it.item.trim(),
@@ -657,6 +711,56 @@ export function BillReview({
         )}
 
         {!editing && (
+          <div className="space-y-2 pt-1">
+            <label className="field-label">Save this as</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  ["boq", "Bill only", "Material rows"],
+                  ["entry", "Payment only", "One ledger entry"],
+                  ["both", "Both", "Rows + payment"],
+                ] as [SaveTarget, string, string][]
+              ).map(([value, label, hint]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`btn !px-2 !py-2 text-center ${
+                    target === value ? "btn-primary" : ""
+                  }`}
+                  aria-pressed={target === value}
+                  onClick={() => setTarget(value)}
+                >
+                  <span className="block text-[13px] leading-tight">{label}</span>
+                  <span className="block text-[10px] font-normal opacity-70 leading-tight mt-0.5">
+                    {hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {draft.paidAmount ? (
+              <div className="text-[12px] text-ink-soft">
+                This paper records a payment of{" "}
+                <b>{inr(toNum(draft.paidAmount) ?? 0)}</b>
+                {balanceDue > 0 && (
+                  <>
+                    {" "}
+                    against a bill of <b>{inr(total)}</b>, leaving{" "}
+                    <b>{inr(balanceDue)}</b> still due
+                  </>
+                )}
+                {" "}— so it is a bill and a payment on one sheet. Pick{" "}
+                <b>Bill only</b> if that payment is already in your ledger.
+              </div>
+            ) : (
+              <div className="text-[12px] text-ink-soft">
+                Choose <b>Both</b> to also log the payment; leave it on{" "}
+                <b>Bill only</b> if the payment is already in your ledger.
+              </div>
+            )}
+          </div>
+        )}
+
+        {!editing && wantsBoq && (
           <label className="flex items-start gap-2 text-[13px]">
             <input
               type="checkbox"
@@ -674,21 +778,6 @@ export function BillReview({
           </label>
         )}
 
-        {!editing && (
-          <label className="flex items-start gap-2 text-[13px]">
-            <input
-              type="checkbox"
-              className="mt-0.5 shrink-0"
-              checked={alsoLedger}
-              onChange={(e) => setAlsoLedger(e.target.checked)}
-            />
-            <span>
-              Also create a ledger entry for this bill's total (leave unchecked
-              if the payment is already in the ledger).
-            </span>
-          </label>
-        )}
-
         {editing && (
           <div className="text-[12px] text-ink-soft">
             Editing replaces this bill's rows. Stock already received from it,
@@ -696,8 +785,18 @@ export function BillReview({
           </div>
         )}
 
-        {alsoLedger && (
-          <div className="grid grid-cols-2 gap-3 pl-6">
+        {wantsEntry && (
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="field-label">Amount paid</label>
+              <input
+                className="input"
+                inputMode="decimal"
+                value={ledgerAmount}
+                placeholder={total > 0 ? String(total) : ""}
+                onChange={(e) => setLedgerAmount(e.target.value)}
+              />
+            </div>
             <div>
               <label className="field-label">Payment mode</label>
               <select
@@ -737,7 +836,13 @@ export function BillReview({
           className="btn btn-primary w-full !py-3 !text-base"
           onClick={() => void save()}
         >
-          {editing ? "Save changes" : "Save bill"}
+          {editing
+            ? "Save changes"
+            : effectiveTarget === "entry"
+              ? `Save payment${entryAmount > 0 ? ` (${inr(entryAmount)})` : ""}`
+              : effectiveTarget === "both"
+                ? "Save bill and payment"
+                : "Save bill"}
         </button>
       </div>
     </div>

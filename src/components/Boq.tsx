@@ -56,6 +56,11 @@ export function Boq() {
       // it would demand a number the paper never had.
       informal: !head.invoiceNo,
       writtenQty: head.writtenQty != null ? String(head.writtenQty) : "",
+      // Only a fresh scan carries these; a saved bill doesn't, and editing
+      // never re-opens the payment side anyway.
+      paidAmount: "",
+      balanceDue: "",
+      paymentDate: "",
       items: rows.map((r) => ({
         item: r.item,
         hsn: r.hsn ?? "",
@@ -138,8 +143,13 @@ export function Boq() {
         billGstPct: scan.gstPct || "18",
         otherCharges: scan.otherCharges,
         otherChargesTaxed: scan.otherChargesTaxed,
-        informal: false,
+        // A handwritten bill reads as informal here too, so it saves without
+        // the vendor and invoice number it was never going to have.
+        informal: scan.isInformal,
         writtenQty: "",
+        paidAmount: scan.paidAmount,
+        balanceDue: scan.balanceDue,
+        paymentDate: scan.paymentDate,
         items: scan.items.length
           ? scan.items.map((it) => ({
               item: it.item,
@@ -202,6 +212,11 @@ export function Boq() {
         otherChargesTaxed: false,
         informal: true,
         writtenQty: scan.writtenQty,
+        // A size list prices the goods; it isn't a running account, so
+        // scan-sizes doesn't look for a payment and none is offered.
+        paidAmount: "",
+        balanceDue: "",
+        paymentDate: "",
         // recalcItem turns each size into its cubic feet and its amount — a
         // scanned slip has neither until the app computes them.
         items: scan.lines.map((l) => recalcItem({

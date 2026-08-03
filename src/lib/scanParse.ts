@@ -24,6 +24,19 @@ export interface ScannedBill {
    * and a rate, e.g. "Freight (GST) 996511 18 %") rather than adding it after
    * the tax. Bills do it both ways, so it has to be read per bill. */
   otherChargesTaxed: boolean;
+  /** True for a handwritten "kaccha" bill — no GSTIN, no letterhead, no
+   * printed invoice number. Those three are required on a tax invoice and
+   * simply absent here, so the review screen stops demanding them. */
+  isInformal: boolean;
+  /** What was actually handed over against this bill, when the paper records
+   * it — a handwritten running account usually does ("जमा 100000"), a printed
+   * invoice never does. Empty when nothing is written. */
+  paidAmount: string;
+  /** What is still owed after that payment ("शेष 11160"). Empty when none. */
+  balanceDue: string;
+  /** The date beside the payment when it differs from the bill's own date: a
+   * bill dated 18/07 can be part-paid on 21/07. Empty otherwise. */
+  paymentDate: string;
   items: ScannedItem[];
 }
 
@@ -225,6 +238,14 @@ export function parseScannedBill(text: string): ScannedBill {
     gstPct: detectGstPct(lines) || "18",
     otherCharges: "",
     otherChargesTaxed: false,
+    // The on-device reader can't do any of this: Tesseract ships English-only
+    // traineddata, so it can't read a Devanagari kaccha bill at all, let alone
+    // spot a "जमा"/"शेष" pair. Left blank rather than guessed — this path only
+    // ever runs offline, on a printed bill, where none of it applies.
+    isInformal: false,
+    paidAmount: "",
+    balanceDue: "",
+    paymentDate: "",
     items: [],
   };
   let otherTotal = 0;
