@@ -49,9 +49,16 @@ English-only training data and cannot read Devanagari at all. When the good
 reader is unavailable the review screen says so, loudly, rather than
 presenting Tesseract's guess as if it were a scan.
 
-> **Gemini free tier is 20 requests/day.** Hit it and every scan silently
-> falls back to the weaker reader. If more than one person is scanning, enable
-> billing on the API key.
+The Edge Functions wait out a busy or rate-limited Gemini rather than failing
+the scan — up to 3 attempts inside a ~100s budget, honouring the `retryDelay`
+Google asks for. A per-*minute* limit clears in seconds and is worth waiting
+out; a per-*day* quota is told apart by its `quotaId` and reported straight
+away, since retrying it only spins.
+
+> **Gemini free tier is 20 requests/day.** Spend it and the review screen says
+> the daily limit is gone rather than passing off the weaker reader's guess as
+> a scan; a bill that fell back offers **Try the AI reader again**. If more
+> than one person is scanning, enable billing on the API key.
 
 ## Stack
 
@@ -144,7 +151,12 @@ failing silently.
   the check worth anything.
 - **Handwritten notes** (Entry) — a kaccha slip, cheque or Hindi diary page
   fills the entry form and keeps the photo as proof. Opt-in per device, since
-  the photo leaves the phone.
+  the photo leaves the phone. A vendor's running account is a bill *and* a
+  payment on one sheet, so the reader also reports the goods rows it found:
+  rather than collapsing the table into one ledger line, the form says **this
+  paper is a bill, not just a payment** and offers to send it to the BOQ, where
+  the same Bill / Payment / Both choice decides where it lands. Which tab the
+  paper was scanned from no longer decides what survives of it.
 - **Paid vs billed** (Ledger) — money handed over that no bill accounts for
   yet. A gap isn't proof of anything; labour never has a bill. It's worth a
   question when the payment was for material.
@@ -178,6 +190,8 @@ Online only:
 - [ ] BOQ scan of a photo/PDF via Gemini
 - [ ] BOQ → Size list on a timber slip; measured total matches the written one
 - [ ] A handwritten kaccha bill offers Bill / Payment / Both
+- [ ] An itemised kaccha slip scanned from **Entry** offers to send it to the
+      BOQ, and lands on the review screen with its rows intact
 - [ ] Sign in, sync across two devices
 - [ ] Site link: share code, approve, both sides post to the shared ledger
 - [ ] Push arrives on a real phone

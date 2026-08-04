@@ -6,7 +6,12 @@ import { guessCategory } from "./scanParse";
 import type { ScannedBill } from "./scanParse";
 
 const MAX_EDGE = 1600;
-const TIMEOUT_MS = 40_000; // multi-page PDFs send several images in one call
+// A single-photo read measures 23-32s end to end, and scan-bill now waits out a
+// busy or rate-limited Gemini rather than failing the scan (its own budget caps
+// that at ~100s). The old 40s ceiling sat inside the normal range once a phone's
+// upload was added, so a perfectly good scan would abort and silently drop to
+// the on-device reader — which cannot read a Hindi handwritten bill at all.
+const TIMEOUT_MS = 120_000; // multi-page PDFs send several images in one call
 
 /** Downscale + re-encode a bill photo for upload. Keeps color (unlike the
  * OCR path's grayscale prep) — Gemini reads a natural photo better than a
@@ -61,6 +66,13 @@ export async function edgeFunctionError(error: unknown): Promise<string> {
  * today and the on-device fallback can't read handwriting or Devanagari. */
 export function isQuotaError(message: string): boolean {
   return /quota|rate.?limit|too_many_requests|\b429\b|RESOURCE_EXHAUSTED/i.test(message);
+}
+
+/** True when scan-bill gave up on a Gemini that stayed busy — it already waited
+ * out the short rate limits itself, so this is the "come back in a minute" case
+ * rather than a spent daily allowance or a dead network. */
+export function isBusyError(message: string): boolean {
+  return /\bbusy\b/i.test(message);
 }
 
 interface GeminiBillResponse {

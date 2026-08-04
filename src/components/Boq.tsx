@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, deleteBill } from "../db";
 import { useCategories } from "../hooks/useCategories";
@@ -12,6 +12,7 @@ import {
   scanImagesWithGemini,
   edgeFunctionError,
   isQuotaError,
+  isBusyError,
 } from "../lib/geminiScan";
 import { scanSizesWithGemini } from "../lib/sizeScan";
 import {
@@ -32,12 +33,29 @@ import type { BoqItem } from "../types";
 function describeFallback(reason: string): string {
   const shared =
     "Read on this phone instead, which only manages printed English bills — it cannot read Hindi or handwriting, and it will not pick up a payment written on the bill. Check every row, or scan again later.";
-  return isQuotaError(reason)
-    ? `The AI reader has hit its daily limit. ${shared}`
-    : `The AI reader could not be reached. ${shared}`;
+  if (isQuotaError(reason)) {
+    return `The AI reader has hit its daily limit. ${shared}`;
+  }
+  // scan-bill already waited out a short rate limit before giving up, so this
+  // one means Gemini stayed busy — worth separating from a dead network,
+  // because here the phone is fine and a retry in a minute usually works.
+  if (isBusyError(reason)) {
+    return `The AI reader is busy. ${shared}`;
+  }
+  return `The AI reader could not be reached. ${shared}`;
 }
 
-export function Boq() {
+export function Boq({
+  preset = null,
+  onPresetUsed,
+}: {
+  /** A bill already read on the Entry tab, handed over because the slip turned
+   * out to be an itemised bill rather than a plain payment. Opens straight on
+   * the review screen — including its "save this as" chooser — so the paper is
+   * read once and filed once. */
+  preset?: ScannedBill | null;
+  onPresetUsed?: () => void;
+} = {}) {
   const items = useLiveQuery(() => db.boqItems.toArray(), []);
   const entries = useLiveQuery(() => db.entries.toArray(), []);
   const categories = useCategories();
@@ -48,11 +66,26 @@ export function Boq() {
   const [error, setError] = useState<string | null>(null);
   /** Set when the good reader failed and the on-device one stood in. */
   const [degraded, setDegraded] = useState<string | null>(null);
+  /** The photo/PDF behind the draft on screen, kept so a scan that fell back to
+   * the on-device reader can be retried from the review screen. Re-picking the
+   * file is otherwise the only way back, and on a phone that means finding it
+   * in the gallery again. */
+  const [lastScanFile, setLastScanFile] = useState<File | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const sizesRef = useRef<HTMLInputElement>(null);
+
+  // Consume a bill handed over from the Entry tab exactly once — clearing it
+  // upstream stops a later visit to this tab from re-opening a bill the person
+  // already saved or cancelled.
+  useEffect(() => {
+    if (!preset) return;
+    openScan(preset);
+    onPresetUsed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset]);
 
   const editBill = (rows: BoqItem[]) => {
     const head = rows[0];
@@ -102,6 +135,7 @@ export function Boq() {
   const onScanFile = async (file: File) => {
     setError(null);
     setDegraded(null);
+    setLastScanFile(file);
     try {
       const isPdf =
         file.type === "application/pdf" || /\.pdf$/i.test(file.name);
@@ -157,43 +191,7 @@ export function Boq() {
           scan = parseScannedBill(text);
         }
       }
-      setScanned(true);
-      setEditing(false);
-      setDraft({
-        billId: crypto.randomUUID(),
-        vendor: scan.vendor,
-        invoiceNo: scan.invoiceNo,
-        date: scan.date || todayStr(),
-        category: scan.category || "Misc",
-        invoiceTotal: scan.invoiceTotal,
-        billGstPct: scan.gstPct || "18",
-        otherCharges: scan.otherCharges,
-        otherChargesTaxed: scan.otherChargesTaxed,
-        // A handwritten bill reads as informal here too, so it saves without
-        // the vendor and invoice number it was never going to have.
-        informal: scan.isInformal,
-        writtenQty: "",
-        paidAmount: scan.paidAmount,
-        balanceDue: scan.balanceDue,
-        paymentDate: scan.paymentDate,
-        items: scan.items.length
-          ? scan.items.map((it) => ({
-              item: it.item,
-              hsn: "",
-              gstPct: "",
-              basis: "qty" as const,
-              length: "",
-              width: "",
-              thickness: "",
-              pieces: "",
-              qty: it.qty,
-              unit: it.unit,
-              rate: it.rate,
-              discPct: "",
-              amount: it.amount,
-            }))
-          : [blankItem()],
-      });
+      openScan(scan);
     } catch (err) {
       console.error("Scan failed:", err);
       setError(
@@ -203,6 +201,49 @@ export function Boq() {
     } finally {
       setBusy(null);
     }
+  };
+
+  /** Open the review screen on an already-read bill. Shared by this tab's own
+   * scanners and by a bill handed over from the Entry tab, where a kaccha slip
+   * turned out to be an itemised bill rather than a plain payment. */
+  const openScan = (scan: ScannedBill) => {
+    setScanned(true);
+    setEditing(false);
+    setDraft({
+      billId: crypto.randomUUID(),
+      vendor: scan.vendor,
+      invoiceNo: scan.invoiceNo,
+      date: scan.date || todayStr(),
+      category: scan.category || "Misc",
+      invoiceTotal: scan.invoiceTotal,
+      billGstPct: scan.gstPct || "18",
+      otherCharges: scan.otherCharges,
+      otherChargesTaxed: scan.otherChargesTaxed,
+      // A handwritten bill reads as informal here too, so it saves without
+      // the vendor and invoice number it was never going to have.
+      informal: scan.isInformal,
+      writtenQty: "",
+      paidAmount: scan.paidAmount,
+      balanceDue: scan.balanceDue,
+      paymentDate: scan.paymentDate,
+      items: scan.items.length
+        ? scan.items.map((it) => ({
+            item: it.item,
+            hsn: "",
+            gstPct: "",
+            basis: "qty" as const,
+            length: "",
+            width: "",
+            thickness: "",
+            pieces: "",
+            qty: it.qty,
+            unit: it.unit,
+            rate: it.rate,
+            discPct: "",
+            amount: it.amount,
+          }))
+        : [blankItem()],
+    });
   };
 
   /**
@@ -312,6 +353,10 @@ export function Boq() {
         draft={draft}
         scanned={scanned}
         degraded={degraded}
+        busy={busy}
+        onRetryScan={
+          lastScanFile ? () => void onScanFile(lastScanFile) : undefined
+        }
         editing={editing}
         onChange={setDraft}
         onClose={() => {
@@ -319,6 +364,7 @@ export function Boq() {
           setScanned(false);
           setEditing(false);
           setDegraded(null);
+          setLastScanFile(null);
         }}
       />
     );

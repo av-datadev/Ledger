@@ -6,8 +6,14 @@
 //
 // Those carry no HSN codes, no invoice number and usually no tax table, so a
 // separate prompt + schema is far more accurate than bending the bill reader.
-// The output maps onto a ledger Entry (date / description / amount / mode),
-// NOT onto BOQ line items.
+// The output maps onto a ledger Entry (date / description / amount / mode).
+//
+// It also reports whether the paper is a BILL as well as a payment — a vendor's
+// running account is an itemised table of goods with what was handed over
+// written underneath, and reading only the money silently threw the whole table
+// away. When there are goods rows they come back in `items`, and the entry form
+// asks the person whether the paper belongs in the ledger, the BOQ, or both,
+// rather than deciding for them.
 //
 // GEMINI_API_KEY is a Supabase Edge Function secret; never sent to the client.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -74,6 +80,51 @@ const RESPONSE_SCHEMA = {
       description:
         "'high' if the handwriting is clear and the amount is unambiguous; 'medium' if mostly readable; 'low' if the amount or key fields are a genuine guess.",
     },
+    // A kaccha slip is often BOTH a bill and a payment on one sheet: an itemised
+    // table of goods, with what was handed over written underneath. Reading only
+    // the payment threw the whole table away and silently turned a bill into a
+    // ledger line, so the goods rows come back too and the caller asks the
+    // person where the paper should land.
+    isItemisedBill: {
+      type: "boolean",
+      description:
+        "True when the paper lists individual goods/materials rows (a quantity + item + amount table), i.e. it is a BILL and not only a payment record. False for a plain cheque, a labour-payment note, or a slip that records only money with no itemisation.",
+    },
+    billTotal: {
+      type: "number",
+      description:
+        "The bill's own grand total (goods + freight) when the paper has an itemised table. This is NOT the amount paid. 0 when there is no itemised table.",
+    },
+    balanceDue: {
+      type: "number",
+      description:
+        "What is still owed after the payment, when the paper records it (शेष / बाकी / बकाया). 0 if none is written.",
+    },
+    otherCharges: {
+      type: "number",
+      description:
+        "Freight or cartage (भाड़ा / ढुलाई) — a real charge but not goods. 0 if none.",
+    },
+    items: {
+      type: "array",
+      description:
+        "The goods/materials rows, when the paper has an itemised table. Empty array for a plain payment record.",
+      items: {
+        type: "object",
+        properties: {
+          item: {
+            type: "string",
+            description:
+              "Product name in ENGLISH, keeping the size/spec exactly as written ('4\"', '6x4', '6Kg').",
+          },
+          qty: { type: "number" },
+          unit: { type: "string", description: "pcs, ft, kg, bag, cft, etc." },
+          rate: { type: "number" },
+          amount: { type: "number" },
+        },
+        required: ["item", "qty", "unit", "rate", "amount"],
+      },
+    },
   },
   required: [
     "date",
@@ -86,6 +137,11 @@ const RESPONSE_SCHEMA = {
     "originalText",
     "isInformal",
     "confidence",
+    "isItemisedBill",
+    "billTotal",
+    "balanceDue",
+    "otherCharges",
+    "items",
   ],
 };
 
@@ -113,13 +169,77 @@ Other rules:
 - "description" must be in English even when the paper is in Hindi. Put the untouched original in "originalText".
 - Transliterate people's and shops' names into Latin script for "detail" (किसान ट्रेडर्स becomes "Kisan Traders"), but keep them recognisable — do not translate a name into its English meaning.
 - Set "isInformal" true for any handwritten or non-GST paper. Many vendors in this trade hand over a plain slip with no GST number; that is exactly what this reader is for, and flagging it lets the person see later which payments have no formal tax invoice behind them.
-- If you genuinely cannot read the amount, return 0 and set "confidence" to "low" rather than inventing a figure. For every other field, a sensible best guess beats an empty value — the person reviews and corrects everything before saving.`;
+- If you genuinely cannot read the amount, return 0 and set "confidence" to "low" rather than inventing a figure. For every other field, a sensible best guess beats an empty value — the person reviews and corrects everything before saving.
+
+Is this paper a BILL as well as a payment? Decide this deliberately — it changes where the paper is filed:
+- Many kaccha slips are a vendor's running account: an itemised table of goods down the page, then what was handed over written at the bottom. That sheet is BOTH a bill and a payment.
+- Set "isItemisedBill" true when there is a table of goods rows (quantity + item + amount). Set it false for a cheque, a labour-payment note, an advance, or any slip that records only money.
+- When it is true, fill "items" with EVERY goods row, put the sheet's own grand total in "billTotal", freight in "otherCharges", and what is still owed in "balanceDue". "amount" stays the money actually HANDED OVER (जमा), which on a part-paid bill is less than "billTotal".
+- When it is false, return an empty "items" array and 0 for "billTotal" / "otherCharges".
+
+Reading an itemised kaccha table, when there is one:
+- A row often reads "<qty> <item> <size> <amount>" with NO rate column. Derive rate = amount / qty.
+- भाड़ा / ढुलाई is freight: it goes in "otherCharges", never in "items". Never put the total, the जमा line, or the शेष line in "items" either.
+- Vendors TICK each delivered row with a check mark (✓, L, ⌐, or a hook) drawn immediately to the LEFT of the quantity. It is not a digit. That tick frequently TOUCHES the first digit and fuses with it: a tick + "1" looks exactly like a "4", and a tick + "0" looks like a "6", so a written "10" reads as "40" and "18" as "48". Read the quantity column as a COLUMN, top to bottom — the real digits line up vertically and the ticks sit outside that alignment. Re-check every quantity beginning with 4 or 6 before answering.
+- Sanity-check each derived rate against its neighbours: a bigger version of a part costs MORE than a smaller one, and a moulded fitting (trap, bend) is never cheaper than a plain socket or washer. A rate far below its neighbours means the quantity was read too high — re-read that row.
+- Item names in ENGLISH, size kept as written: पाइप Pipe · एलबो Elbow · टी Tee · सॉकेट/सोकिट Socket · नहनी ट्रैप Nahani trap · पी ट्रैप P-trap · चैनल Channel · फासनर Fastener · वाशर Washer · नट Nut · सिलिकॉन Silicone · फ्लैंज Flange · सीमेंट Cement · ईंट/ईट Brick · बालू/रेत Sand · गिट्टी Aggregate · सरिया Steel rod · लकड़ी Wood · टाइल्स Tiles · पेंट Paint · तार Wire · नल Tap · पत्थर Stone.
+- Where a quantity is written in feet (फिट / feet / ft), the unit is "ft", not "pcs".`;
 
 function errorResponse(message: string, status = 500): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
     headers: { "Content-Type": "application/json", ...CORS_HEADERS },
   });
+}
+
+// Same shape as scan-bill's retry (see that file for the reasoning). It matters
+// more here, if anything: this reader has NO on-device fallback at all, so a
+// transient rate limit means the person retypes the slip by hand.
+const MAX_ATTEMPTS = 3;
+const TOTAL_BUDGET_MS = 100_000;
+const SLOWEST_ATTEMPT_MS = 35_000;
+const MAX_BACKOFF_MS = 20_000;
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const backoffMs = (attempt: number) =>
+  Math.min(2_000 * 2 ** (attempt - 1), MAX_BACKOFF_MS);
+
+/** Google puts the wait it wants in a RetryInfo detail and names the exhausted
+ * quota in a QuotaFailure detail — that quota id is the only place the
+ * per-minute and per-day limits are told apart. */
+function readUpstreamFailure(
+  status: number,
+  body: string,
+  retryAfter: string | null,
+): { retryDelayMs: number | null; dailyQuota: boolean; retryable: boolean } {
+  let retryDelayMs: number | null = null;
+  let dailyQuota = false;
+  try {
+    const details = JSON.parse(body)?.error?.details;
+    for (const detail of Array.isArray(details) ? details : []) {
+      if (typeof detail?.retryDelay === "string") {
+        const secs = parseFloat(detail.retryDelay);
+        if (Number.isFinite(secs)) retryDelayMs = secs * 1000;
+      }
+      for (const v of Array.isArray(detail?.violations) ? detail.violations : []) {
+        if (/per_?day/i.test(`${v?.quotaId ?? ""} ${v?.quotaMetric ?? ""}`)) {
+          dailyQuota = true;
+        }
+      }
+    }
+  } catch {
+    // Not JSON — fall back to the header below.
+  }
+  if (retryDelayMs == null && retryAfter) {
+    const secs = Number(retryAfter);
+    if (Number.isFinite(secs)) retryDelayMs = secs * 1000;
+  }
+  return {
+    retryDelayMs,
+    dailyQuota,
+    retryable: RETRYABLE_STATUS.has(status) && !dailyQuota,
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -140,38 +260,82 @@ Deno.serve(async (req: Request) => {
     return errorResponse("Missing images, or an image is missing imageBase64/mimeType.", 400);
   }
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: {
-        "x-goog-api-key": apiKey,
-        "Content-Type": "application/json",
-        "Api-Revision": "2026-05-20",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        input: [
-          { type: "text", text: PROMPT },
-          ...images.map((im) => ({ type: "image", data: im.imageBase64, mime_type: im.mimeType })),
-        ],
-        response_format: {
-          type: "text",
-          mime_type: "application/json",
-          schema: RESPONSE_SCHEMA,
+  const geminiBody = JSON.stringify({
+    model: MODEL,
+    input: [
+      { type: "text", text: PROMPT },
+      ...images.map((im) => ({ type: "image", data: im.imageBase64, mime_type: im.mimeType })),
+    ],
+    response_format: {
+      type: "text",
+      mime_type: "application/json",
+      schema: RESPONSE_SCHEMA,
+    },
+  });
+
+  const startedAt = Date.now();
+  let upstream: Response | null = null;
+  let lastStatus = 0;
+  let lastDetail = "";
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let response: Response;
+    try {
+      response = await fetch(GEMINI_URL, {
+        method: "POST",
+        headers: {
+          "x-goog-api-key": apiKey,
+          "Content-Type": "application/json",
+          "Api-Revision": "2026-05-20",
         },
-      }),
-    });
-  } catch (err) {
-    return errorResponse(
-      `Could not reach Gemini: ${err instanceof Error ? err.message : String(err)}`,
-      502,
+        body: geminiBody,
+      });
+    } catch (err) {
+      lastStatus = 0;
+      lastDetail = `Could not reach Gemini: ${err instanceof Error ? err.message : String(err)}`;
+      const wait = backoffMs(attempt);
+      if (
+        attempt === MAX_ATTEMPTS ||
+        Date.now() - startedAt + wait + SLOWEST_ATTEMPT_MS > TOTAL_BUDGET_MS
+      ) break;
+      await sleep(wait);
+      continue;
+    }
+
+    if (response.ok) {
+      upstream = response;
+      break;
+    }
+
+    lastStatus = response.status;
+    lastDetail = await response.text().catch(() => "");
+    const { retryDelayMs, dailyQuota, retryable } = readUpstreamFailure(
+      response.status,
+      lastDetail,
+      response.headers.get("retry-after"),
     );
+
+    if (dailyQuota) {
+      return errorResponse("The AI reader's daily quota is used up. It resets tomorrow.", 429);
+    }
+    if (!retryable) break;
+
+    const wait = Math.min(retryDelayMs ?? backoffMs(attempt), MAX_BACKOFF_MS);
+    if (
+      attempt === MAX_ATTEMPTS ||
+      Date.now() - startedAt + wait + SLOWEST_ATTEMPT_MS > TOTAL_BUDGET_MS
+    ) break;
+    await sleep(wait);
   }
 
-  if (!upstream.ok) {
-    const detail = await upstream.text().catch(() => "");
-    return errorResponse(`Gemini error ${upstream.status}: ${detail.slice(0, 500)}`, 502);
+  if (!upstream) {
+    if (RETRYABLE_STATUS.has(lastStatus)) {
+      return errorResponse("The AI reader is busy right now. Try again in a moment.", 503);
+    }
+    return errorResponse(
+      lastStatus ? `Gemini error ${lastStatus}: ${lastDetail.slice(0, 500)}` : lastDetail,
+      502,
+    );
   }
 
   const data = await upstream.json();

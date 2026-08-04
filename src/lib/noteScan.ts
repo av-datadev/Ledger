@@ -17,7 +17,11 @@ import { fileToGeminiImage } from "./geminiScan";
 import { guessCategory } from "./scanParse";
 import type { Category } from "../../shared/constants";
 
-const TIMEOUT_MS = 40_000;
+// Matches geminiScan.ts: a read measures 15-30s, and scan-note now waits out a
+// busy or rate-limited Gemini rather than failing outright (its own budget caps
+// that at ~100s). 40s aborted perfectly good reads over mobile data — and here
+// there is no fallback reader at all, so an abort means retyping the slip.
+const TIMEOUT_MS = 120_000;
 
 /** A handwritten note read into the shape of the entry form. */
 export interface ScannedNote {
@@ -38,6 +42,25 @@ export interface ScannedNote {
   isInformal: boolean;
   confidence: "high" | "medium" | "low";
   category: Category | "";
+  /** True when the paper is a BILL as well as a payment — an itemised table of
+   * goods with what was handed over written underneath. The entry form asks
+   * where such a sheet should land instead of assuming it is only a payment. */
+  isItemisedBill: boolean;
+  /** The bill's own grand total (goods + freight), which on a part-paid slip is
+   * more than `amount`. Empty when the paper has no itemised table. */
+  billTotal: string;
+  /** Still owed after the payment (शेष / बाकी). Empty when none is written. */
+  balanceDue: string;
+  /** Freight / cartage (भाड़ा), which is a charge but not goods. */
+  otherCharges: string;
+  /** The goods rows, when the paper has them. Empty for a plain payment. */
+  items: {
+    item: string;
+    qty: string;
+    unit: string;
+    rate: string;
+    amount: string;
+  }[];
 }
 
 interface GeminiNoteResponse {
@@ -51,6 +74,11 @@ interface GeminiNoteResponse {
   originalText: string;
   isInformal: boolean;
   confidence: string;
+  isItemisedBill?: boolean;
+  billTotal?: number;
+  balanceDue?: number;
+  otherCharges?: number;
+  items?: { item: string; qty: number; unit: string; rate: number; amount: number }[];
   error?: string;
 }
 
@@ -130,5 +158,19 @@ export async function scanNoteWithGemini(files: File[]): Promise<ScannedNote> {
     isInformal: data.isInformal === true,
     confidence,
     category: guessCategory(categoryText),
+    // Only treat it as a bill when rows actually came back — the flag alone,
+    // with an empty table behind it, would offer a BOQ hand-off that had
+    // nothing to hand over.
+    isItemisedBill: data.isItemisedBill === true && (data.items?.length ?? 0) > 0,
+    billTotal: data.billTotal ? String(data.billTotal) : "",
+    balanceDue: data.balanceDue ? String(data.balanceDue) : "",
+    otherCharges: data.otherCharges ? String(data.otherCharges) : "",
+    items: (data.items ?? []).map((it) => ({
+      item: it.item ?? "",
+      qty: it.qty != null ? String(it.qty) : "",
+      unit: it.unit ?? "",
+      rate: it.rate != null ? String(it.rate) : "",
+      amount: it.amount != null ? String(it.amount) : "",
+    })),
   };
 }

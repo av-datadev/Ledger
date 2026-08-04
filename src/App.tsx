@@ -9,6 +9,7 @@ import { Stock } from "./components/Stock";
 import { People } from "./components/People";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { TabBar, type Tab } from "./components/TabBar";
+import type { ScannedBill } from "./lib/scanParse";
 import { useTheme } from "./hooks/useTheme";
 import { useAuth } from "./hooks/useAuth";
 import { useAppMode } from "./hooks/useAppMode";
@@ -106,6 +107,10 @@ function LedgerApp({
   // People tab) and "open Entry with category Y preselected" (People tab).
   const [ledgerPreset, setLedgerPreset] = useState<LedgerPreset | null>(null);
   const [entryPreset, setEntryPreset] = useState<string | null>(null);
+  // "This slip is actually an itemised bill" — the Entry tab's reader found
+  // goods rows, so the read bill moves to the BOQ tab rather than collapsing
+  // into one ledger line and losing the table.
+  const [boqPreset, setBoqPreset] = useState<ScannedBill | null>(null);
 
   // Android back button: from any non-dashboard tab, back returns to the
   // dashboard instead of exiting the app. Sub-screens (BOQ review, entry
@@ -142,7 +147,14 @@ function LedgerApp({
   const navigateFromTabBar = (t: Tab) => {
     setLedgerPreset(null);
     setEntryPreset(null);
+    setBoqPreset(null);
     navigate(t);
+  };
+
+  /** Move a bill read on the Entry tab over to the BOQ review screen. */
+  const openBoqBill = (bill: ScannedBill) => {
+    navigate("boq");
+    setBoqPreset(bill);
   };
 
   const openLedger = (preset: Omit<LedgerPreset, "seq">) => {
@@ -208,11 +220,17 @@ function LedgerApp({
           />
         )}
         {tab === "entry" && (
-          <EntryForm key={entryPreset ?? "new"} presetCategory={entryPreset} />
+          <EntryForm
+            key={entryPreset ?? "new"}
+            presetCategory={entryPreset}
+            onBillDetected={openBoqBill}
+          />
         )}
         {tab === "ledger" && <Ledger preset={ledgerPreset} />}
         {tab === "recent" && <Recent />}
-        {tab === "boq" && <Boq />}
+        {tab === "boq" && (
+          <Boq preset={boqPreset} onPresetUsed={() => setBoqPreset(null)} />
+        )}
         {tab === "stock" && <Stock />}
         {tab === "people" && (
           <People

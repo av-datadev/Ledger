@@ -157,6 +157,8 @@ export function BillReview({
   draft,
   scanned = false,
   degraded = null,
+  busy = null,
+  onRetryScan,
   editing = false,
   onChange,
   onClose,
@@ -166,6 +168,13 @@ export function BillReview({
   /** Why the weaker on-device reader stood in, when it did. Shown loudly: its
    * output looks the same as a good scan but is far less trustworthy. */
   degraded?: string | null;
+  /** Progress text while a re-read runs, since the review screen covers the
+   * scan screen's own busy indicator. */
+  busy?: string | null;
+  /** Read the same photo again with the AI reader. Offered after a fallback:
+   * the usual cause is a passing rate limit, so a second try minutes later
+   * normally succeeds — and beats retyping the bill by hand. */
+  onRetryScan?: () => void;
   /** Editing an existing bill: replace its rows and skip the create-only helpers. */
   editing?: boolean;
   onChange: (d: DraftBill) => void;
@@ -420,6 +429,15 @@ export function BillReview({
       {scanned && degraded && (
         <div className="text-[13px] px-3 py-2 rounded-md border border-crimson bg-crimson/10 text-crimson mb-3 font-medium">
           {degraded}
+          {onRetryScan && (
+            <button
+              className="btn !py-1.5 !px-3 !text-[13px] mt-2 block"
+              disabled={!!busy}
+              onClick={onRetryScan}
+            >
+              {busy ?? "Try the AI reader again"}
+            </button>
+          )}
         </div>
       )}
 

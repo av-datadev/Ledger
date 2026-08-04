@@ -4,10 +4,40 @@ import { PAYERS } from "../../shared/constants";
 import { useCategories } from "../hooks/useCategories";
 import { usePayers, useModes } from "../hooks/useFacets";
 import { useNoteAiConsent } from "../hooks/useNoteAiConsent";
-import { todayStr } from "../lib/format";
+import { todayStr, inr } from "../lib/format";
 import { fileToAttachment, type ProcessedImage } from "../lib/attach";
 import { scanNoteWithGemini, matchMode, type ScannedNote } from "../lib/noteScan";
+import type { ScannedBill } from "../lib/scanParse";
 import type { Entry, Attachment } from "../types";
+
+/**
+ * Re-shape a note that turned out to be an itemised bill into the bill reader's
+ * own shape, so the BOQ review screen can open on it unchanged. The payment the
+ * slip records rides along as `paidAmount`, which is what makes that screen
+ * offer "Bill only / Payment only / Both" rather than silently dropping the
+ * money — the whole point of sending it over.
+ */
+function noteToBill(note: ScannedNote): ScannedBill {
+  return {
+    vendor: "",
+    invoiceNo: "",
+    date: note.date,
+    category: note.category,
+    invoiceTotal: note.billTotal,
+    // A kaccha bill carries no tax; the review screen's slab is only a
+    // calculator input and 0 keeps it from inventing 18% GST on a slip.
+    gstPct: "0",
+    otherCharges: note.otherCharges,
+    otherChargesTaxed: false,
+    isInformal: note.isInformal,
+    paidAmount: note.amount,
+    balanceDue: note.balanceDue,
+    // The slip's own date is the bill date; a payment noted separately is rare
+    // enough on this path that the review screen's field is left for the person.
+    paymentDate: "",
+    items: note.items,
+  };
+}
 
 // A photo shown in the form: either already saved to the DB (edit mode) or
 // freshly picked and still in memory. `url` is an object URL for display and is
@@ -29,6 +59,10 @@ interface EntryFormProps {
   onDone?: () => void;
   /** Shows a Cancel button (edit mode). */
   onCancel?: () => void;
+  /** The scanned paper turned out to be an itemised bill and the person chose
+   * to file it as one. Hands the read bill to the BOQ tab rather than losing
+   * its rows to a single ledger line. */
+  onBillDetected?: (bill: ScannedBill) => void;
 }
 
 const formFrom = (initial?: Entry, presetCategory?: string | null) => ({
@@ -47,6 +81,7 @@ export function EntryForm({
   presetCategory,
   onDone,
   onCancel,
+  onBillDetected,
 }: EntryFormProps) {
   const categories = useCategories();
   const payers = usePayers();
@@ -338,6 +373,46 @@ export function EntryForm({
                 </span>
                 {read.isInformal && <span className="badge">No GST bill</span>}
               </div>
+              {/* A kaccha slip is often a BILL and a payment on one sheet. Read
+                  only as a payment, its whole goods table is thrown away and
+                  the BOQ never learns what was bought — so ask, rather than
+                  assume this is just money. */}
+              {read.isItemisedBill && onBillDetected && (
+                <div className="mt-2 rounded-md border border-crimson bg-crimson/10 p-2.5">
+                  <div className="font-medium text-crimson">
+                    This paper is a bill, not just a payment
+                  </div>
+                  <div className="mt-1 text-ink-soft">
+                    It lists <b>{read.items.length} material rows</b>
+                    {read.billTotal && (
+                      <> totalling <b>{inr(Number(read.billTotal))}</b></>
+                    )}
+                    {read.amount && (
+                      <>
+                        , with <b>{inr(Number(read.amount))}</b> paid against it
+                      </>
+                    )}
+                    . Sending it to the BOQ keeps the rows and still lets you log
+                    the payment; keeping it here records only the money.
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-primary !py-1.5 !px-3 !text-[13px]"
+                      onClick={() => onBillDetected(noteToBill(read))}
+                    >
+                      Send it to the BOQ
+                    </button>
+                    <button
+                      type="button"
+                      className="btn !py-1.5 !px-3 !text-[13px]"
+                      onClick={() => setRead({ ...read, isItemisedBill: false })}
+                    >
+                      No, just a payment
+                    </button>
+                  </div>
+                </div>
+              )}
               {read.amountInWords && (
                 <div className="mt-1.5 text-ink-soft">
                   Written in words:{" "}
