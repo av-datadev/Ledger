@@ -15,7 +15,11 @@ import { fileToGeminiImage } from "./geminiScan";
 import { guessCategory } from "./scanParse";
 import type { Category } from "../../shared/constants";
 
-const TIMEOUT_MS = 40_000;
+// Matches geminiScan.ts / noteScan.ts: scan-sizes now waits out a busy or
+// rate-limited Gemini (its own budget caps that at ~100s), and 40s was already
+// aborting good reads over mobile data. There is no fallback reader here, so an
+// abort means retyping every three-way measurement by hand.
+const TIMEOUT_MS = 120_000;
 
 /** One size line: a timber section and how many pieces of it were bought. */
 export interface ScannedSizeLine {

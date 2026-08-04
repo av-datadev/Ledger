@@ -178,6 +178,57 @@ function errorResponse(message: string, status = 500): Response {
   });
 }
 
+// Same retry as scan-bill and scan-note (see scan-bill for the reasoning). Like
+// scan-note this reader has NO on-device fallback, so a transient rate limit
+// costs the person a hand-typed size list — and a timber slip is the worst one
+// to retype, since every row is a three-way measurement.
+const MAX_ATTEMPTS = 3;
+const TOTAL_BUDGET_MS = 100_000;
+const SLOWEST_ATTEMPT_MS = 35_000;
+const MAX_BACKOFF_MS = 20_000;
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const backoffMs = (attempt: number) =>
+  Math.min(2_000 * 2 ** (attempt - 1), MAX_BACKOFF_MS);
+
+/** Google puts the wait it wants in a RetryInfo detail and names the exhausted
+ * quota in a QuotaFailure detail — that quota id is the only place the
+ * per-minute and per-day limits are told apart. */
+function readUpstreamFailure(
+  status: number,
+  body: string,
+  retryAfter: string | null,
+): { retryDelayMs: number | null; dailyQuota: boolean; retryable: boolean } {
+  let retryDelayMs: number | null = null;
+  let dailyQuota = false;
+  try {
+    const details = JSON.parse(body)?.error?.details;
+    for (const detail of Array.isArray(details) ? details : []) {
+      if (typeof detail?.retryDelay === "string") {
+        const secs = parseFloat(detail.retryDelay);
+        if (Number.isFinite(secs)) retryDelayMs = secs * 1000;
+      }
+      for (const v of Array.isArray(detail?.violations) ? detail.violations : []) {
+        if (/per_?day/i.test(`${v?.quotaId ?? ""} ${v?.quotaMetric ?? ""}`)) {
+          dailyQuota = true;
+        }
+      }
+    }
+  } catch {
+    // Not JSON — fall back to the header below.
+  }
+  if (retryDelayMs == null && retryAfter) {
+    const secs = Number(retryAfter);
+    if (Number.isFinite(secs)) retryDelayMs = secs * 1000;
+  }
+  return {
+    retryDelayMs,
+    dailyQuota,
+    retryable: RETRYABLE_STATUS.has(status) && !dailyQuota,
+  };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
   if (req.method !== "POST") return errorResponse("POST only", 405);
@@ -196,38 +247,82 @@ Deno.serve(async (req: Request) => {
     return errorResponse("Missing images, or an image is missing imageBase64/mimeType.", 400);
   }
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: {
-        "x-goog-api-key": apiKey,
-        "Content-Type": "application/json",
-        "Api-Revision": "2026-05-20",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        input: [
-          { type: "text", text: PROMPT },
-          ...images.map((im) => ({ type: "image", data: im.imageBase64, mime_type: im.mimeType })),
-        ],
-        response_format: {
-          type: "text",
-          mime_type: "application/json",
-          schema: RESPONSE_SCHEMA,
+  const geminiBody = JSON.stringify({
+    model: MODEL,
+    input: [
+      { type: "text", text: PROMPT },
+      ...images.map((im) => ({ type: "image", data: im.imageBase64, mime_type: im.mimeType })),
+    ],
+    response_format: {
+      type: "text",
+      mime_type: "application/json",
+      schema: RESPONSE_SCHEMA,
+    },
+  });
+
+  const startedAt = Date.now();
+  let upstream: Response | null = null;
+  let lastStatus = 0;
+  let lastDetail = "";
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let response: Response;
+    try {
+      response = await fetch(GEMINI_URL, {
+        method: "POST",
+        headers: {
+          "x-goog-api-key": apiKey,
+          "Content-Type": "application/json",
+          "Api-Revision": "2026-05-20",
         },
-      }),
-    });
-  } catch (err) {
-    return errorResponse(
-      `Could not reach Gemini: ${err instanceof Error ? err.message : String(err)}`,
-      502,
+        body: geminiBody,
+      });
+    } catch (err) {
+      lastStatus = 0;
+      lastDetail = `Could not reach Gemini: ${err instanceof Error ? err.message : String(err)}`;
+      const wait = backoffMs(attempt);
+      if (
+        attempt === MAX_ATTEMPTS ||
+        Date.now() - startedAt + wait + SLOWEST_ATTEMPT_MS > TOTAL_BUDGET_MS
+      ) break;
+      await sleep(wait);
+      continue;
+    }
+
+    if (response.ok) {
+      upstream = response;
+      break;
+    }
+
+    lastStatus = response.status;
+    lastDetail = await response.text().catch(() => "");
+    const { retryDelayMs, dailyQuota, retryable } = readUpstreamFailure(
+      response.status,
+      lastDetail,
+      response.headers.get("retry-after"),
     );
+
+    if (dailyQuota) {
+      return errorResponse("The AI reader's daily quota is used up. It resets tomorrow.", 429);
+    }
+    if (!retryable) break;
+
+    const wait = Math.min(retryDelayMs ?? backoffMs(attempt), MAX_BACKOFF_MS);
+    if (
+      attempt === MAX_ATTEMPTS ||
+      Date.now() - startedAt + wait + SLOWEST_ATTEMPT_MS > TOTAL_BUDGET_MS
+    ) break;
+    await sleep(wait);
   }
 
-  if (!upstream.ok) {
-    const detail = await upstream.text().catch(() => "");
-    return errorResponse(`Gemini error ${upstream.status}: ${detail.slice(0, 500)}`, 502);
+  if (!upstream) {
+    if (RETRYABLE_STATUS.has(lastStatus)) {
+      return errorResponse("The AI reader is busy right now. Try again in a moment.", 503);
+    }
+    return errorResponse(
+      lastStatus ? `Gemini error ${lastStatus}: ${lastDetail.slice(0, 500)}` : lastDetail,
+      502,
+    );
   }
 
   const data = await upstream.json();
