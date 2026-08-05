@@ -1,6 +1,11 @@
 import { useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { sendMagicLink, verifyEmailCode, signOut } from "../hooks/useAuth";
+import {
+  sendMagicLink,
+  verifyEmailCode,
+  signOut,
+  deleteAccount,
+} from "../hooks/useAuth";
 import {
   createHousehold,
   joinHousehold,
@@ -351,6 +356,99 @@ function AccountPanel({
       >
         Sign out &amp; clear this device
       </button>
+      <DeleteAccountRow />
     </Card>
+  );
+}
+
+/**
+ * Permanent account deletion, required by both app stores before Brick Flow can
+ * be listed. Deliberately harder to reach than signing out: it's folded away,
+ * and opening it demands the word DELETE be typed rather than a tap on a
+ * confirm dialog — the two sit next to each other and only one is reversible.
+ */
+function DeleteAccountRow() {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const go = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      await deleteAccount();
+      // The account is gone; clear this device too, or the local copy would sit
+      // here looking like a signed-out ledger that could be synced back.
+      await stopSync();
+      await clearAllData();
+      window.location.reload();
+    } catch (err) {
+      setBusy(false);
+      setError(
+        err instanceof Error ? err.message : "Could not delete the account.",
+      );
+    }
+  };
+
+  if (!open) {
+    return (
+      <div className="mt-2">
+        <button
+          className="text-[12px] text-ink-soft underline"
+          onClick={() => setOpen(true)}
+        >
+          Delete my account
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-rule space-y-2">
+      <div className="text-[13px] font-medium text-crimson">
+        Delete this account permanently
+      </div>
+      <p className="text-[12px] text-ink-soft">
+        Removes your sign-in and your data from the cloud — entries, bills,
+        stock, people and bill photos. This cannot be undone.
+      </p>
+      <p className="text-[12px] text-ink-soft">
+        If someone else still shares this ledger, it stays with them and only
+        your access is removed. Download a backup first if you want to keep a
+        copy.
+      </p>
+      <label className="field-label" htmlFor="del-confirm">
+        Type DELETE to confirm
+      </label>
+      <input
+        id="del-confirm"
+        className="input"
+        autoComplete="off"
+        autoCapitalize="characters"
+        placeholder="DELETE"
+        value={typed}
+        onChange={(e) => setTyped(e.target.value)}
+      />
+      {error && <div className="text-[13px] text-crimson">{error}</div>}
+      <button
+        className="btn w-full !py-2.5 !bg-crimson !text-paper disabled:opacity-40"
+        disabled={busy || typed.trim().toUpperCase() !== "DELETE"}
+        onClick={() => void go()}
+      >
+        {busy ? "Deleting…" : "Delete my account"}
+      </button>
+      <button
+        className="text-[12px] text-ink-soft underline w-full text-center"
+        disabled={busy}
+        onClick={() => {
+          setOpen(false);
+          setTyped("");
+          setError(null);
+        }}
+      >
+        Cancel
+      </button>
+    </div>
   );
 }

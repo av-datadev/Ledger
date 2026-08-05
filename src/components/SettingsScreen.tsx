@@ -412,6 +412,20 @@ export function SettingsScreen() {
             check for update
           </button>
         </div>
+        {/* Plain links, not in-app screens: a store reviewer has to be able to
+            reach these from the listing without installing anything, so the
+            pages are static HTML and the app points at the same URLs. */}
+        <div className="flex items-center gap-3 pt-1">
+          <a className="underline" href="/privacy.html">
+            Privacy
+          </a>
+          <a className="underline" href="/terms.html">
+            Terms
+          </a>
+          <a className="underline" href="/delete-account.html">
+            Delete account
+          </a>
+        </div>
       </div>
     </div>
   );

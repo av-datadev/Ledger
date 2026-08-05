@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { edgeFunctionError } from "../lib/geminiScan";
 
 export interface AuthState {
   session: Session | null;
@@ -55,5 +56,27 @@ export async function verifyEmailCode(
 }
 
 export async function signOut(): Promise<void> {
+  await supabase.auth.signOut();
+}
+
+/**
+ * Delete the account and everything behind it, then sign out.
+ *
+ * Both stores require this before Brick Flow can be listed, and neither accepts
+ * a support-email flow — it has to happen inside the app. The work is done in
+ * the delete-account Edge Function, since removing an auth user needs the
+ * service-role key; the confirmation string is checked on both sides so a
+ * stray call can't do this on its own.
+ *
+ * A household shared with other people is NOT deleted — only this person's
+ * membership. The books are removed when the last member leaves.
+ */
+export async function deleteAccount(): Promise<void> {
+  const { error } = await supabase.functions.invoke("delete-account", {
+    body: { confirm: "DELETE" },
+  });
+  // supabase-js reports every non-2xx as the same opaque "non-2xx status code"
+  // and leaves the body unread, so the real reason has to be unwrapped.
+  if (error) throw new Error(await edgeFunctionError(error));
   await supabase.auth.signOut();
 }
