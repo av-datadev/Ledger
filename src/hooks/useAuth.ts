@@ -29,7 +29,7 @@ export function useAuth(): AuthState {
 
 /**
  * Send a passwordless sign-in email. The email carries BOTH a one-tap magic
- * link and a 6-digit code. On iOS the installed (home-screen) app has its own
+ * link and a numeric code. On iOS the installed (home-screen) app has its own
  * storage separate from Safari, and tapping the link opens Safari — so the code
  * path (verifyEmailCode) is what actually signs the installed app in.
  */
@@ -41,7 +41,7 @@ export async function sendMagicLink(email: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Verify the 6-digit code from the sign-in email (works inside the app). */
+/** Verify the emailed sign-in code (works inside the installed app). */
 export async function verifyEmailCode(
   email: string,
   token: string,

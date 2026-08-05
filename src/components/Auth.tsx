@@ -68,7 +68,7 @@ export function AccountSection({
   return <AccountPanel household={household} email={session.user.email} />;
 }
 
-/** Passwordless email sign-in (6-digit code), inline on the Data tab. */
+/** Passwordless email sign-in (emailed numeric code), inline on the Data tab. */
 function SignInCard() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -95,8 +95,10 @@ function SignInCard() {
 
   const verify = async () => {
     setError(null);
-    if (!/^\d{6}$/.test(code.trim())) {
-      setError("Enter the 6-digit code from the email.");
+    // Supabase's OTP length is a project setting (6–10 digits), so don't pin
+    // this to one length — a dashboard change would otherwise lock everyone out.
+    if (!/^\d{6,10}$/.test(code.trim())) {
+      setError("Enter the code from the email.");
       return;
     }
     setStatus("verifying");
@@ -119,7 +121,7 @@ function SignInCard() {
       {status === "sent" || status === "verifying" ? (
         <div className="space-y-2">
           <div className="text-sm">
-            We emailed a 6-digit sign-in code to <b>{email.trim()}</b>.
+            We emailed a sign-in code to <b>{email.trim()}</b>.
           </div>
           <label className="field-label" htmlFor="login-code">
             Enter the code
@@ -129,9 +131,8 @@ function SignInCard() {
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
-            maxLength={6}
+            maxLength={10}
             className="input tracking-[0.4em] text-center text-lg"
-            placeholder="000000"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             onKeyDown={(e) => e.key === "Enter" && void verify()}
@@ -163,7 +164,7 @@ function SignInCard() {
         <div className="space-y-2">
           <p className="text-[13px] text-ink-soft">
             Your entries live on this device. Sign in to back them up and sync
-            across phones — no password, just a 6-digit email code.
+            across phones — no password, just a code sent to your email.
           </p>
           <label className="field-label" htmlFor="login-email">
             Email

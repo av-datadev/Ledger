@@ -4,7 +4,7 @@ import { sendMagicLink, verifyEmailCode } from "../hooks/useAuth";
 /**
  * Sign-in for a contractor, so his sites can be linked to an owner's app.
  *
- * Same 6-digit email code the household side uses. Phone OTP would suit this
+ * Same emailed code the household side uses. Phone OTP would suit this
  * trade better, but in India it needs DLT registration (a per-year fee to the
  * operator plus entity, sender-ID and per-template approval) before any SMS is
  * delivered at all — too much to carry for this. Every Android phone already
@@ -39,8 +39,9 @@ export function ContractorAuth() {
   };
 
   const verify = async () => {
-    if (!/^\d{6}$/.test(code.trim())) {
-      setError("Enter the 6-digit code from the email.");
+    // Length is a Supabase project setting (6–10 digits) — see Auth.tsx.
+    if (!/^\d{6,10}$/.test(code.trim())) {
+      setError("Enter the code from the email.");
       return;
     }
     setError(null);
@@ -74,7 +75,7 @@ export function ContractorAuth() {
             />
           </div>
           <p className="text-[11px] text-ink-soft">
-            We'll email a 6-digit code. Needed once on this phone.
+            We'll email you a code. Needed once on this phone.
           </p>
           {error && <div className="text-[12px] text-crimson">{error}</div>}
           <button
@@ -88,7 +89,7 @@ export function ContractorAuth() {
       ) : (
         <>
           <p className="text-[12px] text-ink-soft">
-            We emailed a 6-digit code to <b>{email.trim()}</b>.
+            We emailed a code to <b>{email.trim()}</b>.
           </p>
           <div>
             <label className="field-label" htmlFor="ca-code">Enter the code</label>
@@ -96,9 +97,8 @@ export function ContractorAuth() {
               id="ca-code"
               inputMode="numeric"
               autoComplete="one-time-code"
-              maxLength={6}
+              maxLength={10}
               className="input money !text-xl !tracking-[0.3em]"
-              placeholder="123456"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             />
