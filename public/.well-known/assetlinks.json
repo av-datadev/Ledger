@@ -1,9 +1,11 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
-      "package_name": "app.brickflow.twa",
+      "package_name": "app.brickbook.twa",
       "sha256_cert_fingerprints": [
         "BE:F4:24:2C:7F:8B:27:3B:7F:01:9F:D2:A2:5E:F7:3A:CD:66:62:FC:85:D7:E0:4C:DC:D8:51:7A:ED:28:51:D2"
       ]

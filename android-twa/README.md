@@ -1,4 +1,4 @@
-# Brick Flow — Android app (Trusted Web Activity)
+# Brick Book — Android app (Trusted Web Activity)
 
 This wraps the live PWA at `ledger-nu-ashen.vercel.app` in a Trusted Web
 Activity (TWA) for the Play Store — a thin Android shell that opens the real
@@ -9,7 +9,7 @@ separate Android codebase to maintain: everything the app does still lives in
 Generated with [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap)
 (`@bubblewrap/cli`) from the site's own `manifest.webmanifest`, driven
 programmatically rather than through its interactive wizard so the result is
-reproducible. `package_name`: `app.brickflow.twa`.
+reproducible. `package_name`: `app.brickbook.twa`.
 
 ## The signing key — read this before doing anything else
 
@@ -27,6 +27,21 @@ verification, taking several days) but it is a real outage to avoid.
 
 Put both somewhere durable — a password manager, encrypted drive — that
 survives this machine being wiped.
+
+That secrets path really does still say `brickflow` — it was left alone
+deliberately during the rename to Brick Book. It is a local file that may
+already have been backed up or written down somewhere, and quietly moving
+someone's only copy of a signing password is a worse outcome than an
+inconsistent directory name.
+
+For the same reason **the key itself was not regenerated**, so its certificate
+still reads `CN=Brick Flow`. That name appears only in `apksigner verify`
+output and Play Console's app-signing page — never to a user, and never in the
+listing. Regenerating would change the SHA-256 fingerprint, which would in turn
+invalidate both `assetlinks.json` and any backup of the keystore already taken.
+If you want it to read Brick Book anyway, now (pre-publication) is the only
+cheap moment: delete the `.jks`, re-run the generator, and update the
+fingerprint in `assetlinks.json` to match.
 
 ## assetlinks.json
 

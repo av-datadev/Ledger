@@ -21,11 +21,11 @@ plugins {
 }
 
 def twaManifest = [
-    applicationId: 'app.brickflow.twa',
+    applicationId: 'app.brickbook.twa',
     hostName: 'ledger-nu-ashen.vercel.app', // The domain being opened in the TWA.
     launchUrl: '/', // The start path for the TWA. Must be relative to the domain.
-    name: 'Brick Flow', // The application name.
-    launcherName: 'Brick Flow', // The name shown on the Android Launcher.
+    name: 'Brick Book', // The application name.
+    launcherName: 'Brick Book', // The name shown on the Android Launcher.
     themeColor: '#182B3A', // The color used for the status bar.
     themeColorDark: '#000000', // The color used for the dark status bar.
     navigationColor: '#000000', // The color used for the navigation bar.
@@ -52,9 +52,9 @@ def twaManifest = [
 
 android {
     compileSdkVersion 36
-    namespace "app.brickflow.twa"
+    namespace "app.brickbook.twa"
     defaultConfig {
-        applicationId "app.brickflow.twa"
+        applicationId "app.brickbook.twa"
         minSdkVersion 21
         targetSdkVersion 36
         versionCode 1

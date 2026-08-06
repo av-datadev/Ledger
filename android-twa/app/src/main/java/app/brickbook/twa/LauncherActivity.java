@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package app.brickflow.twa;
+package app.brickbook.twa;
 
 import android.content.pm.ActivityInfo;
 import android.net.Uri;
