@@ -11,3 +11,15 @@ dev-dist/
 .env*
 scratch-bill*
 Ref_img/
+
+# Android/TWA build output and signing material — the keystore is the Play
+# Store upload key; it must never reach git. See android-twa/README.md.
+android-twa/android-keystore.jks
+android-twa/*.aab
+android-twa/*.apk
+android-twa/*.apk.idsig
+android-twa/*-unsigned-aligned.apk
+android-twa/.gradle/
+android-twa/app/build/
+android-twa/build/
+android-twa/local.properties
