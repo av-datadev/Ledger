@@ -71,7 +71,7 @@ export function ContractorLeadForm({
     <div className={embedded ? "" : "min-h-dvh bg-paper text-ink"}>
       {!embedded && (
         <header className="bg-header text-onhead sticky top-0 z-30 px-4 h-12 flex items-center justify-between border-b border-black/30">
-          <h1 className="text-sm font-semibold tracking-[0.18em]">BRICK FLOW</h1>
+          <h1 className="text-sm font-semibold tracking-[0.18em]">BRICK BOOK</h1>
           <button
             onClick={onSwitchToBuilder}
             className="text-onhead/90 active:text-onhead text-[11px] border border-onhead/30 rounded px-2 py-1"

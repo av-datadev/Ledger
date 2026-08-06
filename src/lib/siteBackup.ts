@@ -18,14 +18,20 @@ import { downloadFile, timestampSlug } from "./csv";
 import { blobToBase64, base64ToBlob } from "./attach";
 import type { ContractorSite, SiteLedgerRow } from "../types";
 
-const APP_TAG = "brick-flow-contractor";
+// Written into the file, so the Brick Book rename can't just replace it: every
+// sites backup already on a contractor's phone says "brick-flow-contractor".
+// New files carry the new tag; both are accepted on import. A contractor's site
+// books are device-local and this file is their only copy, so refusing to read
+// an older one would lose exactly the data the feature exists to protect.
+const APP_TAG = "brick-book-contractor";
+const LEGACY_APP_TAG = "brick-flow-contractor";
 const PROOF_MIME = "image/jpeg";
 
 // The proof photo is a Blob, which JSON can't hold — carry it as base64.
 type SerializedRow = Omit<SiteLedgerRow, "proof"> & { proofData: string | null };
 
 interface SiteBackupFile {
-  app: typeof APP_TAG;
+  app: typeof APP_TAG | typeof LEGACY_APP_TAG;
   version: 1;
   exportedAt: string;
   sites: ContractorSite[];
@@ -61,7 +67,7 @@ export async function exportSiteBackup(): Promise<{ sites: number; rows: number 
   };
 
   downloadFile(
-    `brick-flow-sites-${timestampSlug()}.json`,
+    `brick-book-sites-${timestampSlug()}.json`,
     JSON.stringify(payload, null, 1),
     "application/json",
   );
@@ -88,8 +94,12 @@ export async function readSiteBackupFile(file: File): Promise<ParsedSiteBackup> 
       "That's a ledger backup from the home-builder side, not a sites backup. Restore it from the Data tab there instead.",
     );
   }
-  if (data.app !== APP_TAG || !Array.isArray(data.sites) || !Array.isArray(data.ledger)) {
-    throw new Error("That file doesn't look like a Brick Flow sites backup.");
+  if (
+    (data.app !== APP_TAG && data.app !== LEGACY_APP_TAG) ||
+    !Array.isArray(data.sites) ||
+    !Array.isArray(data.ledger)
+  ) {
+    throw new Error("That file doesn't look like a Brick Book sites backup.");
   }
 
   // Backups written before site linking existed have no linkId/linkStatus.

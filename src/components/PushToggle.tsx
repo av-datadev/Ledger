@@ -54,7 +54,7 @@ export function PushToggle() {
       {state === "unsupported" ? (
         <p className="text-[13px] text-ink-soft">
           {iosNeedsInstall
-            ? "Add Brick Flow to your home screen first — on iPhone, notifications only work once the app is installed."
+            ? "Add Brick Book to your home screen first — on iPhone, notifications only work once the app is installed."
             : "This browser can't show notifications."}
         </p>
       ) : state === "denied" ? (

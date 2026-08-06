@@ -16,7 +16,7 @@ function readMode(): AppMode | null {
  *
  * The gate exists only for a genuinely fresh device — no local ledger entries
  * and no signed-in session. Any device that already has data or a session
- * (every existing Brick Flow user right now) is auto-set to "builder" and
+ * (every existing Brick Book user right now) is auto-set to "builder" and
  * never sees the gate at all, so this ships with zero disruption to daily use.
  * Once a choice is made (auto or explicit), it's remembered — asked at most
  * once per device.

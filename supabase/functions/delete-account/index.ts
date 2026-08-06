@@ -1,6 +1,6 @@
 // Deletes the caller's account and every trace of their data.
 //
-// Required by both stores before Brick Flow can be listed: Google Play's User
+// Required by both stores before Brick Book can be listed: Google Play's User
 // Data policy (in force since 2024-04-15) and Apple guideline 5.1.1(v) both
 // oblige any app that can create an account to let a person delete it from
 // inside the app. Deactivating or "freezing" does not count.

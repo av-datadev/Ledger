@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const vapidPublic = Deno.env.get("VAPID_PUBLIC_KEY");
   const vapidPrivate = Deno.env.get("VAPID_PRIVATE_KEY");
-  const vapidSubject = Deno.env.get("VAPID_SUBJECT") ?? "mailto:noreply@brickflow.app";
+  const vapidSubject = Deno.env.get("VAPID_SUBJECT") ?? "mailto:noreply@brickbook.app";
 
   // Authorisation is settled before anything else — an unauthorised caller
   // shouldn't learn whether the server is configured, and reordering these lets
@@ -113,8 +113,8 @@ Deno.serve(async (req: Request) => {
     entry_shared: `${who} shared an entry`,
   };
   const payload = JSON.stringify({
-    title: TITLES[event] ?? "Brick Flow",
-    body: detail ? String(detail).slice(0, 140) : "Open Brick Flow to see it.",
+    title: TITLES[event] ?? "Brick Book",
+    body: detail ? String(detail).slice(0, 140) : "Open Brick Book to see it.",
     tag: `${event}:${linkId}`,
     url: "/",
   });

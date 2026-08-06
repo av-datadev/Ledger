@@ -149,7 +149,7 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
       "notes",
     ];
     downloadFile(
-      `brick-flow-entries-${timestampSlug()}.csv`,
+      `brick-book-entries-${timestampSlug()}.csv`,
       toCsv(headers, visible as unknown as Record<string, unknown>[]),
       "text/csv",
     );

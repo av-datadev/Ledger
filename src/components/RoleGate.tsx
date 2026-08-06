@@ -10,7 +10,7 @@ export function RoleGate({ onChoose }: { onChoose: (m: AppMode) => void }) {
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <div className="text-lg font-semibold tracking-[0.18em]">
-            BRICK FLOW
+            BRICK BOOK
           </div>
           <div className="text-[13px] text-ink-soft mt-2">
             Are you building or renovating a home, or are you a contractor?

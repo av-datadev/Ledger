@@ -171,7 +171,7 @@ function LedgerApp({
     <div className="min-h-dvh flex flex-col bg-paper">
       <header className="bg-header text-onhead sticky top-0 z-30 px-4 h-12 flex items-center justify-between border-b border-black/30">
         <h1 className="text-sm font-semibold tracking-[0.18em]">
-          BRICK FLOW
+          BRICK BOOK
         </h1>
         <div className="flex items-center gap-1">
         {/* One-tap hop to the contractor side and back, so a listing can be

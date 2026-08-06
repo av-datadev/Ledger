@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Brick Flow's Supabase project. These are the PUBLISHABLE credentials — they
+// Brick Book's Supabase project. These are the PUBLISHABLE credentials — they
 // are meant to ship in client code; access is protected by login + row-level
 // security, not by hiding the key. (Project: mttdiyovwuduyriwylfs.)
 const SUPABASE_URL = "https://mttdiyovwuduyriwylfs.supabase.co";

@@ -68,7 +68,7 @@ export async function exportBackup(): Promise<void> {
     attachments,
   };
   downloadFile(
-    `brick-flow-backup-${timestampSlug()}.json`,
+    `brick-book-backup-${timestampSlug()}.json`,
     JSON.stringify(payload, null, 1),
     "application/json",
   );
@@ -99,14 +99,15 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
   const data = raw as Omit<Partial<BackupFile>, "app"> & { app?: string };
   // Name the likely mix-up before the generic shape check, so picking the
   // contractor-side file here says what actually went wrong.
-  if (data.app === "brick-flow-contractor") {
+  // Both tags: files written before the Brick Book rename carry the old one.
+  if (data.app === "brick-book-contractor" || data.app === "brick-flow-contractor") {
     throw new Error(
       "That's a sites backup from the contractor side, not a ledger backup. Restore it from My sites there instead.",
     );
   }
   if (!Array.isArray(data.entries) || !Array.isArray(data.boqItems)) {
     throw new Error(
-      "That file doesn't look like a Brick Flow backup (missing entries/boqItems arrays).",
+      "That file doesn't look like a Brick Book backup (missing entries/boqItems arrays).",
     );
   }
   for (const e of data.entries) {

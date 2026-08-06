@@ -362,7 +362,7 @@ function AccountPanel({
 }
 
 /**
- * Permanent account deletion, required by both app stores before Brick Flow can
+ * Permanent account deletion, required by both app stores before Brick Book can
  * be listed. Deliberately harder to reach than signing out: it's folded away,
  * and opening it demands the word DELETE be typed rather than a tap on a
  * confirm dialog — the two sit next to each other and only one is reversible.

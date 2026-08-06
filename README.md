@@ -1,4 +1,4 @@
-# Brick Flow
+# Brick Book
 
 A PWA for tracking the money, materials and people involved in building a
 house. Formerly "House Ledger". Built for one real project in Moradabad, UP,

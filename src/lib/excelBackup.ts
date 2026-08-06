@@ -161,8 +161,17 @@ const PEOPLE: TableSpec<PersonDetails> = {
 
 /** Marks the workbook as ours, and records which app version wrote it — the
  * same job the JSON backup's `app`/`version` keys do. Without it, any
- * spreadsheet at all would look like a candidate for import. */
-const META_SHEET = "Brick Flow";
+ * spreadsheet at all would look like a candidate for import.
+ *
+ * These two strings are written INTO the workbook, so the rename to Brick Book
+ * can't simply replace them: every backup already sitting in someone's Drive
+ * says "Brick Flow". New exports carry the new name, and both are accepted on
+ * import — dropping the old one would reject the very files this feature
+ * exists to restore. */
+const META_SHEET = "Brick Book";
+const LEGACY_META_SHEET = "Brick Flow";
+const APP_TAG = "brick-book-excel";
+const LEGACY_APP_TAG = "brick-flow-excel";
 const FORMAT_VERSION = 1;
 
 type Row = (string | number | boolean | null)[];
@@ -205,7 +214,7 @@ export async function exportExcelBackup(): Promise<Blob> {
   const meta = {
     sheet: META_SHEET,
     data: [
-      ["app", "brick-flow-excel"],
+      ["app", APP_TAG],
       ["formatVersion", FORMAT_VERSION],
       ["exportedAt", new Date().toISOString()],
       ["note", "Data only — entry photos are not included. Keep a .json backup for those."],
@@ -306,14 +315,21 @@ export async function readExcelBackupFile(file: File): Promise<ParsedExcelBackup
   try {
     metaRows = (await readSheet(file, META_SHEET)) as unknown[][];
   } catch {
-    throw new Error(
-      "That workbook wasn't written by Brick Flow — it has no \"Brick Flow\" sheet. Export one from Data → Backup first.",
-    );
+    // Workbooks exported before the Brick Book rename carry the old sheet name.
+    try {
+      metaRows = (await readSheet(file, LEGACY_META_SHEET)) as unknown[][];
+    } catch {
+      throw new Error(
+        `That workbook wasn't written by Brick Book — it has no "${META_SHEET}" sheet. Export one from Data → Backup first.`,
+      );
+    }
   }
-  const app = metaRows.find((r) => String(r[0]).trim() === "app")?.[1];
-  if (String(app ?? "").trim() !== "brick-flow-excel") {
+  const app = String(
+    metaRows.find((r) => String(r[0]).trim() === "app")?.[1] ?? "",
+  ).trim();
+  if (app !== APP_TAG && app !== LEGACY_APP_TAG) {
     throw new Error(
-      "That workbook wasn't written by Brick Flow. Export one from Data → Backup first.",
+      "That workbook wasn't written by Brick Book. Export one from Data → Backup first.",
     );
   }
 

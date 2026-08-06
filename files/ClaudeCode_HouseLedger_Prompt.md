@@ -1,4 +1,4 @@
-# Brick Flow — build spec
+# Brick Book — build spec
 
 Originally the prompt that created this app as "House Ledger". Kept current as
 a specification of what it now is, so it can be rebuilt or handed to someone
@@ -9,7 +9,7 @@ Last updated: 2026-08-03.
 
 ---
 
-Build an installable, offline-first PWA called **Brick Flow** for tracking the
+Build an installable, offline-first PWA called **Brick Book** for tracking the
 money, materials and people involved in building a house. It replaces an Excel
 workbook. Target: Android Chrome and iOS Safari, installed to the home screen,
 full-screen with no browser chrome.

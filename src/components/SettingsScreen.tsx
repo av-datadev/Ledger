@@ -106,7 +106,7 @@ export function SettingsScreen() {
   const exportEntriesCsv = async () => {
     const rows = await db.entries.toArray();
     downloadFile(
-      `brick-flow-entries-${timestampSlug()}.csv`,
+      `brick-book-entries-${timestampSlug()}.csv`,
       toCsv(
         ["date", "category", "event", "detail", "amount", "mode", "paidBy", "notes"],
         rows as unknown as Record<string, unknown>[],
@@ -118,7 +118,7 @@ export function SettingsScreen() {
   const exportBoqCsv = async () => {
     const rows = await db.boqItems.toArray();
     downloadFile(
-      `brick-flow-boq-${timestampSlug()}.csv`,
+      `brick-book-boq-${timestampSlug()}.csv`,
       toCsv(
         ["date", "category", "vendor", "invoiceNo", "invoiceTotal", "item", "hsn", "gstPct", "basis", "length", "width", "thickness", "pieces", "qty", "writtenQty", "unit", "rate", "discPct", "amount"],
         rows as unknown as Record<string, unknown>[],
@@ -142,7 +142,7 @@ export function SettingsScreen() {
       done: s.done ? "yes" : "no",
     }));
     downloadFile(
-      `brick-flow-stock-${timestampSlug()}.csv`,
+      `brick-book-stock-${timestampSlug()}.csv`,
       toCsv(
         ["name", "category", "unit", "received", "givenOut", "balance", "done"],
         rows as unknown as Record<string, unknown>[],
@@ -286,7 +286,7 @@ export function SettingsScreen() {
             onClick={() =>
               void exportExcelBackup()
                 .then((blob) => {
-                  downloadBlob(`brick-flow-backup-${timestampSlug()}.xlsx`, blob);
+                  downloadBlob(`brick-book-backup-${timestampSlug()}.xlsx`, blob);
                   setMsg({ kind: "ok", text: "Excel backup downloaded." });
                 })
                 .catch((err) =>

@@ -62,7 +62,7 @@ export async function signOut(): Promise<void> {
 /**
  * Delete the account and everything behind it, then sign out.
  *
- * Both stores require this before Brick Flow can be listed, and neither accepts
+ * Both stores require this before Brick Book can be listed, and neither accepts
  * a support-email flow — it has to happen inside the app. The work is done in
  * the delete-account Edge Function, since removing an auth user needs the
  * service-role key; the confirmation string is checked on both sides so a

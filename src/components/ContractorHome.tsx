@@ -33,7 +33,7 @@ export function ContractorHome({
   return (
     <div className="min-h-dvh flex flex-col bg-paper text-ink">
       <header className="sticky top-0 z-30 bg-header text-onhead px-4 h-12 flex items-center justify-between">
-        <div className="font-bold tracking-[0.14em] text-sm">BRICK FLOW</div>
+        <div className="font-bold tracking-[0.14em] text-sm">BRICK BOOK</div>
         <button
           className="text-[11px] underline opacity-80"
           onClick={onSwitchToBuilder}

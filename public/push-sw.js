@@ -15,14 +15,14 @@ self.addEventListener("push", (event) => {
     data = { body: event.data ? event.data.text() : "" };
   }
 
-  const title = data.title || "Brick Flow";
+  const title = data.title || "Brick Book";
   const options = {
     body: data.body || "",
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-192.png",
     // Same tag replaces an earlier notification about the same thing rather
     // than stacking five of them for one conversation.
-    tag: data.tag || "brick-flow",
+    tag: data.tag || "brick-book",
     renotify: true,
     data: { url: data.url || "/" },
   };
