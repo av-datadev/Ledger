@@ -40,6 +40,7 @@ Most of the app works in airplane mode. Three things don't:
 | Feature | Why |
 | --- | --- |
 | Bill / note / size-list scanning | Gemini vision, via Supabase Edge Functions |
+| Importing a free-form expense list | Gemini text, via `scan-ledger` — **a mapped spreadsheet needs none of this** |
 | Household sync + sign-in | Supabase |
 | Push notifications | Web Push via the `send-push` function |
 
@@ -75,7 +76,7 @@ src/                   the PWA
 src/lib/               sync, scanning, backup, stock, measures, push
 public/tesseract/      self-hosted OCR worker, wasm cores, English data
 scripts/               icon generator, tesseract vendoring, user-guide build
-supabase/functions/    scan-bill, scan-note, scan-sizes, send-push
+supabase/functions/    scan-bill, scan-note, scan-sizes, scan-ledger, send-push
 supabase/migrations/   SQL for columns the sync engine pushes
 design/                HTML mockups the current skin came from
 files/                 the build spec (ClaudeCode_HouseLedger_Prompt.md)
@@ -160,6 +161,20 @@ failing silently.
 - **Paid vs billed** (Ledger) — money handed over that no bill accounts for
   yet. A gap isn't proof of anything; labour never has a bill. It's worth a
   question when the payment was for material.
+- **Importing a past history** (Data → *Import past expenses*) — the one-time
+  migration for someone who has been keeping this in a phone note or a
+  spreadsheet. Two paths, and which one runs is a privacy decision rather than
+  a convenience one. A sheet whose columns can be identified is mapped and
+  parsed **entirely on the device** (`importParse.ts`) and nothing is uploaded;
+  only free text, or a sheet too irregular to map, goes to `scan-ledger`, and
+  only after a prompt that states how many lines are about to be sent. Consent
+  is a separate per-device key from the note reader's — agreeing to send one
+  photo of a slip is not agreeing to send every payment you have ever made.
+  Every row lands in a review table, and anything matching an existing entry
+  (same date, same amount, overlapping description) arrives **unticked**,
+  because the realistic failure here is importing the same list twice. Rows are
+  *added*; nothing is replaced. Each one is stamped `Imported from <source>` in
+  its notes so a wrong import can be found again.
 - **Backups** — JSON is the complete one and the only format carrying entry
   photos. Excel (.xlsx) opens anywhere and can be corrected by hand and
   uploaded back, but holds no photos, so restoring one deliberately leaves the
@@ -183,6 +198,10 @@ Offline (airplane mode, after one full load):
 - [ ] BOQ: "Type manually" saves; a printed English bill still scans via
       on-device OCR; the lines-vs-total check holds
 - [ ] Stock: received / given out, balance, done-checkbox
+- [ ] Data → Import: a .csv/.xlsx with date/description/amount columns maps,
+      previews and imports **with no signal at all** — if this needs the
+      network, the on-device path has regressed. Importing the same file a
+      second time must arrive fully unticked.
 - [ ] Data: JSON and Excel backups download; both restore
 
 Online only:
