@@ -8,6 +8,7 @@ import { toCsv, downloadFile, downloadBlob, timestampSlug } from "../lib/csv";
 import { currentHouseholdId } from "../lib/sync";
 import { useTextScale, TEXT_SCALES } from "../hooks/useTextScale";
 import { useNoteAiConsent } from "../hooks/useNoteAiConsent";
+import { ImportEntries } from "./ImportEntries";
 import { PushToggle } from "./PushToggle";
 import { Faq } from "./Faq";
 
@@ -26,6 +27,7 @@ export function SettingsScreen() {
   );
   const importRef = useRef<HTMLInputElement>(null);
   const importExcelRef = useRef<HTMLInputElement>(null);
+  const [showImport, setShowImport] = useState(false);
   const { scale, setScale } = useTextScale();
   const noteAi = useNoteAiConsent();
   // While the shared cloud ledger is active, restoring/resetting local data
@@ -175,8 +177,33 @@ export function SettingsScreen() {
     setMsg({ kind: "ok", text: "All on-device data cleared." });
   };
 
+  if (showImport) return <ImportEntries onClose={() => setShowImport(false)} />;
+
   return (
     <div className="px-4 py-4 max-w-lg mx-auto space-y-5">
+      {/* Deliberately its own section, above Backup & restore and worded to
+          keep the two apart: restoring REPLACES this ledger with a file the app
+          wrote, importing ADDS rows from a file it didn't. Confusing them is
+          how someone wipes a month of entries trying to bring in a spreadsheet. */}
+      <section className="space-y-2">
+        <h2 className="eyebrow">Import past expenses</h2>
+        <p className="text-[13px] text-ink-soft">
+          Been keeping this in a phone note or a spreadsheet? Bring that history
+          in once and carry on here. Rows are <strong>added</strong> to what you
+          already have — nothing is replaced — and you check every one before it
+          saves.
+        </p>
+        <button
+          className="btn w-full !py-3"
+          onClick={() => {
+            setMsg(null);
+            setShowImport(true);
+          }}
+        >
+          Import a list or spreadsheet
+        </button>
+      </section>
+
       <section className="space-y-2">
         <h2 className="eyebrow">
           Text size

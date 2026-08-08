@@ -135,7 +135,7 @@ toc_items = [
     "6.  Ledger — searching and managing entries",
     "7.  BOQ — scanning and tracking itemized bills",
     "8.  Stock — inventory given to labour vs. left with you",
-    "9.  Data — backup, restore &amp; reset",
+    "9.  Data — importing your old list, backup, restore &amp; reset",
     "10. Good habits &amp; troubleshooting",
 ]
 for t in toc_items:
@@ -487,13 +487,60 @@ story.append(Paragraph(
 
 # ---------- 9. Data ----------
 story.append(PageBreak())
-story.append(Paragraph("9. Data — backup, restore &amp; reset", h1_style))
+story.append(Paragraph("9. Data — importing your old list, backup, restore &amp; reset", h1_style))
 story.append(Paragraph(
     "Tap the <b>Data</b> tab. This is your safety net — since everything "
     "lives only on this device, exporting a backup is the only way to "
     "protect against a lost or reset phone.",
     body_style,
 ))
+story.append(Paragraph("Bringing in expenses you already recorded elsewhere", h2_style))
+story.append(Paragraph(
+    "If you have been keeping this house's spending in a phone note, a "
+    "WhatsApp message to yourself, or an Excel sheet, you do not have to type "
+    "it all in again. Tap <b>Import a list or spreadsheet</b> at the top of "
+    "the Data tab. This <b>adds</b> to what you already have \u2014 it never "
+    "replaces it, and nothing is saved until you have looked at every row.",
+    body_style,
+))
+story.append(Paragraph("From a spreadsheet (.xlsx or .csv):", body_style))
+story.append(numbered([
+    "Choose the file. If the workbook has several sheets, pick the right one.",
+    "The app shows each column with a sample of what is in it and its best "
+    "guess at what it holds \u2014 Date, Description, Amount, and so on. "
+    "Correct anything it got wrong.",
+    "Tap <b>Check rows</b>, look through the list, and tap <b>Import</b>.",
+]))
+story.append(Paragraph(
+    "A spreadsheet read this way is handled <b>entirely on your phone</b>. "
+    "Nothing is uploaded and it works with no signal.",
+    note_style,
+))
+story.append(Paragraph("From a note or a message:", body_style))
+story.append(numbered([
+    "Paste the list into the box \u2014 lines like "
+    "\"12/3 cement 4500 cash\" are fine, in English, Hindi or a mix.",
+    "Tap <b>Read this list</b>. Because this text has no columns to follow, "
+    "it has to be read by the AI reader, which means sending it off the "
+    "phone. The app tells you exactly how much is about to be sent and asks "
+    "first; you can say no and map a spreadsheet instead.",
+    "Check every row \u2014 especially the amounts \u2014 then tap <b>Import</b>.",
+]))
+story.append(Paragraph(
+    "Rows that look like something already in your ledger (same date, same "
+    "amount, similar description) come in <b>unticked</b> and are marked in "
+    "red, so importing the same list twice will not double your totals. Every "
+    "imported entry is tagged \"Imported from ...\" in its notes, so you can "
+    "always find them again.",
+    note_style,
+))
+story.append(Paragraph(
+    "Once your old list is in, you are done with importing \u2014 add each "
+    "expense as it happens from then on, and nothing needs to be read by AI "
+    "again.",
+    note_style,
+))
+
 story.append(Paragraph("Exporting a backup", h2_style))
 story.append(numbered([
     "Tap <b>Export full backup (.json)</b>.",
