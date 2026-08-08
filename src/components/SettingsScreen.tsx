@@ -9,6 +9,7 @@ import { currentHouseholdId } from "../lib/sync";
 import { useTextScale, TEXT_SCALES } from "../hooks/useTextScale";
 import { useNoteAiConsent } from "../hooks/useNoteAiConsent";
 import { PushToggle } from "./PushToggle";
+import { ImportWizard } from "./ImportWizard";
 import { Faq } from "./Faq";
 
 export function SettingsScreen() {
@@ -251,6 +252,13 @@ export function SettingsScreen() {
               : "No backup yet — export one now."}
           </div>
         )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="eyebrow">
+          Bring in an old spreadsheet
+        </h2>
+        <ImportWizard />
       </section>
 
       <section className="space-y-2">

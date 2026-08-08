@@ -44,13 +44,17 @@
 <p>Switch it off, under <em>Data → Reading handwritten notes</em>, and no photograph leaves your device; the app falls back to reading printed bills on the phone itself. Because the setting is stored per device and is not synced, one person turning it on never turns it on for anyone else sharing the ledger.</p>
 <p>Google's handling of anything sent to that API is governed by Google's own terms.</p>
 
+<h2>Bringing in a spreadsheet you already keep</h2>
+<p>If you import an existing expense file, the app has to work out how your columns are laid out. To do that it sends <strong>only a sample — the sheet names, the column headings and about ten rows</strong> — to Google's Gemini API, along with the list of category names you have used. Your file is not uploaded: every row is converted into ledger entries <em>on your own device</em>, and nothing is saved until you have seen the result and pressed the button.</p>
+<p>So a spreadsheet with five thousand payments in it results in ten rows leaving the phone, once. If you would rather nothing at all left the device, you can skip the reading step and match the columns yourself on the review screen — the import works either way.</p>
+
 <h2>Sharing a site with a contractor</h2>
 <p>You can link one building site to a contractor. When you do, both of you see only the rows recorded against that shared site and any bill photograph attached to them. The rest of your ledger — every other vendor, your budget, and the People tab with its bank details — is never visible to them, and their other sites are never visible to you. Revoking the link ends that access immediately, photographs included.</p>
 
 <h2>Who else can see your data</h2>
 <ul>
 <li><strong>Supabase</strong> — hosting, database, sign-in and file storage</li>
-<li><strong>Google</strong> — only the photographs you choose to scan, and only while the AI reader is switched on</li>
+<li><strong>Google</strong> — only the photographs you choose to scan while the AI reader is switched on, and the small sample described above if you import a spreadsheet</li>
 <li><strong>Vercel</strong> — serves the app itself; it does not receive your ledger</li>
 </ul>
 <p>No one else. There are no advertising networks, no analytics providers and no data brokers involved, and we do not sell your data or use it to build a profile of you.</p>
