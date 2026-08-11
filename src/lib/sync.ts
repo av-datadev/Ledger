@@ -501,6 +501,52 @@ export async function startSync(hid: string): Promise<void> {
   subscribeRealtime();
 }
 
+/**
+ * Pull everything again, now.
+ *
+ * startSync reconciles once and then relies on the realtime channel for
+ * anything new. That channel does not survive a phone sleeping or changing
+ * network reliably — and when it dies there is nothing to notice, so an entry
+ * added on one phone can sit unseen on another until the app is fully
+ * restarted. This is the way back: the same idempotent two-way reconcile
+ * startSync runs, plus a fresh channel to replace one that may have gone
+ * quiet.
+ *
+ * Safe to call at any time. Concurrent calls collapse onto the first, because
+ * reconciling twice at once would have both passes racing to push the same
+ * local-only rows.
+ */
+let resyncing: Promise<void> | null = null;
+
+export function isSyncing(): boolean {
+  return resyncing !== null;
+}
+
+export async function resyncNow(): Promise<void> {
+  if (!householdId) return; // not on the shared ledger — nothing to pull
+  if (resyncing) return resyncing;
+
+  resyncing = (async () => {
+    try {
+      for (const cfg of tableConfigs()) await reconcileTable(cfg);
+      await reconcileSettings();
+      await reconcileAttachments();
+
+      // Replace the subscription rather than trusting it. A channel that
+      // dropped while the phone was asleep still looks like an object.
+      if (channel) {
+        await supabase.removeChannel(channel);
+        channel = null;
+      }
+      subscribeRealtime();
+    } finally {
+      resyncing = null;
+    }
+  })();
+
+  return resyncing;
+}
+
 export async function stopSync(): Promise<void> {
   if (channel) {
     await supabase.removeChannel(channel);

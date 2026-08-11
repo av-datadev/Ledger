@@ -6,13 +6,18 @@ import { inr, num } from "../lib/format";
 import { withBalances } from "../lib/stock";
 import { BudgetCard } from "./BudgetCard";
 import { AddressCard } from "./AddressCard";
+import { SyncButton } from "./SyncButton";
 
 export function Dashboard({
   onOpenCategory,
   onOpenPayer,
+  synced = false,
 }: {
   onOpenCategory: (category: string) => void;
   onOpenPayer: (payer: string) => void;
+  /** True once a shared household is active — gates the refresh control, which
+   * has nothing to do on a device that isn't syncing. */
+  synced?: boolean;
 }) {
   // Computed live from Dexie on every change — never cached.
   const entries = useLiveQuery(() => db.entries.toArray(), []);
@@ -53,10 +58,15 @@ export function Dashboard({
   return (
     <div>
       <div className="sticky top-12 z-20 bg-header text-onhead px-4 pb-4 pt-1 border-b-2 border-crimson">
-        <div className="text-[10px] uppercase tracking-[0.2em] text-onhead/55">
-          Total spent · {entries.length} transactions
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-onhead/55">
+              Total spent · {entries.length} transactions
+            </div>
+            <div className="money text-4xl font-bold mt-1">{inr(total)}</div>
+          </div>
+          {synced && <SyncButton />}
         </div>
-        <div className="money text-4xl font-bold mt-1">{inr(total)}</div>
       </div>
 
       <BudgetCard spent={total} />
