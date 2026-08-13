@@ -7,6 +7,7 @@ import {
   withBalances,
   billStockImpact,
   removeBillFromStock,
+  deleteStockItems,
   type StockWithBalance,
 } from "../lib/stock";
 import { BillStockPanel } from "./BillStockPanel";
@@ -193,6 +194,16 @@ export function Stock() {
   const [billSel, setBillSel] = useState<string>("");
   /** Bill whose "remove everything this put into stock" is awaiting confirmation. */
   const [confirmClearBill, setConfirmClearBill] = useState<string | null>(null);
+  /**
+   * Selection mode for the All-items list.
+   *
+   * A mode rather than a second checkbox per row: every row already carries a
+   * tick meaning "fully used / settled", and two checkboxes side by side is an
+   * invitation to press the wrong one — here, one that deletes.
+   */
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmBulk, setConfirmBulk] = useState(false);
 
   const bills = useMemo<BillOpt[]>(() => {
     if (!boqItems) return [];
@@ -225,6 +236,46 @@ export function Stock() {
     () => categories.filter((c) => items?.some((it) => it.category === c)),
     [items, categories],
   );
+
+  // Selection survives a change of category filter, so a person can gather up
+  // plumbing and then electrical before acting. That means some of what is
+  // selected may be off screen, which the confirmation has to own up to.
+  const visibleIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const selectedVisible = visibleIds.filter((id) => selected.has(id)).length;
+  const allVisibleSelected =
+    visibleIds.length > 0 && selectedVisible === visibleIds.length;
+  const hiddenSelected = selected.size - selectedVisible;
+
+  /** Movements about to be destroyed along with the selected items. */
+  const selectedMoveCount = useMemo(
+    () => (moves ?? []).filter((m) => selected.has(m.stockId)).length,
+    [moves, selected],
+  );
+
+  const toggleSelected = (id: string) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+
+  const leaveSelectMode = () => {
+    setSelecting(false);
+    setSelected(new Set());
+    setConfirmBulk(false);
+  };
+
+  const bulkSetDone = async (done: boolean) => {
+    await db.transaction("rw", db.stockItems, async () => {
+      for (const id of selected) await db.stockItems.update(id, { done });
+    });
+    leaveSelectMode();
+  };
+
+  const bulkDelete = async () => {
+    await deleteStockItems([...selected]);
+    leaveSelectMode();
+  };
 
   const deleteItem = async (id: string) => {
     await db.transaction("rw", [db.stockItems, db.stockMoves], async () => {
@@ -262,14 +313,29 @@ export function Stock() {
     <div className="px-4 py-4">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold">Stock / Inventory</h2>
-        {view === "items" && (
-          <button
-            className="btn btn-primary !py-1.5"
-            onClick={() => setAdding(true)}
-          >
-            + Add item
-          </button>
-        )}
+        {view === "items" &&
+          (selecting ? (
+            <button className="btn !py-1.5" onClick={leaveSelectMode}>
+              Cancel
+            </button>
+          ) : (
+            <div className="flex gap-1.5">
+              {rows.length > 0 && (
+                <button
+                  className="btn !py-1.5"
+                  onClick={() => setSelecting(true)}
+                >
+                  Select
+                </button>
+              )}
+              <button
+                className="btn btn-primary !py-1.5"
+                onClick={() => setAdding(true)}
+              >
+                + Add item
+              </button>
+            </div>
+          ))}
       </div>
 
       {/* Items ↔ By-bill view toggle */}
@@ -430,21 +496,136 @@ export function Stock() {
             </div>
           )}
 
+          {selecting && (
+            <div className="card px-3 py-2.5 mb-2 space-y-2 sticky top-0 z-10">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[13px] font-medium">
+                  {selected.size === 0
+                    ? "Tap items to select them"
+                    : `${selected.size} selected`}
+                  {hiddenSelected > 0 && (
+                    <span className="text-[11px] font-normal text-ink-soft">
+                      {" "}
+                      ({hiddenSelected} not shown here)
+                    </span>
+                  )}
+                </span>
+                <button
+                  className="text-[12px] underline shrink-0"
+                  onClick={() =>
+                    setSelected((s) => {
+                      const next = new Set(s);
+                      // Acts on what is on screen, so the category filter above
+                      // is how you select a subset: filter to Plumbing, select
+                      // all, act. Never reaches rows the filter is hiding.
+                      if (allVisibleSelected)
+                        visibleIds.forEach((id) => next.delete(id));
+                      else visibleIds.forEach((id) => next.add(id));
+                      return next;
+                    })
+                  }
+                >
+                  {allVisibleSelected ? "Clear these" : `Select all ${visibleIds.length}`}
+                </button>
+              </div>
+
+              {selected.size > 0 &&
+                (confirmBulk ? (
+                  <div className="space-y-2">
+                    <div className="text-[12px] text-crimson">
+                      Deletes <b>{selected.size}</b> item
+                      {selected.size === 1 ? "" : "s"}
+                      {selectedMoveCount > 0 && (
+                        <>
+                          {" "}
+                          and the <b>{selectedMoveCount}</b> movement
+                          {selectedMoveCount === 1 ? "" : "s"} recorded against
+                          {selected.size === 1 ? " it" : " them"} — every
+                          received and given-out row, not just the balance
+                        </>
+                      )}
+                      .{" "}
+                      {hiddenSelected > 0 && (
+                        <>
+                          <b>{hiddenSelected}</b> of them{" "}
+                          {hiddenSelected === 1 ? "is" : "are"} hidden by the
+                          filter above.{" "}
+                        </>
+                      )}
+                      The bills these came from are not touched.
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        className="text-[12px] text-white bg-crimson rounded px-3 py-1"
+                        onClick={() => void bulkDelete()}
+                      >
+                        Delete {selected.size}
+                      </button>
+                      <button
+                        className="text-[12px] border border-rule rounded px-3 py-1"
+                        onClick={() => setConfirmBulk(false)}
+                      >
+                        Keep
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      className="btn !py-1 !px-2.5 !text-[12px]"
+                      onClick={() => void bulkSetDone(true)}
+                    >
+                      Mark done
+                    </button>
+                    <button
+                      className="btn !py-1 !px-2.5 !text-[12px]"
+                      onClick={() => void bulkSetDone(false)}
+                    >
+                      Mark not done
+                    </button>
+                    <button
+                      className="btn !py-1 !px-2.5 !text-[12px] !text-crimson !border-crimson"
+                      onClick={() => setConfirmBulk(true)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+            </div>
+          )}
+
           <div className="space-y-2 pb-4">
             {rows.map((it) => (
               <div
                 key={it.id}
-                className={`card px-3 py-2.5 ${it.done ? "opacity-55" : ""}`}
+                className={`card px-3 py-2.5 ${it.done && !selecting ? "opacity-55" : ""} ${
+                  selecting && selected.has(it.id)
+                    ? "outline outline-2 outline-crimson"
+                    : ""
+                }`}
+                // In select mode the whole card is the target — a 16px
+                // checkbox is a poor thing to aim at twenty times over.
+                onClick={selecting ? () => toggleSelected(it.id) : undefined}
               >
                 <div className="flex items-start gap-2.5">
+                  {/* One checkbox, two meanings, never both at once: normally
+                      "fully used / settled", and in select mode the selection
+                      itself. Showing both would put a delete-me tick next to an
+                      archive-me tick, on every row. */}
                   <input
                     type="checkbox"
-                    className="mt-1 w-4 h-4 accent-moss"
-                    checked={it.done}
-                    title="Tick when this material is fully used / settled"
-                    onChange={(e) =>
-                      void db.stockItems.update(it.id, { done: e.target.checked })
+                    className={`mt-1 w-4 h-4 ${selecting ? "accent-crimson" : "accent-moss"}`}
+                    checked={selecting ? selected.has(it.id) : it.done}
+                    title={
+                      selecting
+                        ? "Select this item"
+                        : "Tick when this material is fully used / settled"
                     }
+                    onChange={(e) => {
+                      if (selecting) toggleSelected(it.id);
+                      else void db.stockItems.update(it.id, { done: e.target.checked });
+                    }}
+                    onClick={(e) => e.stopPropagation()}
                   />
                   <div className="min-w-0 flex-1">
                     <div className={`text-sm font-medium ${it.done ? "line-through" : ""}`}>
@@ -470,7 +651,10 @@ export function Stock() {
                   </div>
                 </div>
 
-                {editItemId === it.id ? (
+                {/* The per-row actions are hidden while selecting. Leaving them
+                    under a card that now responds to a tap means aiming at
+                    "Edit" and hitting the row, or the reverse. */}
+                {selecting ? null : editItemId === it.id ? (
                   <ItemEditForm
                     item={it}
                     categories={categories}

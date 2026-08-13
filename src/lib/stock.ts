@@ -96,6 +96,33 @@ export async function addBillRowsToStock(
   return usable.length;
 }
 
+/**
+ * Delete several stock items and everything recorded against them, in one
+ * transaction.
+ *
+ * A bill saved with "add to stock" ticked can put twenty rows into inventory at
+ * once — twenty unions and a washer off one plumbing bill — and clearing those
+ * one at a time is a confirmation per row. One transaction rather than a loop
+ * of deletes: a bulk delete that fails halfway leaves a selection the person
+ * can no longer reason about, since they cannot tell which half went.
+ *
+ * This destroys the movement history too, which is the point (the item is
+ * going) but also why the caller counts the movements first and says so.
+ */
+export async function deleteStockItems(
+  ids: string[],
+): Promise<{ items: number; moves: number }> {
+  if (ids.length === 0) return { items: 0, moves: 0 };
+  return db.transaction("rw", [db.stockItems, db.stockMoves], async () => {
+    let moves = 0;
+    for (const id of ids) {
+      moves += await db.stockMoves.where("stockId").equals(id).delete();
+    }
+    await db.stockItems.bulkDelete(ids);
+    return { items: ids.length, moves };
+  });
+}
+
 /** What removing a bill's stock would do, worked out before anything is done. */
 export interface BillStockImpact {
   /** Receipts this bill put into stock. */
