@@ -155,10 +155,34 @@ signing key before touching anything there.
   items are goods only; GST, freight and rounding are computed, not itemised.
   Rows summing to *more* than the printed total blocks saving, since that means
   a duplicated or misread row.
+- **A bill spread over several photos** — a kaccha bill is a notebook page, and
+  a running account routinely covers two or three. Photos accumulate in a tray
+  (one shot at a time from the camera, or several at once from the gallery) and
+  are read **together, in one call** — `scan-bill` merges a sequence of page
+  images into a single item list, the same mechanism the multi-page PDF path
+  uses. Read one page at a time they become unrelated bills, each holding a
+  fragment of the items and only one carrying the जमा/शेष line. Capped at 6
+  pages, matching the PDF path. **Try the AI reader again** re-sends every page.
 - **Handwritten kaccha bills** carry something printed invoices don't: what was
   actually paid and what's still owed. After scanning, choose **Bill only**,
   **Payment only**, or **Both**. The ledger entry takes the *paid* figure, not
   the invoice total, dated the day the money moved.
+- **Keeping a bill as one line** — a review-screen toggle. Every scanned row is
+  still saved and still opens on tap; what changes is downstream. Twenty rows
+  of a handwritten fittings bill would otherwise become twenty stock items to
+  hand out and tick off one by one, each named by whatever the reader made of a
+  Devanagari line — so a clubbed bill goes into Stock as the single thing it
+  is. Off by default (clubbing is a judgement about one particular paper), and
+  never offered on a size list, whose measured-vs-written check has nothing to
+  check without its rows.
+- **Part payment** — the normal case on a running account, so the paid figure
+  is asked for on the bill itself rather than only when a ledger entry is being
+  created. `amountPaid` is stored on the bill, and what's still owed shows on
+  the review screen as you type it, on each bill in the BOQ list behind a
+  **Still to pay** filter, and per vendor on People. `amountPaid` is **null,
+  not 0**, when nothing has been recorded: a bill nobody has answered the
+  question for is not a bill confirmed unpaid, and a default of 0 would
+  announce every bill already on record as fully outstanding.
 - **Size lists** (BOQ → *Size list*) — timber and stone dealers price by size,
   not quantity: `Teak / 8¼ × 9 × 8 — 3 pc`. Each size becomes one `cft` row and
   the app computes the volume itself — **length ft × width in × thickness in ÷
@@ -177,6 +201,29 @@ signing key before touching anything there.
 - **Paid vs billed** (Ledger) — money handed over that no bill accounts for
   yet. A gap isn't proof of anything; labour never has a bill. It's worth a
   question when the payment was for material.
+- **Taking a whole bill back out of Stock** (Stock → *By BOQ bill*) — line by
+  line is right for one wrong row; a bill saved with every quantity wrong needs
+  as many confirmations as it has rows. `removeBillFromStock` is deliberately
+  narrow about what it destroys: the bill itself is untouched (deleting a bill
+  lives on the BOQ tab), material already **given out to labour is kept** —
+  those handouts happened — and a stock item is deleted only when nothing else
+  ever touched it. Keeping the handouts means the item can be left at a
+  negative balance, so `billStockImpact` works the damage out first and the
+  confirmation states it in real numbers rather than asking if you're sure.
+- **Selecting several stock items** (Stock → *All items* → **Select**) — for
+  "these particular rows", where the whole-bill removal above is for "undo that
+  entire bill". A *mode*, not a second checkbox: every row already carries a
+  tick meaning **fully used / settled**, and a delete-me tick beside an
+  archive-me tick on twenty rows is an invitation to press the wrong one. While
+  selecting, that same checkbox changes meaning (and colour), the card itself
+  becomes the tap target, and the per-row buttons hide so a tap can't be a
+  near-miss on *Edit*. **Select all follows the category filter** — filter to
+  Plumbing, select all, act — which is the point of it. Selection survives a
+  filter change so several categories can be gathered, so the bar and the
+  delete confirmation both say how many of the selected rows are **not
+  currently on screen**. Bulk actions: delete (one transaction — a bulk delete
+  that fails halfway leaves a selection nobody can reason about), mark done,
+  mark not done.
 - **Backups** — JSON is the complete one and the only format carrying entry
   photos. Excel (.xlsx) opens anywhere and can be corrected by hand and
   uploaded back, but holds no photos, so restoring one deliberately leaves the
@@ -229,6 +276,17 @@ Offline (airplane mode, after one full load):
 - [ ] BOQ: "Type manually" saves; a printed English bill still scans via
       on-device OCR; the lines-vs-total check holds
 - [ ] Stock: received / given out, balance, done-checkbox
+- [ ] Stock → By BOQ bill → **remove everything this bill put into stock**: a
+      bill-only item disappears, one with its own history survives, a handout
+      is kept, and the BOQ rows are untouched
+- [ ] Stock → All items → **Select**: filtering to one category then "select
+      all" takes only that category; selection survives switching the filter
+      and the confirmation says how many are off screen; delete removes the
+      items *and* their movements
+- [ ] A bill saved with **Keep this bill as one line** ticked reads as "one
+      line · N rows kept" and puts a single line into Stock
+- [ ] A part-paid bill shows its balance on the BOQ list and against the vendor
+      on People; one with nothing recorded shows no balance at all
 - [ ] Data: JSON and Excel backups download; both restore
 - [ ] Data → Bring in an old spreadsheet, with **"I'll pick the columns
       myself"** ticked: imports with no network call at all
@@ -236,6 +294,8 @@ Offline (airplane mode, after one full load):
 Online only:
 
 - [ ] BOQ scan of a photo/PDF via Gemini
+- [ ] Several photos of one bill: the tray holds them, they read as **one**
+      bill in **one** call, and the rows from every page arrive together
 - [ ] BOQ → Size list on a timber slip; measured total matches the written one
 - [ ] A handwritten kaccha bill offers Bill / Payment / Both
 - [ ] An itemised kaccha slip scanned from **Entry** offers to send it to the

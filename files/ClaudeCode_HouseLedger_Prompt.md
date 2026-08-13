@@ -5,7 +5,7 @@ a specification of what it now is, so it can be rebuilt or handed to someone
 new. Where the original brief was overtaken by reality, this says so — those
 reversals are the most useful part of the document.
 
-Last updated: 2026-08-11.
+Last updated: 2026-08-14.
 
 ---
 
@@ -55,12 +55,20 @@ id, billId, date, category, vendor, invoiceNo, invoiceTotal,
 item, hsn, gstPct,
 basis ("qty" | "rft" | "sqft" | "sqm" | "wt" | "cft"),
 length, width, thickness, pieces, writtenQty,
-qty, unit, rate, discPct, amount
+qty, unit, rate, discPct, amount,
+amountPaid, clubbed
 ```
 `basis` drives how `qty` is derived. For `cft` it's
 `length ft × width in × thickness in ÷ 144 × pieces`. `writtenQty` holds the
 dealer's own written total, purely so the app's figure can be checked against
 it — it is never used in a calculation.
+
+A bill has **no table of its own** — it is the rows sharing a `billId`. So its
+bill-level facts (`invoiceTotal`, `writtenQty`, `amountPaid`, `clubbed`) are
+repeated on every row and read off the first one. Never sum them, or the bill
+is multiplied by its own line count.
+
+`amountPaid` and `clubbed` are **nullable, and null by default**. See §6.
 
 **Categories are editable rows, not an enum.** Built-ins seed on first run;
 each is also a person/vendor with contact details, bank details and contract
@@ -117,19 +125,23 @@ disagreement is the entire point of the feature.
 4. **Recent** — the 50 most recently added or edited entries.
 
 5. **BOQ** — four ways in: Take photo · Photo/PDF · Size list · Type manually.
-   Everything lands in a review screen before saving. Rows summing to *more*
-   than the printed total blocks the save; below it is fine, because that gap
-   is the tax. Two-way BOQ↔Stock linking. Coverage table vs the ledger.
+   Photos accumulate in a tray and are read as one bill (§5). Everything lands
+   in a review screen before saving. Rows summing to *more* than the printed
+   total blocks the save; below it is fine, because that gap is the tax. Two-way
+   BOQ↔Stock linking. Coverage table vs the ledger. Bills list what is still
+   owed on them, behind a **Still to pay** filter (§6).
 
 6. **Stock** — received vs given out to labour, balance, hard-linked to the
-   source bill.
+   source bill. Two ways to clear more than one row at a time, and they answer
+   different questions: a whole bill taken back out in one action, and a
+   selection mode for particular rows (both §6).
 
 7. **People** — every category as an editable person: contact, contract
    pricing (lump sum, area×rate, or per-floor lines), bank details scannable
    from a UPI QR, per-person totals.
 
 8. **Data** — JSON and Excel backup/restore, importing somebody else's
-   spreadsheet (§6), CSV exports, notification toggle, text size, site code and
+   spreadsheet (§7), CSV exports, notification toggle, text size, site code and
    linked contractors, a folded FAQ, app version with a force-update link,
    links to the privacy/terms/deletion pages, danger zone including account
    deletion.
@@ -152,6 +164,22 @@ Three Edge Functions, deliberately separate because the outputs differ:
 does — जमा (paid) and शेष (balance) — so one sheet of paper can become a bill,
 a payment, or both, and the person chooses which.
 
+**One bill can be several photos.** A kaccha bill is a notebook page and a
+running account routinely covers two or three. Photos accumulate in a tray —
+one shot at a time from the camera, several at once from the gallery — and go
+to the reader **together, in one call**: `scan-bill` takes an array of page
+images and merges them into a single item list, which is how the multi-page PDF
+path already works. Two reasons it must be one call and not one per page:
+
+- Read separately they become unrelated bills, each holding a fragment of the
+  items, and only one of them carrying the जमा/शेष line that says what was paid.
+- The free tier is 20 requests a day. Three pages costing three requests is the
+  difference between scanning a day's bills and running out by mid-morning.
+
+Cap at 6 pages, matching the PDF path. A retry after a failed read must re-send
+**every** page, not just the first. On the OCR fallback each page is recognised
+on its own and the text joined, the same way a PDF's pages are.
+
 Rules the prompts encode, each from a real misread:
 
 - Indian digit grouping is lakh-based: `1,00,000` is 100000
@@ -173,7 +201,82 @@ confidently wrong bill that looked exactly like a right one.
 > **Gemini's free tier allows 20 requests/day.** Exhaust it and every scan
 > degrades to the fallback. Enable billing if more than one person scans.
 
-## 6. Importing somebody else's spreadsheet
+## 6. A bill kept as one line, and a bill part paid
+
+Two things a handwritten vendor bill needs that a printed invoice does not.
+
+### Clubbing
+
+A review-screen toggle keeps a bill as **one line** rather than as its items.
+Clubbing still **saves every row** — they are the evidence, and they still open
+on tap. What it changes is downstream: twenty rows of a handwritten fittings
+bill would otherwise become twenty stock items to hand out and tick off one by
+one, each named by whatever the reader made of a Devanagari line. A clubbed
+bill goes into Stock as the single thing it is.
+
+Off by default, because clubbing is a judgement about one particular paper and
+turning it on for someone hides an itemisation they may have wanted. Never
+offered on a size list, whose whole point is the measured-vs-written check —
+there is nothing to check once the rows are collapsed away. Re-opening a
+clubbed bill to edit it must keep it clubbed, or saving quietly itemises a bill
+somebody deliberately kept whole.
+
+### Part payment
+
+Paying a vendor part of a bill is the normal case on a running account, so the
+paid figure is asked for **on the bill**, not only when a ledger entry is being
+created — the bill may be recorded now and the payment already be in the ledger.
+`invoiceTotal - amountPaid` is what the vendor is still owed, surfaced three
+ways: live on the review screen as the figure is typed, per bill in the BOQ
+list behind a **Still to pay** filter, and per vendor on People.
+
+**`amountPaid` is null, not 0, when nothing has been recorded.** A bill nobody
+has answered the question for is not a bill confirmed unpaid. A default of 0 —
+in the type, in the Dexie upgrade, in the backup normalisers, or as a column
+default in Postgres — announces every bill already on record, and every bill
+restored from an older backup, as fully outstanding. Outstanding is likewise
+null rather than the full total when there is no paid figure to work from, so
+only bills that have actually been answered reach a list of money owed.
+
+### Taking a bill back out of Stock
+
+Line by line is right for one wrong row; a bill saved with every quantity wrong
+costs as many confirmations as it has rows, which is how a mis-scanned bill
+ends up left in inventory instead. One action removes the lot, and is
+deliberately narrow about what it destroys:
+
+- **Not the bill.** The BOQ rows record what was purchased; this unwinds only
+  what was taken into inventory from them.
+- **Not anything given out to labour.** Those handouts record things that
+  actually happened. Keeping them means removing the receipts behind them can
+  leave an item at a negative balance — so the impact is computed *before*
+  anything is written and the confirmation states it in real numbers (how many
+  receipts, how much in total, how many items vanish versus keep their own
+  history, how much has already gone out) rather than asking "are you sure?".
+- **An item only when nothing else ever touched it.** One holding a manual
+  receipt, or a receipt from another bill, keeps its history and loses only
+  this bill's contribution.
+
+### Selecting several stock rows
+
+The other half of the same problem, and a different question: *those particular
+rows*, rather than *undo that bill*. A **selection mode** on the all-items list,
+deliberately not a second checkbox — every row already carries a tick meaning
+"fully used / settled", and a delete-me tick beside an archive-me tick, on every
+row, is an invitation to press the wrong one. While selecting, that same
+checkbox changes meaning and colour, the card becomes the tap target, and the
+per-row actions hide so a tap cannot be a near-miss on *Edit*.
+
+**Select-all acts on what the filter is showing** — filter to a category,
+select all, act. That is what makes it useful on a bill that put twenty rows
+into inventory at once. Selection deliberately survives a change of filter, so
+more than one category can be gathered before acting; the consequence is that
+some of what is selected may be off screen, so both the bar and the delete
+confirmation say how many. Bulk delete runs as one transaction: one that fails
+halfway leaves a selection nobody can reason about, because there is no way to
+tell which half went.
+
+## 7. Importing somebody else's spreadsheet
 
 Distinct from the .xlsx *restore*, which reads a workbook this app wrote, with
 a known meta sheet and fixed columns. This reads a file with no agreed shape at
@@ -213,7 +316,7 @@ Parsing lives in `importParse.ts`, deliberately free of any network import so
 it can be exercised directly: day-first vs month-first, Excel serials, lakh
 grouping, bracketed negatives, and impossible dates like 31 February.
 
-## 7. Sync and freshness
+## 8. Sync and freshness
 
 Two-way reconcile at startup, then a Supabase realtime channel. **The channel
 is not trustworthy on its own** — a sleeping phone or a network change kills it
@@ -230,7 +333,7 @@ ledger to be right. A background failure stays silent — the phone is usually
 just offline and the local ledger is still correct — while a pressed button
 reports.
 
-## 8. Account deletion, and saying what is held
+## 9. Account deletion, and saying what is held
 
 Required before any store listing exists: Play's User Data policy demands
 deletion from *inside* the app **and** a web page where it can be requested
@@ -252,14 +355,14 @@ privacy policy URL.
   that the setting is per-device, so one person enabling it never enables it
   for the rest of the household.
 
-## 9. Offline behaviour
+## 10. Offline behaviour
 
 Precache the shell. Dexie works offline by nature: dashboard, ledger, manual
 entry, manual BOQ, stock, backup/restore, CSV and a hand-mapped import must all
 work in airplane mode. Only sync, scanning, import layout analysis and push
 need a connection, and each must fail visibly rather than blankly.
 
-## 10. Visual design
+## 11. Visual design
 
 A ledger/accounting aesthetic, not consumer fintech. Warm paper ground
 (`#F5F3EC`), ink navy (`#15232E`), one terracotta accent (`#C0562F`), muted
@@ -273,7 +376,7 @@ Dark mode is hand-authored — nothing dark falls out of a light-only mockup for
 free. Keep ≥44px tap targets, respect `prefers-reduced-motion`, and self-host
 any font: this app must not fetch from a CDN at runtime.
 
-## 11. Non-functional
+## 12. Non-functional
 
 - TypeScript strict; no console errors in normal use
 - Android back button: tab → dashboard → exit, and closes a review screen
@@ -286,7 +389,7 @@ any font: this app must not fetch from a CDN at runtime.
   the upsert is rejected and only `console.error`s — indistinguishable from a
   save that worked.
 
-## 12. Acceptance
+## 13. Acceptance
 
 - [ ] Installs to the home screen and launches standalone
 - [ ] Airplane mode: manual entry, dashboard, manual bill, backup/restore, CSV,
@@ -295,6 +398,14 @@ any font: this app must not fetch from a CDN at runtime.
       total, or flags the mismatch
 - [ ] A handwritten Hindi bill extracts its items **and** its payment, and
       offers Bill / Payment / Both
+- [ ] A bill photographed across three pages reads as **one** bill, in **one**
+      call, with the rows from every page merged
+- [ ] A clubbed bill still stores all its rows, and puts a single line into
+      Stock rather than one per row
+- [ ] A part-paid bill shows its balance on the review screen, in the BOQ list
+      and against its vendor; a bill with nothing recorded shows none of them
+- [ ] Removing a bill from Stock leaves the bill, the handouts, and any item
+      with its own history intact
 - [ ] A timber size list computes cubic feet matching the dealer's own figure
 - [ ] Backup → clear → restore, for **both** JSON and Excel
 - [ ] An outside spreadsheet imports on top of existing entries, summing to the
