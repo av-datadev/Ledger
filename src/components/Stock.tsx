@@ -3,7 +3,12 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
 import { useCategories } from "../hooks/useCategories";
 import { num, todayStr, formatDate } from "../lib/format";
-import { withBalances, type StockWithBalance } from "../lib/stock";
+import {
+  withBalances,
+  billStockImpact,
+  removeBillFromStock,
+  type StockWithBalance,
+} from "../lib/stock";
 import { BillStockPanel } from "./BillStockPanel";
 import { AddStockPicker } from "./AddStockPicker";
 
@@ -186,6 +191,8 @@ export function Stock() {
   const [moveDraft, setMoveDraft] = useState({ qty: "", note: "" });
   // Selected bill in the "By bill" view.
   const [billSel, setBillSel] = useState<string>("");
+  /** Bill whose "remove everything this put into stock" is awaiting confirmation. */
+  const [confirmClearBill, setConfirmClearBill] = useState<string | null>(null);
 
   const bills = useMemo<BillOpt[]>(() => {
     if (!boqItems) return [];
@@ -238,6 +245,18 @@ export function Stock() {
   };
 
   const selectedBill = bills.find((b) => b.billId === billSel);
+
+  // What clearing the selected bill would cost, so the confirmation can say it
+  // in real numbers rather than asking whether the person is sure.
+  const billImpact = useMemo(
+    () => (selectedBill ? billStockImpact(selectedBill.billId, moves ?? []) : null),
+    [selectedBill, moves],
+  );
+
+  const clearBillStock = async (billId: string) => {
+    await removeBillFromStock(billId);
+    setConfirmClearBill(null);
+  };
 
   return (
     <div className="px-4 py-4">
@@ -292,6 +311,95 @@ export function Stock() {
                 billId={selectedBill.billId}
                 billLabel={selectedBill.label}
               />
+              {/* Undo the whole bill at once. Line by line is the right tool
+                  for one wrong row; a bill scanned with every quantity wrong
+                  needs as many confirmations as it has rows. */}
+              {billImpact && billImpact.receipts > 0 && (
+                <div className="px-3 py-2 border-t border-rule">
+                  {confirmClearBill === selectedBill.billId ? (
+                    <div className="space-y-2">
+                      <div className="text-[12px] text-ink-soft">
+                        Removes{" "}
+                        <b>
+                          {billImpact.receipts} receipt
+                          {billImpact.receipts === 1 ? "" : "s"}
+                        </b>{" "}
+                        (<span className="money">{num(billImpact.qty)}</span> in
+                        total) across {billImpact.itemsTouched} item
+                        {billImpact.itemsTouched === 1 ? "" : "s"}.
+                        {billImpact.itemsRemoved > 0 && (
+                          <>
+                            {" "}
+                            {billImpact.itemsRemoved}{" "}
+                            {billImpact.itemsRemoved === 1
+                              ? "of those exists"
+                              : "of those exist"}{" "}
+                            only because of this bill and will disappear
+                            {billImpact.itemsTouched -
+                              billImpact.itemsRemoved >
+                            0 ? (
+                              <>
+                                ;{" "}
+                                {billImpact.itemsTouched -
+                                  billImpact.itemsRemoved}{" "}
+                                {billImpact.itemsTouched -
+                                  billImpact.itemsRemoved ===
+                                1
+                                  ? "keeps its"
+                                  : "keep their"}{" "}
+                                other history.
+                              </>
+                            ) : (
+                              "."
+                            )}
+                          </>
+                        )}{" "}
+                        The bill itself is not touched.
+                      </div>
+                      {billImpact.givenOut > 0 && (
+                        <div className="text-[12px] text-crimson">
+                          {/* No unit: these items can be counted in pieces,
+                              bags and kg at once, so a bare total is the only
+                              honest thing to put here. */}
+                          <b>
+                            Some of this has already been given out —{" "}
+                            <span className="money">
+                              {num(billImpact.givenOut)}
+                            </span>{" "}
+                            across these items.
+                          </b>{" "}
+                          Those handouts really happened, so they are kept —
+                          which means removing the receipts behind them will
+                          leave those items showing a negative balance.
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          className="text-[12px] text-white bg-crimson rounded px-3 py-1"
+                          onClick={() =>
+                            void clearBillStock(selectedBill.billId)
+                          }
+                        >
+                          Remove all {billImpact.receipts} from stock
+                        </button>
+                        <button
+                          className="text-[12px] border border-rule rounded px-3 py-1"
+                          onClick={() => setConfirmClearBill(null)}
+                        >
+                          Keep
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="text-[12px] text-crimson"
+                      onClick={() => setConfirmClearBill(selectedBill.billId)}
+                    >
+                      remove everything this bill put into stock
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-sm text-ink-soft text-center py-8">

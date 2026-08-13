@@ -96,6 +96,103 @@ export async function addBillRowsToStock(
   return usable.length;
 }
 
+/** What removing a bill's stock would do, worked out before anything is done. */
+export interface BillStockImpact {
+  /** Receipts this bill put into stock. */
+  receipts: number;
+  /** Total quantity across those receipts. */
+  qty: number;
+  /** Stock items this bill contributed to. */
+  itemsTouched: number;
+  /** Of those, the ones that exist only because of this bill and would go. */
+  itemsRemoved: number;
+  /**
+   * Quantity already given out from the items this bill fed — the reason this
+   * needs a warning rather than a plain confirm. Those handouts happened and
+   * are not deleted, so removing the receipts behind them leaves the item
+   * showing a negative balance.
+   */
+  givenOut: number;
+}
+
+/**
+ * What `removeBillFromStock` would do, computed from lists already in hand so
+ * the confirmation can state real numbers instead of "are you sure?".
+ */
+export function billStockImpact(
+  billId: string,
+  moves: StockMove[],
+): BillStockImpact {
+  const receipts = moves.filter((m) => m.billId === billId);
+  const touched = new Set(receipts.map((m) => m.stockId));
+  let itemsRemoved = 0;
+  let givenOut = 0;
+  for (const stockId of touched) {
+    const others = moves.filter(
+      (m) => m.stockId === stockId && m.billId !== billId,
+    );
+    // Nothing else ever touched this item, so it exists only because of this
+    // bill and goes with it rather than being left behind at zero.
+    if (others.length === 0) itemsRemoved++;
+    givenOut += others
+      .filter((m) => m.kind === "out")
+      .reduce((s, m) => s + m.qty, 0);
+  }
+  return {
+    receipts: receipts.length,
+    qty: Math.round(receipts.reduce((s, m) => s + m.qty, 0) * 1000) / 1000,
+    itemsTouched: touched.size,
+    itemsRemoved,
+    givenOut: Math.round(givenOut * 1000) / 1000,
+  };
+}
+
+/**
+ * Undo everything one BOQ bill put into stock, in a single action.
+ *
+ * The counterpart to addBillRowsToStock. Removing a mis-scanned bill's stock
+ * line by line means as many confirmations as the bill had rows — and a
+ * handwritten bill saved with the wrong quantities is exactly the case where
+ * every row is wrong at once.
+ *
+ * What it does NOT do:
+ *
+ * - It does not touch the bill. The BOQ rows are the record of what was
+ *   purchased; this only unwinds what was taken into inventory from them.
+ * - It does not delete anything given out to labour. Those handouts are
+ *   records of things that actually happened, and are not this bill's to
+ *   erase — see `givenOut` on the impact, which is why the caller warns first.
+ *
+ * An item is deleted only when nothing else ever touched it. One that also
+ * holds a manual receipt, or a receipt from another bill, keeps its history
+ * and simply loses this bill's contribution.
+ */
+export async function removeBillFromStock(billId: string): Promise<{
+  receiptsRemoved: number;
+  itemsRemoved: number;
+}> {
+  return db.transaction("rw", [db.stockItems, db.stockMoves], async () => {
+    const receipts = await db.stockMoves
+      .where("billId")
+      .equals(billId)
+      .toArray();
+    const touched = new Set(receipts.map((m) => m.stockId));
+    await db.stockMoves.where("billId").equals(billId).delete();
+
+    let itemsRemoved = 0;
+    // Counted after the delete, so an item is judged on what is actually left
+    // rather than on what the caller believed a moment ago.
+    for (const stockId of touched) {
+      const left = await db.stockMoves.where("stockId").equals(stockId).count();
+      if (left === 0) {
+        await db.stockItems.delete(stockId);
+        itemsRemoved++;
+      }
+    }
+    return { receiptsRemoved: receipts.length, itemsRemoved };
+  });
+}
+
 /**
  * Add a single stock item under a category, reusing an existing item with the
  * same name+category. Returns the item id — used when adding stock straight
