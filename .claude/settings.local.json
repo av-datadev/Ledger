@@ -17,7 +17,9 @@
       "Bash(/opt/homebrew/bin/python3.11 -m pip install --quiet pdf2image)",
       "Bash(brew list *)",
       "Bash(mkdir -p /tmp/guide-preview)",
-      "Bash(/opt/homebrew/bin/python3.11 -m pip install --quiet pypdfium2)"
+      "Bash(/opt/homebrew/bin/python3.11 -m pip install --quiet pypdfium2)",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('seed-entries.json'\\)\\); print\\('entries', len\\(d\\) if isinstance\\(d,list\\) else len\\(d.get\\('entries',[]\\)\\)\\)\")",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('seed-boq.json'\\)\\); print\\('boq', len\\(d\\) if isinstance\\(d,list\\) else list\\(d.keys\\(\\)\\)\\)\")"
     ]
   }
 }
