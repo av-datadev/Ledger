@@ -35,13 +35,15 @@ flagged disagreement instead of one side quietly restating the other.
 
 ## What needs the network
 
-Most of the app works in airplane mode. Three things don't:
+Most of the app works in airplane mode. These don't:
 
 | Feature | Why |
 | --- | --- |
 | Bill / note / size-list scanning | Gemini vision, via Supabase Edge Functions |
+| Working out an outside spreadsheet's layout | Gemini, via `analyse-import` — skippable, see below |
 | Household sync + sign-in | Supabase |
 | Push notifications | Web Push via the `send-push` function |
+| Deleting an account | the `delete-account` function |
 
 Printed English bills fall back to on-device Tesseract OCR when Gemini can't
 be reached. **Handwriting and Hindi have no fallback** — Tesseract ships
@@ -72,17 +74,20 @@ Edge Functions + Storage + Auth).
 ```
 shared/constants.ts    category enum + scanner keyword→category map
 src/                   the PWA
-src/lib/               sync, scanning, backup, stock, measures, push
+src/lib/               sync, scanning, import, backup, stock, measures, push
 public/tesseract/      self-hosted OCR worker, wasm cores, English data
+public/*.html          privacy, terms and delete-account — static, no JS
 scripts/               icon generator, tesseract vendoring, user-guide build
-supabase/functions/    scan-bill, scan-note, scan-sizes, send-push
+supabase/functions/    scan-bill, scan-note, scan-sizes, analyse-import,
+                       send-push, delete-account
 supabase/migrations/   SQL for columns the sync engine pushes
+android-twa/           Play Store packaging only — no Android source
 design/                HTML mockups the current skin came from
 files/                 the build spec (ClaudeCode_HouseLedger_Prompt.md)
 Ref_img/               real bills used as scanner test fixtures
 ```
 
-Two things that will bite you:
+Three things that will bite you:
 
 **Sync pushes whole rows** (`upsert({...obj})` in `src/lib/sync.ts`), so any
 new field on a synced type needs its column added remotely *first*. PostgREST
@@ -93,6 +98,13 @@ in `supabase/migrations/` before shipping a build that writes the field.
 **OCR needs all three Tesseract core variants** vendored, including
 relaxed-SIMD. Miss one and every scan fails on the devices that pick it.
 `npm run vendor:tesseract` runs as part of `npm run build` and enforces this.
+
+**The realtime channel is not a reliable wake-up.** Sync reconciles once at
+startup and then leans on a Supabase realtime subscription, which a sleeping
+phone or a network change kills with no error and no retry — the object still
+looks live. `resyncNow()` re-runs the reconcile *and replaces the channel*
+rather than trusting it; anything that needs fresh data should call that, not
+assume the subscription is still delivering.
 
 ## Local development
 
@@ -132,6 +144,11 @@ iOS only exposes push to an app added to the home screen, so notifications
 cannot be enabled from a browser tab there — the toggle says so instead of
 failing silently.
 
+There is also an Android build for the Play Store — a Trusted Web Activity
+wrapping this same site, so there is no second codebase. See
+[android-twa/README.md](android-twa/README.md), and read its note on the
+signing key before touching anything there.
+
 ## Feature notes
 
 - **Bills** — photo or PDF, read by Gemini into editable line items. Line
@@ -164,6 +181,35 @@ failing silently.
   photos. Excel (.xlsx) opens anywhere and can be corrected by hand and
   uploaded back, but holds no photos, so restoring one deliberately leaves the
   photos already on the device untouched.
+- **Importing someone else's sheet** (Data → *Bring in an old spreadsheet*) —
+  distinct from the Excel restore above, which reads a workbook this app
+  wrote. This takes an .xlsx, .csv or pasted note with no agreed shape at all,
+  and **adds** to the ledger rather than replacing it. Only a sample leaves
+  the phone: `analyse-import` sees the sheet names, the headings and ten rows
+  and returns a *mapping*; every row is then converted on-device, so a file of
+  five thousand payments costs one small call. A second call sends category
+  **names** alone to suggest merges. Both are suggestions — date order is
+  re-derived from the whole column first, since a confident wrong guess moves
+  every payment to a different month, and a category keeps the person's own
+  name unless the match is confident. The preview shows the total being
+  imported so it can be checked against the total at the bottom of their own
+  sheet. A checkbox skips the AI step entirely and maps the columns by hand;
+  that path makes zero network calls and works offline.
+- **Freshness** — the Dashboard's **Refresh** button re-pulls the shared
+  ledger and says when the last pull happened, and only appears on a device
+  that actually has a household. Coming back to the app re-pulls too, if the
+  last one is over 30s old, which is the half that matters: an entry added on
+  one phone used to sit unseen on another until the app was fully restarted.
+  A background failure stays silent (the phone is usually just offline and the
+  local ledger is still right); a pressed button reports.
+- **Account deletion** — from Settings, or from `/delete-account.html` without
+  installing anything. `delete-account` resolves the caller from their own
+  token before the admin client touches a row, and removes the login **last**,
+  so every earlier step stays retryable. Leaving a household always drops the
+  membership but only destroys the ledger when the last member leaves — one
+  person deleting must leave the others whole. Privacy and terms are static
+  HTML at `/privacy.html` and `/terms.html`, readable with no JS and no
+  sign-in, because that's how a store reviewer reads them.
 - **Categories** are editable rows, not an enum. Built-ins seed on first run:
   Contractor, Architect, Wood, Electrical, Paint, Plumbing, Tiles, Marble,
   Aluminium, Govt Fee/Chalan, MDA/Mutation, Gift, Site Prep, Legal, Utility
@@ -184,6 +230,8 @@ Offline (airplane mode, after one full load):
       on-device OCR; the lines-vs-total check holds
 - [ ] Stock: received / given out, balance, done-checkbox
 - [ ] Data: JSON and Excel backups download; both restore
+- [ ] Data → Bring in an old spreadsheet, with **"I'll pick the columns
+      myself"** ticked: imports with no network call at all
 
 Online only:
 
@@ -192,7 +240,11 @@ Online only:
 - [ ] A handwritten kaccha bill offers Bill / Payment / Both
 - [ ] An itemised kaccha slip scanned from **Entry** offers to send it to the
       BOQ, and lands on the review screen with its rows intact
+- [ ] Import an outside .xlsx: the mapping is right, and the imported total
+      matches the total written at the bottom of the source sheet
 - [ ] Sign in, sync across two devices
+- [ ] Dashboard **Refresh** pulls an entry added on the other phone, and
+      backgrounding and returning does the same with no interaction
 - [ ] Site link: share code, approve, both sides post to the shared ledger
 - [ ] Push arrives on a real phone
 

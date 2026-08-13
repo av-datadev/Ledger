@@ -5,7 +5,7 @@ a specification of what it now is, so it can be rebuilt or handed to someone
 new. Where the original brief was overtaken by reality, this says so — those
 reversals are the most useful part of the document.
 
-Last updated: 2026-08-03.
+Last updated: 2026-08-11.
 
 ---
 
@@ -25,7 +25,9 @@ full-screen with no browser chrome.
 - **AI** — Gemini vision, called *only* from Edge Functions so the key never
   reaches a device
 - **Deployment** — Vercel for the client (auto-deploys from `main`), Supabase
-  CLI for functions
+  CLI for functions. Android ships as a Trusted Web Activity wrapping that same
+  site (`android-twa/`), so there is no second codebase and a content change
+  needs no store submission.
 
 > **Reversed from the original brief.** It specified an Express/Vercel
 > serverless backend calling the Anthropic API, and "no cloud sync, on-device
@@ -126,9 +128,15 @@ disagreement is the entire point of the feature.
    pricing (lump sum, area×rate, or per-floor lines), bank details scannable
    from a UPI QR, per-person totals.
 
-8. **Data** — JSON and Excel backup/restore, CSV exports, notification toggle,
-   text size, site code and linked contractors, a folded FAQ, app version with
-   a force-update link, danger zone.
+8. **Data** — JSON and Excel backup/restore, importing somebody else's
+   spreadsheet (§6), CSV exports, notification toggle, text size, site code and
+   linked contractors, a folded FAQ, app version with a force-update link,
+   links to the privacy/terms/deletion pages, danger zone including account
+   deletion.
+
+The Dashboard also carries a **Refresh** control, on a device that has a
+household. It re-pulls the shared ledger and shows when the last pull happened,
+so "is this up to date?" is answered on screen rather than by pressing it.
 
 ## 5. Scanning
 
@@ -165,14 +173,93 @@ confidently wrong bill that looked exactly like a right one.
 > **Gemini's free tier allows 20 requests/day.** Exhaust it and every scan
 > degrades to the fallback. Enable billing if more than one person scans.
 
-## 6. Offline behaviour
+## 6. Importing somebody else's spreadsheet
+
+Distinct from the .xlsx *restore*, which reads a workbook this app wrote, with
+a known meta sheet and fixed columns. This reads a file with no agreed shape at
+all — years of spending someone arrives with — and **adds** to the ledger
+rather than replacing it, since an import happens on top of whatever is already
+there.
+
+**Only a sample crosses the network.** `analyse-import` receives the sheet
+names, the headings and ten rows, and returns a *mapping* — which column index
+is the date, which the amount, how dates are ordered. Every row is then
+converted on the device. A file of five thousand payments costs one small call
+and the person's financial history never leaves their phone. A second, smaller
+call sends category **names** alone — no figures, no vendors — to suggest which
+of theirs merge into ours.
+
+The model's answer is a suggestion, not an instruction:
+
+- **Date order is re-derived from the whole column first.** A day of 25 settles
+  day-first outright, and a confident wrong guess moves every payment in the
+  file to a different month.
+- **Categories keep the person's own name** unless the match is confident. A
+  wrong merge is silent and hard to notice later, so the review screen offers
+  the suggestion, the alternatives, and the questions the reader could not
+  resolve.
+- **Nothing is written until the rows have been seen.** The preview shows the
+  total being imported precisely so it can be checked against the total written
+  at the bottom of their own sheet — two independent numbers, the same check
+  the size-list reader uses.
+- The commit is **one transaction**: half an imported ledger is worse than
+  none, because the person cannot tell which half.
+
+**The AI step must be skippable.** A checkbox maps the columns by hand instead
+and makes zero network calls, which is what the privacy policy promises, so it
+has to actually exist.
+
+Parsing lives in `importParse.ts`, deliberately free of any network import so
+it can be exercised directly: day-first vs month-first, Excel serials, lakh
+grouping, bracketed negatives, and impossible dates like 31 February.
+
+## 7. Sync and freshness
+
+Two-way reconcile at startup, then a Supabase realtime channel. **The channel
+is not trustworthy on its own** — a sleeping phone or a network change kills it
+with no error and no retry, and the dead subscription still looks like a live
+object. An entry added on one phone therefore sat unseen on another until the
+app was fully restarted.
+
+`resyncNow()` re-runs the same idempotent reconcile and **replaces** the
+channel rather than trusting it. Concurrent calls collapse onto the first, or
+two passes race to push the same local-only rows. It runs on the Dashboard's
+Refresh button, on returning to the app if the last pull is over 30s old, and
+on regaining signal. Nobody should have to know about a button for their own
+ledger to be right. A background failure stays silent — the phone is usually
+just offline and the local ledger is still correct — while a pressed button
+reports.
+
+## 8. Account deletion, and saying what is held
+
+Required before any store listing exists: Play's User Data policy demands
+deletion from *inside* the app **and** a web page where it can be requested
+without installing anything, and the Data safety form will not submit without a
+privacy policy URL.
+
+- `delete-account` resolves the caller from their own token and only then lets
+  the admin client act, on rows belonging to that resolved id. A client cannot
+  delete its own auth user, and the service-role key must never reach a device.
+- **The login goes last.** Everything before it is retryable while the account
+  still exists; an auth user deleted out from under its data leaves rows nobody
+  can reach.
+- **Leaving must not destroy the books of the people still in the household.**
+  Membership always goes; the ledger goes only when the last member leaves.
+- Privacy, terms and the deletion request page are **static HTML**, not app
+  routes — a reviewer, and anyone who has not installed the app, has to read
+  them with no JavaScript and no sign-in. The privacy policy says plainly that
+  with the AI reader on, the photograph is sent to Google's Gemini API, and
+  that the setting is per-device, so one person enabling it never enables it
+  for the rest of the household.
+
+## 9. Offline behaviour
 
 Precache the shell. Dexie works offline by nature: dashboard, ledger, manual
-entry, manual BOQ, stock, backup/restore and CSV must all work in airplane
-mode. Only sync, scanning and push need a connection, and each must fail
-visibly rather than blankly.
+entry, manual BOQ, stock, backup/restore, CSV and a hand-mapped import must all
+work in airplane mode. Only sync, scanning, import layout analysis and push
+need a connection, and each must fail visibly rather than blankly.
 
-## 7. Visual design
+## 10. Visual design
 
 A ledger/accounting aesthetic, not consumer fintech. Warm paper ground
 (`#F5F3EC`), ink navy (`#15232E`), one terracotta accent (`#C0562F`), muted
@@ -186,7 +273,7 @@ Dark mode is hand-authored — nothing dark falls out of a light-only mockup for
 free. Keep ≥44px tap targets, respect `prefers-reduced-motion`, and self-host
 any font: this app must not fetch from a CDN at runtime.
 
-## 8. Non-functional
+## 11. Non-functional
 
 - TypeScript strict; no console errors in normal use
 - Android back button: tab → dashboard → exit, and closes a review screen
@@ -199,16 +286,22 @@ any font: this app must not fetch from a CDN at runtime.
   the upsert is rejected and only `console.error`s — indistinguishable from a
   save that worked.
 
-## 9. Acceptance
+## 12. Acceptance
 
 - [ ] Installs to the home screen and launches standalone
-- [ ] Airplane mode: manual entry, dashboard, manual bill, backup/restore, CSV
+- [ ] Airplane mode: manual entry, dashboard, manual bill, backup/restore, CSV,
+      and an import with the columns picked by hand
 - [ ] A photographed GST invoice extracts line items summing to the printed
       total, or flags the mismatch
 - [ ] A handwritten Hindi bill extracts its items **and** its payment, and
       offers Bill / Payment / Both
 - [ ] A timber size list computes cubic feet matching the dealer's own figure
 - [ ] Backup → clear → restore, for **both** JSON and Excel
-- [ ] Two devices signed into one household see each other's entries
+- [ ] An outside spreadsheet imports on top of existing entries, summing to the
+      total written at the bottom of the source file
+- [ ] Two devices signed into one household see each other's entries, and an
+      entry added on one appears on the other without restarting the app
 - [ ] A linked contractor reads zero rows of the private ledger
+- [ ] Deleting an account removes its login and its own rows, and leaves the
+      remaining household members' books intact
 - [ ] No entry saves with a zero amount or empty description
