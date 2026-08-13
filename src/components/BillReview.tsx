@@ -68,6 +68,16 @@ export interface DraftBill {
   balanceDue: string;
   /** Date of that payment when it differs from the bill's own date. */
   paymentDate: string;
+  /**
+   * Keep this bill as one line rather than as its items.
+   *
+   * For a handwritten bill the rows are frequently not worth correcting one by
+   * one — twenty Devanagari lines of assorted fittings, where the figure that
+   * matters is the total at the bottom. Clubbing still SAVES every row (they
+   * are the evidence, and they still open on tap); it decides how the bill
+   * reads and whether Stock receives one combined receipt or one per row.
+   */
+  clubbed: boolean;
   items: DraftItem[];
 }
 
@@ -110,6 +120,7 @@ export const emptyDraft = (): DraftBill => ({
   paidAmount: "",
   balanceDue: "",
   paymentDate: "",
+  clubbed: false,
   items: [blankItem()],
 });
 
@@ -197,7 +208,12 @@ export function BillReview({
   // Blank means "whatever the bill total turns out to be" — seeded from the
   // PAID figure when the paper has one, because on a part-paid kaccha bill the
   // two differ and posting the total would overstate the ledger by the balance.
-  const [ledgerAmount, setLedgerAmount] = useState<string>(draft.paidAmount);
+  //
+  // This one figure does two jobs, because on a bill they are the same number:
+  // it is the amount of any ledger entry created here, and it is what gets
+  // stored on the bill as `amountPaid` so the vendor's outstanding can be
+  // worked out later.
+  const [paidSoFar, setPaidSoFar] = useState<string>(draft.paidAmount);
 
   // Default the optional ledger entry's payer/mode to the user's own first real
   // option (data-derived) rather than a generic placeholder.
@@ -290,8 +306,20 @@ export function BillReview({
   const effectiveTarget: SaveTarget = editing ? "boq" : target;
   const wantsBoq = effectiveTarget !== "entry";
   const wantsEntry = effectiveTarget !== "boq";
-  const entryAmount = toNum(ledgerAmount) ?? total;
+  const entryAmount = toNum(paidSoFar) ?? total;
   const balanceDue = toNum(draft.balanceDue) ?? 0;
+  // What the bill will record as paid. null — not 0 — when nothing has been
+  // entered and no entry is being created, because "nobody has said anything
+  // about paying this bill" and "₹0 has been paid on it" are different claims,
+  // and only the second one should show the whole total as outstanding.
+  const recordedPaid: number | null =
+    toNum(paidSoFar) ?? (wantsEntry ? entryAmount : null);
+  // What the vendor is still owed on this bill. Shown only once both figures
+  // exist: a bill with no total to measure against can't have an outstanding.
+  const outstanding =
+    total > 0 && recordedPaid != null
+      ? Math.round((total - recordedPaid) * 100) / 100
+      : null;
 
   const save = async () => {
     const errs: string[] = [];
@@ -349,6 +377,11 @@ export function BillReview({
       rate: toNum(it.rate),
       discPct: toNum(it.discPct),
       amount: toNum(it.amount) ?? 0,
+      // Bill-level facts, repeated on every row exactly as invoiceTotal and
+      // writtenQty already are — a bill has no table of its own, only the rows
+      // that share a billId.
+      amountPaid: recordedPaid,
+      clubbed: draft.clubbed ? true : null,
     }));
 
     // Editing replaces the bill's rows in place, keeping billId (and therefore
@@ -398,11 +431,18 @@ export function BillReview({
     }
     if (wantsBoq && addToStock) {
       await addBillRowsToStock(
-        validItems.map((it) => ({
-          name: it.item.trim(),
-          qty: toNum(it.qty) ?? 0,
-          unit: it.unit.trim(),
-        })),
+        // A clubbed bill goes into Stock as the one thing it is. Twenty rows of
+        // a handwritten fittings bill would otherwise become twenty stock items
+        // to hand out and tick off individually, each named by whatever the
+        // reader made of a Devanagari line — which is precisely the itemisation
+        // the person just said they did not want.
+        draft.clubbed
+          ? [{ name: label, qty: validItems.length, unit: "items" }]
+          : validItems.map((it) => ({
+              name: it.item.trim(),
+              qty: toNum(it.qty) ?? 0,
+              unit: it.unit.trim(),
+            })),
         draft.category,
         date,
         label,
@@ -788,6 +828,26 @@ export function BillReview({
           </div>
         )}
 
+        {wantsBoq && (
+          <label className="flex items-start gap-2 text-[13px]">
+            <input
+              type="checkbox"
+              className="mt-0.5 shrink-0 accent-moss"
+              checked={draft.clubbed}
+              onChange={(e) => set({ clubbed: e.target.checked })}
+            />
+            <span>
+              <b>Keep this bill as one line.</b> The{" "}
+              {draft.items.length === 1 ? "row" : `${draft.items.length} rows`}{" "}
+              below {draft.items.length === 1 ? "is" : "are"} still saved and
+              still open on tap — the bill just reads as a single line of{" "}
+              <span className="money">{inr(total)}</span> instead of an itemised
+              one. Worth it on a handwritten bill whose rows aren't worth
+              correcting one by one.
+            </span>
+          </label>
+        )}
+
         {!editing && wantsBoq && (
           <label className="flex items-start gap-2 text-[13px]">
             <input
@@ -800,8 +860,17 @@ export function BillReview({
                 and <b> would each become separate flex items and break onto
                 their own columns. */}
             <span>
-              Add the material rows (with quantities) to <b>Stock</b> so you can
-              track how much is given to labour and what's left.
+              {draft.clubbed ? (
+                <>
+                  Add this bill to <b>Stock</b> as one received line, so you can
+                  track what has been given to labour and what's left.
+                </>
+              ) : (
+                <>
+                  Add the material rows (with quantities) to <b>Stock</b> so you
+                  can track how much is given to labour and what's left.
+                </>
+              )}
             </span>
           </label>
         )}
@@ -813,42 +882,83 @@ export function BillReview({
           </div>
         )}
 
-        {wantsEntry && (
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="field-label">Amount paid</label>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={ledgerAmount}
-                placeholder={total > 0 ? String(total) : ""}
-                onChange={(e) => setLedgerAmount(e.target.value)}
-              />
+        {/* Paying a vendor part of a bill is the normal case on a running
+            account, not an exception — so the paid figure is asked for on the
+            bill itself, not only when a ledger entry is being created. Left
+            blank the bill records nothing about payment, which is different
+            from recording that nothing has been paid. */}
+        {!editing && (wantsEntry || wantsBoq) && (
+          <div className="space-y-2">
+            <div className={wantsEntry ? "grid grid-cols-3 gap-3" : ""}>
+              <div>
+                <label className="field-label">
+                  {wantsEntry ? "Amount paid" : "Paid against this bill"}
+                </label>
+                <input
+                  className="input"
+                  inputMode="decimal"
+                  value={paidSoFar}
+                  placeholder={
+                    wantsEntry && total > 0 ? String(total)
+                    : wantsBoq ? "nothing paid yet"
+                    : ""
+                  }
+                  onChange={(e) => setPaidSoFar(e.target.value)}
+                />
+              </div>
+              {wantsEntry && (
+                <>
+                  <div>
+                    <label className="field-label">Payment mode</label>
+                    <select
+                      className="input"
+                      value={ledgerMode}
+                      onChange={(e) => setLedgerMode(e.target.value)}
+                    >
+                      {modes.map((m) => (
+                        <option key={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="field-label">Paid by</label>
+                    <select
+                      className="input"
+                      value={ledgerPayer}
+                      onChange={(e) => setLedgerPayer(e.target.value)}
+                    >
+                      {payers.map((p) => (
+                        <option key={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
-            <div>
-              <label className="field-label">Payment mode</label>
-              <select
-                className="input"
-                value={ledgerMode}
-                onChange={(e) => setLedgerMode(e.target.value)}
-              >
-                {modes.map((m) => (
-                  <option key={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="field-label">Paid by</label>
-              <select
-                className="input"
-                value={ledgerPayer}
-                onChange={(e) => setLedgerPayer(e.target.value)}
-              >
-                {payers.map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
-            </div>
+
+            {/* Three figures, of which two were entered independently — the
+                bill total off the paper, and what was actually handed over.
+                Showing the third is what makes a part payment checkable now
+                rather than a surprise when the vendor asks for the rest. */}
+            {wantsBoq && outstanding != null && (
+              <div className="flex items-center justify-between gap-2 text-[12px] px-3 py-2 rounded-md border border-rule bg-paper">
+                <span className="text-ink-soft">
+                  Billed <span className="money">{inr(total)}</span> · paid{" "}
+                  <span className="money">{inr(recordedPaid ?? 0)}</span>
+                </span>
+                <span
+                  className={`money font-semibold ${
+                    outstanding > 0 ? "text-crimson"
+                    : outstanding < 0 ? "text-crimson"
+                    : "text-moss"
+                  }`}
+                >
+                  {outstanding > 0 ? `${inr(outstanding)} still due`
+                  : outstanding < 0 ? `${inr(-outstanding)} overpaid`
+                  : "settled"}
+                </span>
+              </div>
+            )}
           </div>
         )}
 

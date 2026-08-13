@@ -147,6 +147,11 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
       thickness: b.thickness ?? null,
       pieces: b.pieces ?? null,
       writtenQty: b.writtenQty ?? null,
+      // Pre-v12 rows predate part-payment and clubbing. Both stay null rather
+      // than 0/false: a bill restored from an old backup records nothing about
+      // payment, and 0 would state that the whole of it is still owed.
+      amountPaid: b.amountPaid ?? null,
+      clubbed: b.clubbed ?? null,
     };
   });
 

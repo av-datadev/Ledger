@@ -96,6 +96,8 @@ const BOQ: TableSpec<BoqItem> = {
     { key: "rate", type: "number", nullable: true },
     { key: "discPct", type: "number", nullable: true },
     { key: "amount", type: "number" },
+    { key: "amountPaid", type: "number", nullable: true },
+    { key: "clubbed", type: "bool", nullable: true },
   ],
 };
 

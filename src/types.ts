@@ -62,6 +62,24 @@ export interface BoqItem {
   rate: number | null;
   discPct: number | null;
   amount: number;
+  /**
+   * How much of this bill has actually been handed over, repeated on every row
+   * of the bill (like `invoiceTotal`). `invoiceTotal - amountPaid` is what the
+   * vendor is still owed.
+   *
+   * null means the bill says nothing about payment, which is NOT the same as a
+   * payment of zero: a printed invoice that arrived unpaid and a bill paid in
+   * full both have an outstanding figure worth showing, but a bill nobody has
+   * recorded a payment against should not claim the whole total is due.
+   */
+  amountPaid: number | null;
+  /**
+   * True when the bill is kept as one line rather than as its items. The rows
+   * are still stored and still open on tap — a handwritten bill's twenty
+   * Devanagari rows are worth keeping as evidence even when nobody wants them
+   * itemised — but the bill reads, and stocks, as a single line.
+   */
+  clubbed: boolean | null;
 }
 
 export interface Settings {

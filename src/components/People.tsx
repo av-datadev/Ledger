@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
 import { useCategories } from "../hooks/useCategories";
 import { inr } from "../lib/format";
 import { contractTotal } from "../lib/measure";
+import { outstandingByCategory } from "../lib/billBalance";
 import { PersonDetailsForm } from "./PersonDetailsForm";
 import type { PersonDetails } from "../types";
 
@@ -72,6 +73,7 @@ export function People({
   const categories = useCategories();
   const entries = useLiveQuery(() => db.entries.toArray(), []);
   const people = useLiveQuery(() => db.people.toArray(), []);
+  const boqItems = useLiveQuery(() => db.boqItems.toArray(), []);
   const [name, setName] = useState("");
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
     null,
@@ -112,6 +114,14 @@ export function People({
     setOpenDetails(trimmed);
   };
 
+  // What is still owed on this person's bills — money the app knows about
+  // because a bill was recorded as part paid, which is exactly the figure a
+  // vendor turns up asking for.
+  const owed = useMemo(
+    () => outstandingByCategory(boqItems ?? []),
+    [boqItems],
+  );
+
   const stats = categories.map((cat) => ({
     cat,
     count: entries?.filter((e) => e.category === cat).length ?? 0,
@@ -119,6 +129,7 @@ export function People({
       entries
         ?.filter((e) => e.category === cat)
         .reduce((s, e) => s + e.amount, 0) ?? 0,
+    outstanding: owed.get(cat) ?? 0,
   }));
 
   return (
@@ -158,7 +169,7 @@ export function People({
       )}
 
       <div className="card overflow-hidden divide-y divide-rule mt-2">
-        {stats.map(({ cat, count, total }) => {
+        {stats.map(({ cat, count, total, outstanding }) => {
           const details = detailsFor(cat);
           return (
             <div key={cat} className="px-3 py-2">
@@ -179,6 +190,12 @@ export function People({
                       "no payments yet"
                     )}
                   </div>
+                  {outstanding > 0 && (
+                    <div className="text-[11px] text-crimson mt-0.5">
+                      <span className="money">{inr(outstanding)}</span> still due
+                      on their bills
+                    </div>
+                  )}
                   {details && detailSummary(details) && (
                     <div className="text-[11px] text-ink-soft truncate mt-0.5">
                       📇 {detailSummary(details)}

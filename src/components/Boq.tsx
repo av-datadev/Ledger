@@ -8,13 +8,14 @@ import { recognizeText } from "../lib/ocr";
 import { pdfToText, pdfPagesToImages } from "../lib/pdf";
 import { parseScannedBill, type ScannedBill } from "../lib/scanParse";
 import {
-  scanBillWithGemini,
+  fileToGeminiImage,
   scanImagesWithGemini,
   edgeFunctionError,
   isQuotaError,
   isBusyError,
 } from "../lib/geminiScan";
 import { scanSizesWithGemini } from "../lib/sizeScan";
+import { billBalance } from "../lib/billBalance";
 import {
   BillReview,
   recalcItem,
@@ -24,6 +25,18 @@ import {
 } from "./BillReview";
 import { BillStockPanel } from "./BillStockPanel";
 import type { BoqItem } from "../types";
+
+/** How many photos of one bill are read in a single call. Matches the PDF
+ * path's MAX_GEMINI_PAGES: a kaccha bill running past six notebook pages is
+ * rarer than a picker that selects half an album by accident. */
+const MAX_BILL_PAGES = 6;
+
+const isPdfFile = (f: File) =>
+  f.type === "application/pdf" || /\.pdf$/i.test(f.name);
+
+const isImageFile = (f: File) =>
+  f.type.startsWith("image/") ||
+  /\.(jpe?g|png|heic|heif|webp|gif|bmp)$/i.test(f.name);
 
 /**
  * What to tell someone whose bill was read by the weaker on-device reader.
@@ -66,13 +79,20 @@ export function Boq({
   const [error, setError] = useState<string | null>(null);
   /** Set when the good reader failed and the on-device one stood in. */
   const [degraded, setDegraded] = useState<string | null>(null);
-  /** The photo/PDF behind the draft on screen, kept so a scan that fell back to
-   * the on-device reader can be retried from the review screen. Re-picking the
-   * file is otherwise the only way back, and on a phone that means finding it
-   * in the gallery again. */
-  const [lastScanFile, setLastScanFile] = useState<File | null>(null);
+  /** The photo(s)/PDF behind the draft on screen, kept so a scan that fell back
+   * to the on-device reader can be retried from the review screen. Re-picking
+   * the file is otherwise the only way back, and on a phone that means finding
+   * it in the gallery again. Every page is kept, or a retry would silently
+   * re-read only the first one. */
+  const [lastScan, setLastScan] = useState<File[] | null>(null);
+  /** Photos picked so far for a bill that hasn't been read yet — see addPages.
+   * Held rather than read on pick, because the next page of the same bill is a
+   * tap away and both should go to the reader together. */
+  const [pages, setPages] = useState<File[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
+  /** Narrow the bill list to the ones a vendor is still owed money on. */
+  const [dueOnly, setDueOnly] = useState(false);
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const sizesRef = useRef<HTMLInputElement>(null);
@@ -109,6 +129,9 @@ export function Boq({
       // it would demand a number the paper never had.
       informal: !head.invoiceNo,
       writtenQty: head.writtenQty != null ? String(head.writtenQty) : "",
+      // Re-open a clubbed bill still clubbed, or saving an edit would quietly
+      // itemise a bill the person deliberately kept as one line.
+      clubbed: head.clubbed === true,
       // Only a fresh scan carries these; a saved bill doesn't, and editing
       // never re-opens the payment side anyway.
       paidAmount: "",
@@ -132,27 +155,82 @@ export function Boq({
     });
   };
 
-  const onScanFile = async (file: File) => {
+  /**
+   * Take photos of one bill and hold them until the person says they have the
+   * whole thing. A vendor's kaccha bill is a notebook page, and a running
+   * account routinely covers two or three of them — read one at a time they
+   * become three unrelated bills, each with a fragment of the items and only
+   * one carrying the जमा/शेष line that says what was actually paid.
+   *
+   * They are read in ONE call rather than one call per page: scan-bill already
+   * merges a sequence of page images into a single item list (that is how the
+   * multi-page PDF path works), and on a free tier of 20 requests a day, three
+   * pages costing three requests is the difference between scanning a day's
+   * bills and running out by mid-morning.
+   */
+  const addPages = (picked: File[]) => {
+    setError(null);
+    const images = picked.filter(isImageFile);
+    const skipped = picked.length - images.length;
+    setPages((prev) => {
+      const room = MAX_BILL_PAGES - prev.length;
+      if (room <= 0) {
+        setError(
+          `That's already ${MAX_BILL_PAGES} pages, which is as many as can be read as one bill. Save these, then scan the rest as a second bill.`,
+        );
+        return prev;
+      }
+      if (skipped > 0 || images.length > room) {
+        setError(
+          [
+            skipped > 0
+              ? `${skipped === 1 ? "One file wasn't" : `${skipped} files weren't`} a photo and ${skipped === 1 ? "was" : "were"} left out.`
+              : null,
+            images.length > room
+              ? `Only the first ${room} of these fit — a bill can be at most ${MAX_BILL_PAGES} pages.`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        );
+      }
+      return [...prev, ...images.slice(0, room)];
+    });
+  };
+
+  /**
+   * Read whatever was picked — a PDF, or one or more photos of the same bill.
+   *
+   * One function rather than two so the review screen's "try the AI reader
+   * again" retries exactly what was scanned, pages and all, instead of only
+   * ever re-reading the first page.
+   */
+  const scanFiles = async (files: File[]) => {
+    if (files.length === 0) return;
     setError(null);
     setDegraded(null);
-    setLastScanFile(file);
+    setLastScan(files);
     try {
-      const isPdf =
-        file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-      const isImage =
-        file.type.startsWith("image/") ||
-        /\.(jpe?g|png|heic|heif|webp|gif|bmp)$/i.test(file.name);
+      const pdf = files.find(isPdfFile);
+      const images = files.filter(isImageFile);
       // The picker is deliberately unfiltered (see the file inputs below) so
       // every OS offers both the camera/gallery and Files — so an unsupported
       // pick is possible and needs a clear message rather than a parse crash.
-      if (!isPdf && !isImage) {
+      if (!pdf && images.length === 0) {
         setError(
-          `"${file.name}" isn't a photo or a PDF. Pick a bill photo or a PDF, or enter the bill manually.`,
+          `"${files[0].name}" isn't a photo or a PDF. Pick a bill photo or a PDF, or enter the bill manually.`,
         );
         return;
       }
+      // A PDF is already a multi-page document; combining one with loose photos
+      // has no sensible reading order, so the PDF wins and says so.
+      if (pdf && images.length > 0) {
+        setError(
+          `Read "${pdf.name}" on its own — a PDF is already a whole bill, so the photos picked alongside it were left out.`,
+        );
+      }
       let scan: ScannedBill;
-      if (isPdf) {
+      if (pdf) {
         // Same as the photo path: Gemini reads the bill first (render every
         // page — up to MAX_GEMINI_PAGES — to images and send them together,
         // so a multi-annexure BOQ still comes back as one merged item list),
@@ -160,37 +238,52 @@ export function Boq({
         // for scanned PDFs) stays as the offline fallback on any Gemini failure.
         try {
           setBusy("Reading the bill…");
-          const images = await pdfPagesToImages(file, setBusy);
-          scan = await scanImagesWithGemini(images);
+          const rendered = await pdfPagesToImages(pdf, setBusy);
+          scan = await scanImagesWithGemini(rendered);
         } catch (geminiErr) {
           console.warn("Gemini PDF scan failed, using on-device extraction:", geminiErr);
           setDegraded(describeFallback(await edgeFunctionError(geminiErr)));
-          const text = await pdfToText(file, setBusy);
+          const text = await pdfToText(pdf, setBusy);
           scan = parseScannedBill(text);
         }
       } else {
-        // Gemini reads the photo directly (no OCR step) and handles skew,
+        // Gemini reads the photos directly (no OCR step) and handles skew,
         // low light, and mangled columns far better than Tesseract. It needs
         // the network, so fall back to on-device OCR on any failure —
         // offline, quota, or a bad response.
+        const pageLabel = images.length > 1 ? ` (${images.length} pages)` : "";
         try {
-          setBusy("Reading the bill…");
-          scan = await scanBillWithGemini(file);
+          setBusy(`Reading the bill${pageLabel}…`);
+          const prepared = [];
+          for (const f of images) prepared.push(await fileToGeminiImage(f));
+          scan = await scanImagesWithGemini(prepared);
         } catch (geminiErr) {
           console.warn("Gemini scan failed, using on-device OCR:", geminiErr);
           // The fallback is a genuinely weaker reader — English-only, and
           // blind to the payment an informal bill records — so falling back
           // silently produces a wrong bill that looks like a right one. Say so.
           setDegraded(describeFallback(await edgeFunctionError(geminiErr)));
-          setBusy("Preparing the photo…");
-          const image = await fileToOcrImage(file);
-          setBusy("Reading the bill on this phone… 0%");
-          const text = await recognizeText(image, (pct) =>
-            setBusy(`Reading the bill on this phone… ${pct}%`),
-          );
-          scan = parseScannedBill(text);
+          // Each page is recognised on its own and the text joined, the same
+          // way pdfToText concatenates a PDF's pages — parseScannedBill reads
+          // the result as one document. It is still the weaker reader on every
+          // page, and on a handwritten or Hindi bill it will read nothing
+          // useful at all; the banner above the draft says so.
+          const texts: string[] = [];
+          for (const [i, f] of images.entries()) {
+            const of = images.length > 1 ? ` (page ${i + 1} of ${images.length})` : "";
+            setBusy(`Preparing the photo${of}…`);
+            const image = await fileToOcrImage(f);
+            setBusy(`Reading the bill on this phone${of}… 0%`);
+            texts.push(
+              await recognizeText(image, (pct) =>
+                setBusy(`Reading the bill on this phone${of}… ${pct}%`),
+              ),
+            );
+          }
+          scan = parseScannedBill(texts.join("\n"));
         }
       }
+      setPages([]);
       openScan(scan);
     } catch (err) {
       console.error("Scan failed:", err);
@@ -223,6 +316,11 @@ export function Boq({
       // the vendor and invoice number it was never going to have.
       informal: scan.isInformal,
       writtenQty: "",
+      // Off by default even on a handwritten bill: clubbing is a judgement
+      // about this particular paper, and turning it on for someone would hide
+      // an itemisation they may well have wanted. The toggle is on the review
+      // screen, next to the rows it applies to.
+      clubbed: false,
       paidAmount: scan.paidAmount,
       balanceDue: scan.balanceDue,
       paymentDate: scan.paymentDate,
@@ -279,6 +377,10 @@ export function Boq({
         otherChargesTaxed: false,
         informal: true,
         writtenQty: scan.writtenQty,
+        // Never clubbed: a size list exists to be read as its sizes — the
+        // measured-vs-written check is the entire reason for the feature, and
+        // it has nothing to check if the rows are collapsed away.
+        clubbed: false,
         // A size list prices the goods; it isn't a running account, so
         // scan-sizes doesn't look for a payment and none is offered.
         paidAmount: "",
@@ -327,9 +429,20 @@ export function Boq({
       map.set(it.billId, arr);
     }
     return [...map.entries()]
-      .map(([key, rows]) => ({ key, rows }))
+      .map(([key, rows]) => ({ key, rows, ...billBalance(rows) }))
       .sort((a, b) => (a.rows[0].date < b.rows[0].date ? 1 : -1));
   }, [items]);
+
+  // Bills the vendor is still owed money on. Kept as a filter rather than a
+  // separate screen: it is the same list of bills, asked a narrower question.
+  const shownGroups = useMemo(
+    () => (dueOnly ? groups.filter((g) => g.outstanding != null && g.outstanding > 0) : groups),
+    [groups, dueOnly],
+  );
+  const dueCount = useMemo(
+    () => groups.filter((g) => g.outstanding != null && g.outstanding > 0).length,
+    [groups],
+  );
 
   const recon = useMemo(() => {
     if (!items || !entries) return [];
@@ -354,9 +467,7 @@ export function Boq({
         scanned={scanned}
         degraded={degraded}
         busy={busy}
-        onRetryScan={
-          lastScanFile ? () => void onScanFile(lastScanFile) : undefined
-        }
+        onRetryScan={lastScan ? () => void scanFiles(lastScan) : undefined}
         editing={editing}
         onChange={setDraft}
         onClose={() => {
@@ -364,7 +475,7 @@ export function Boq({
           setScanned(false);
           setEditing(false);
           setDegraded(null);
-          setLastScanFile(null);
+          setLastScan(null);
         }}
       />
     );
@@ -413,7 +524,9 @@ export function Boq({
         <b>Size list</b> is for a dealer's slip priced by size (8¼ × 9 × 8 — 3
         pc). Always check the rows against the paper.
       </div>
-      {/* Straight to the camera — `capture` makes the OS skip the picker. */}
+      {/* Straight to the camera — `capture` makes the OS skip the picker. One
+          shot per tap is all the camera returns, so pages accumulate in the
+          tray instead of being read on the spot. */}
       <input
         ref={cameraRef}
         type="file"
@@ -422,7 +535,7 @@ export function Boq({
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) void onScanFile(f);
+          if (f) addPages([f]);
           e.target.value = "";
         }}
       />
@@ -430,15 +543,21 @@ export function Boq({
           phone pickers hide one of the two (photos on iOS, PDFs elsewhere),
           which is exactly the "it takes a PDF but not a photo" problem. Left
           unfiltered every OS offers gallery, camera and Files together;
-          onScanFile validates the pick and explains any unsupported file. */}
+          scanFiles validates the pick and explains any unsupported file. */}
       <input
         ref={uploadRef}
         type="file"
+        multiple
         className="hidden"
         onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void onScanFile(f);
+          const picked = Array.from(e.target.files ?? []);
           e.target.value = "";
+          if (picked.length === 0) return;
+          // A PDF is a whole bill on its own and goes straight to the reader;
+          // photos join the tray, since the next page of the same notebook
+          // bill is usually one tap away.
+          if (picked.some(isPdfFile)) void scanFiles(picked);
+          else addPages(picked);
         }}
       />
       {/* A size list is always a photo of a scrap of paper, never a PDF, so
@@ -455,6 +574,55 @@ export function Boq({
           e.target.value = "";
         }}
       />
+
+      {/* The pages picked so far, held until the whole bill is on screen. A
+          kaccha bill that runs over two notebook pages has to be read as one
+          document: split into two scans, the items land on one bill and the
+          जमा/शेष line on the other. */}
+      {pages.length > 0 && !busy && (
+        <div className="card px-3 py-3 mb-3 space-y-2">
+          <div className="text-[13px] font-medium">
+            {pages.length === 1
+              ? "1 page of this bill"
+              : `${pages.length} pages of this bill`}
+          </div>
+          <ul className="space-y-1">
+            {pages.map((f, i) => (
+              <li
+                key={`${f.name}-${i}`}
+                className="flex items-center justify-between gap-2 text-[12px] text-ink-soft"
+              >
+                <span className="truncate">
+                  Page {i + 1} · <span className="truncate">{f.name}</span>
+                </span>
+                <button
+                  className="text-crimson shrink-0"
+                  onClick={() => setPages((p) => p.filter((_, j) => j !== i))}
+                  aria-label={`Remove page ${i + 1}`}
+                >
+                  remove
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="flex gap-2 pt-0.5">
+            <button
+              className="btn btn-primary flex-1"
+              onClick={() => void scanFiles(pages)}
+            >
+              Read {pages.length === 1 ? "this page" : `these ${pages.length} pages`}
+            </button>
+            <button className="btn" onClick={() => setPages([])}>
+              Clear
+            </button>
+          </div>
+          <div className="text-[11px] text-ink-soft">
+            Tap <b>Take photo</b> or <b>Photo / PDF</b> again to add another
+            page. All of them are read together as one bill — one scan, not one
+            per page.
+          </div>
+        </div>
+      )}
 
       {busy && (
         <div className="text-[13px] px-3 py-2 rounded-md border border-rule bg-surface text-ink-soft mb-3">
@@ -500,13 +668,30 @@ export function Boq({
       </section>
 
       <section className="mt-5 pb-4">
-        <h3 className="eyebrow mb-2">
-          Bills on record
-        </h3>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h3 className="eyebrow">Bills on record</h3>
+          {/* Only offered once a bill actually has money outstanding — a filter
+              that can only ever empty the list is noise on a tab that most
+              people open to add a bill, not to chase one. */}
+          {dueCount > 0 && (
+            <button
+              className={`text-[11px] rounded-full border px-2.5 py-1 ${
+                dueOnly
+                  ? "border-crimson text-crimson bg-crimson/5"
+                  : "border-rule text-ink-soft"
+              }`}
+              aria-pressed={dueOnly}
+              onClick={() => setDueOnly((v) => !v)}
+            >
+              Still to pay ({dueCount})
+            </button>
+          )}
+        </div>
         <div className="space-y-2">
-          {groups.map(({ key, rows }) => {
+          {shownGroups.map(({ key, rows, paid, outstanding }) => {
             const head = rows[0];
             const open = expanded === key;
+            const clubbed = head.clubbed === true;
             return (
               <div key={key} className="card">
                 <button
@@ -515,13 +700,35 @@ export function Boq({
                 >
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">
-                      {head.vendor}
+                      {/* A handwritten bill often names no seller at all — the
+                          reader leaves it empty rather than inventing one, so
+                          the row needs a fallback or it renders blank. */}
+                      {head.vendor || `${head.category} bill`}
                     </div>
                     <div className="text-[11px] text-ink-soft">
-                      Inv #{head.invoiceNo} · {formatDate(head.date)} ·{" "}
+                      {/* Kaccha bills have no invoice number; printing "Inv # ·"
+                          in front of nothing is how that used to read. */}
+                      {head.invoiceNo ? `Inv #${head.invoiceNo} · ` : ""}
+                      {formatDate(head.date)} ·{" "}
                       <span className="badge">{head.category}</span> ·{" "}
-                      {rows.length} lines
+                      {clubbed
+                        ? `one line · ${rows.length} rows kept`
+                        : `${rows.length} ${rows.length === 1 ? "line" : "lines"}`}
                     </div>
+                    {outstanding != null && outstanding > 0 && (
+                      <div className="text-[11px] text-crimson mt-0.5">
+                        Paid <span className="money">{inr(paid ?? 0)}</span> ·{" "}
+                        <b>
+                          <span className="money">{inr(outstanding)}</span> still
+                          due
+                        </b>
+                      </div>
+                    )}
+                    {outstanding === 0 && (
+                      <div className="text-[11px] text-moss mt-0.5">
+                        Paid in full
+                      </div>
+                    )}
                   </div>
                   <div className="money font-semibold shrink-0">
                     {inr(head.invoiceTotal)}
@@ -577,6 +784,12 @@ export function Boq({
           {items && groups.length === 0 && (
             <div className="text-sm text-ink-soft text-center py-6">
               No bills recorded yet.
+            </div>
+          )}
+          {items && groups.length > 0 && shownGroups.length === 0 && (
+            <div className="text-sm text-ink-soft text-center py-6">
+              Nothing outstanding — every bill with a payment recorded against
+              it is paid up.
             </div>
           )}
         </div>

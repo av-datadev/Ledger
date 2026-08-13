@@ -257,6 +257,34 @@ db.version(11)
       });
   });
 
+// Part-payment and clubbing. Both are bill-level facts stored on every row of
+// the bill, the same way `invoiceTotal` and `writtenQty` already are — a bill
+// has no table of its own, only the rows sharing a billId.
+db.version(12)
+  .stores({
+    entries: "id, date, category, paidBy, createdAt, updatedAt",
+    boqItems: "id, invoiceNo, category, date, vendor, billId",
+    settings: "id",
+    stockItems: "id, category, name, createdAt",
+    stockMoves: "id, stockId, date, createdAt, billId",
+    categories: "id, name",
+    people: "id, name",
+    attachments: "id, entryId, createdAt",
+    sites: "id, status, createdAt, linkId",
+    siteLedger: "id, siteId, date, createdAt, sharedId",
+  })
+  .upgrade(async (tx) => {
+    await tx
+      .table("boqItems")
+      .toCollection()
+      .modify((r: BoqItem) => {
+        // null, not 0: an existing bill records nothing about payment, and
+        // backfilling 0 would announce every old bill as fully outstanding.
+        r.amountPaid ??= null;
+        r.clubbed ??= null;
+      });
+  });
+
 const SETTINGS_ID = "app";
 
 // Custom categories sort after every built-in (which occupy 0..N-1).
