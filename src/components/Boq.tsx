@@ -25,6 +25,7 @@ import {
 } from "./BillReview";
 import { BillStockPanel } from "./BillStockPanel";
 import { BillPaymentPanel } from "./BillPaymentPanel";
+import { DealerAccounts } from "./DealerAccounts";
 import type { BoqItem } from "../types";
 
 /** How many photos of one bill are read in a single call. Matches the PDF
@@ -94,6 +95,8 @@ export function Boq({
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   /** Narrow the bill list to the ones a vendor is still owed money on. */
   const [dueOnly, setDueOnly] = useState(false);
+  /** Read the bills one at a time, or as what is owed to each dealer. */
+  const [listView, setListView] = useState<"bills" | "dealers">("bills");
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const sizesRef = useRef<HTMLInputElement>(null);
@@ -670,6 +673,27 @@ export function Boq({
       </section>
 
       <section className="mt-5 pb-4">
+        {/* Two ways to read the same bills: one at a time, or as what is owed
+            to each dealer. Money is handed over against a dealer's account
+            rather than against an invoice, so both questions are real. */}
+        <div className="flex gap-1.5 mb-2">
+          {(["bills", "dealers"] as const).map((v) => (
+            <button
+              key={v}
+              className={`badge !text-[12px] !py-1 !px-3 ${
+                listView === v ? "!bg-ink !text-paper !border-ink" : ""
+              }`}
+              onClick={() => setListView(v)}
+            >
+              {v === "bills" ? "Bills on record" : "By dealer"}
+            </button>
+          ))}
+        </div>
+
+        {listView === "dealers" ? (
+          <DealerAccounts />
+        ) : (
+        <>
         <div className="flex items-center justify-between gap-2 mb-2">
           <h3 className="eyebrow">Bills on record</h3>
           {/* Only offered once a bill actually has money outstanding — a filter
@@ -798,6 +822,8 @@ export function Boq({
             </div>
           )}
         </div>
+        </>
+        )}
       </section>
     </div>
   );
