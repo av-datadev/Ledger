@@ -230,6 +230,17 @@ created — the bill may be recorded now and the payment already be in the ledge
 ways: live on the review screen as the figure is typed, per bill in the BOQ
 list behind a **Still to pay** filter, and per vendor on People.
 
+**A bill already saved must be payable.** The Bill / Payment / Both choice only
+exists at the moment of saving, so choosing *Bill only* by mistake would
+otherwise be final — the bill on record, the money against it invisible to the
+ledger. An existing bill therefore offers **Record a payment**, which writes
+both halves in one transaction: a ledger entry dated the day the money moved,
+and `amountPaid` across every row of the bill. It **adds** rather than replaces,
+which is what makes instalments work — two payments on a running account become
+two ledger entries and one bill that has had the sum of them. Editing a bill
+must carry `amountPaid` through untouched: an edit rewrites every row, so a
+blank field there silently erases the bill's payment and its balance.
+
 **`amountPaid` is null, not 0, when nothing has been recorded.** A bill nobody
 has answered the question for is not a bill confirmed unpaid. A default of 0 —
 in the type, in the Dexie upgrade, in the backup normalisers, or as a column
@@ -404,6 +415,9 @@ any font: this app must not fetch from a CDN at runtime.
       Stock rather than one per row
 - [ ] A part-paid bill shows its balance on the review screen, in the BOQ list
       and against its vendor; a bill with nothing recorded shows none of them
+- [ ] A bill saved as **Bill only** can be paid afterwards, twice over, and
+      ends settled with two ledger entries — and editing it does not wipe what
+      it records as paid
 - [ ] Removing a bill from Stock leaves the bill, the handouts, and any item
       with its own history intact
 - [ ] A timber size list computes cubic feet matching the dealer's own figure

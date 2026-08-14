@@ -175,6 +175,15 @@ signing key before touching anything there.
   is. Off by default (clubbing is a judgement about one particular paper), and
   never offered on a size list, whose measured-vs-written check has nothing to
   check without its rows.
+- **Paying a bill that already exists** (BOQ → tap a bill → **Record a
+  payment**) — the review screen's Bill / Payment / Both choice only happens at
+  the moment of saving, so picking *Bill only* by mistake used to be final: the
+  bill sat there with money against it the ledger never knew about. Recording a
+  payment now writes both halves in one transaction — a ledger entry dated the
+  day the money moved, and `amountPaid` on every row of the bill. It **adds**
+  to what was already paid rather than replacing it, which is what makes
+  instalments work: ₹50,000 today and ₹30,000 next month leaves the bill having
+  had ₹80,000, as two ledger entries. The form pre-fills whatever is still due.
 - **Part payment** — the normal case on a running account, so the paid figure
   is asked for on the bill itself rather than only when a ledger entry is being
   created. `amountPaid` is stored on the bill, and what's still owed shows on
