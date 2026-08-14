@@ -887,7 +887,7 @@ export function BillReview({
             bill itself, not only when a ledger entry is being created. Left
             blank the bill records nothing about payment, which is different
             from recording that nothing has been paid. */}
-        {!editing && (wantsEntry || wantsBoq) && (
+        {(wantsEntry || wantsBoq) && (
           <div className="space-y-2">
             <div className={wantsEntry ? "grid grid-cols-3 gap-3" : ""}>
               <div>
@@ -957,6 +957,14 @@ export function BillReview({
                   : outstanding < 0 ? `${inr(-outstanding)} overpaid`
                   : "settled"}
                 </span>
+              </div>
+            )}
+
+            {editing && (
+              <div className="text-[11px] text-ink-soft">
+                Correcting this figure only changes what the bill records as
+                paid — it adds no ledger entry. To pay the bill, close this and
+                use <b>Record a payment</b> on the bill itself.
               </div>
             )}
           </div>

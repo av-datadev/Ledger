@@ -24,6 +24,7 @@ import {
   blankItem,
 } from "./BillReview";
 import { BillStockPanel } from "./BillStockPanel";
+import { BillPaymentPanel } from "./BillPaymentPanel";
 import type { BoqItem } from "../types";
 
 /** How many photos of one bill are read in a single call. Matches the PDF
@@ -132,9 +133,10 @@ export function Boq({
       // Re-open a clubbed bill still clubbed, or saving an edit would quietly
       // itemise a bill the person deliberately kept as one line.
       clubbed: head.clubbed === true,
-      // Only a fresh scan carries these; a saved bill doesn't, and editing
-      // never re-opens the payment side anyway.
-      paidAmount: "",
+      // Seeded from what the bill already records, NOT left blank: editing
+      // rewrites every row, so a blank here would rewrite `amountPaid` to null
+      // and silently erase the bill's payment and its outstanding balance.
+      paidAmount: head.amountPaid != null ? String(head.amountPaid) : "",
       balanceDue: "",
       paymentDate: "",
       items: rows.map((r) => ({
@@ -736,6 +738,9 @@ export function Boq({
                 </button>
                 {open && (
                   <div className="border-t border-rule">
+                    {/* Above the stock panel: what is still owed on a bill is
+                        the question people open it to answer. */}
+                    <BillPaymentPanel rows={rows} />
                     <BillStockPanel
                       billId={key}
                       billLabel={`Bill #${head.invoiceNo} ${head.vendor}`.trim()}
