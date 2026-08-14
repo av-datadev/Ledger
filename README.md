@@ -175,6 +175,20 @@ signing key before touching anything there.
   is. Off by default (clubbing is a judgement about one particular paper), and
   never offered on a size list, whose measured-vs-written check has nothing to
   check without its rows.
+- **Dealer accounts** (BOQ → **By dealer**) — a dealer is not a category:
+  "Plumbing" is what the money was for, the dealer is who it is owed to. Bills
+  group into one running account per vendor (case- and space-insensitively, so
+  three spellings of one shop still group; bills naming no seller group per
+  category rather than collapsing into one fictional dealer). **Record a
+  payment to this dealer** takes one payment and lets you place it across the
+  bills yourself — **Full** on one, a part amount on another — with a running
+  *placed X of Y* tally. Oldest-first is offered as the opening suggestion and
+  follows the amount as you type it, but stops the moment you touch a bill,
+  since which bill a payment settles is the payer's knowledge, not the app's.
+  One payment writes **one** ledger entry, because money moved once. Anything
+  left unplaced is held as an **advance** with that dealer — derived from the
+  ledger against what the bills record, not stored as a balance, so editing
+  those entries moves it.
 - **Paying a bill that already exists** (BOQ → tap a bill → **Record a
   payment**) — the review screen's Bill / Payment / Both choice only happens at
   the moment of saving, so picking *Bill only* by mistake used to be final: the

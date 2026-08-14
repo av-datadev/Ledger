@@ -230,6 +230,39 @@ created — the bill may be recorded now and the payment already be in the ledge
 ways: live on the review screen as the figure is typed, per bill in the BOQ
 list behind a **Still to pay** filter, and per vendor on People.
 
+### The dealer's running account
+
+A **dealer is not a category**. "Plumbing" is what the money was for; the dealer
+is who it is owed to, and one category routinely has several. Money is handed
+over against the account rather than against an invoice — three bills and one
+payment of ₹50,000 is the ordinary case, not an awkward one — so bills group per
+vendor and the account answers "what do we still owe the plumbing shop?".
+
+Grouping is case- and space-insensitive, because one shop is typed three ways
+across three bills. Bills naming no seller (which the reader is right not to
+invent) group per category rather than collapsing every unnamed bill in the app
+into a single fictional dealer.
+
+**The person places the payment, not the app.** Each bill offers *Full* or a
+part amount, against a running "placed X of Y". Oldest-first is computed and
+offered as the opening suggestion, and follows the amount while it is typed —
+but stops the moment a bill is touched by hand, because silently re-splitting a
+deliberate allocation when someone fixes a typo is worse than a stale
+suggestion. Which bill a payment settles is the payer's knowledge: a dealer and
+a customer routinely agree that a particular bill is being cleared, and guessing
+that wrong makes every bill's balance a fiction even when the dealer total comes
+out right.
+
+**One payment writes one ledger entry**, not one per bill it touches. Three
+entries for a single ₹50,000 would overstate how many times money moved, and the
+ledger is what the dashboard totals and paid-vs-billed are computed from.
+
+Money may be placed short of the payment; the remainder is an **advance** with
+that dealer, which is ordinary when paying ahead of the paperwork. It is
+*derived* — the ledger's payments to that dealer, less what the bills record as
+placed — because there is no dealer table to bank a balance on. Anything relying
+on it should know that editing those ledger entries moves it.
+
 **A bill already saved must be payable.** The Bill / Payment / Both choice only
 exists at the moment of saving, so choosing *Bill only* by mistake would
 otherwise be final — the bill on record, the money against it invisible to the
@@ -418,6 +451,11 @@ any font: this app must not fetch from a CDN at runtime.
 - [ ] A bill saved as **Bill only** can be paid afterwards, twice over, and
       ends settled with two ledger entries — and editing it does not wipe what
       it records as paid
+- [ ] Three bills from one dealer form one account; a single payment placed
+      across them by hand (one Full, one part) writes **one** ledger entry and
+      leaves each bill's balance right
+- [ ] Placing less than the payment leaves the rest as an advance with that
+      dealer
 - [ ] Removing a bill from Stock leaves the bill, the handouts, and any item
       with its own history intact
 - [ ] A timber size list computes cubic feet matching the dealer's own figure
