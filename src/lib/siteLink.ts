@@ -218,6 +218,61 @@ export async function addSharedEntry(input: {
 }
 
 /**
+ * Correct a row you shared, in place.
+ *
+ * "Neither side can edit the other's" is the rule that makes a disagreement
+ * surface instead of being quietly restated — it was never a rule against
+ * fixing your own figure, and RLS says the same (se_update_own). Corrected in
+ * place rather than retracted and re-shared, so the owner sees one row change
+ * rather than a row he was looking at disappearing and a new one arriving,
+ * which reads like something being hidden.
+ *
+ * `proof` mirrors whatever the local row now holds: a Blob replaces the stored
+ * photo, null removes it. The path is derived, not stored, so a replacement
+ * lands on top of the old image rather than orphaning it in the bucket.
+ */
+export async function updateSharedEntry(input: {
+  id: string;
+  linkId: string;
+  date: string;
+  kind: "payment" | "spend";
+  description: string;
+  amount: number;
+  notes?: string;
+  proof?: Blob | null;
+}): Promise<void> {
+  const path = `${input.linkId}/${input.id}.jpg`;
+  let proofPath: string | null = null;
+
+  if (input.proof) {
+    const { error: upErr } = await supabase.storage
+      .from(PROOF_BUCKET)
+      .upload(path, input.proof, { contentType: "image/jpeg", upsert: true });
+    if (upErr) throw upErr;
+    proofPath = path;
+  }
+
+  const { error } = await supabase
+    .from("shared_entries")
+    .update({
+      date: input.date,
+      kind: input.kind,
+      description: input.description,
+      amount: input.amount,
+      notes: input.notes ?? "",
+      proof_path: proofPath,
+    })
+    .eq("id", input.id);
+  if (error) throw error;
+
+  // Only once the row no longer points at it — an image removed first would
+  // leave the row briefly claiming a photo that isn't there.
+  if (!input.proof) {
+    await supabase.storage.from(PROOF_BUCKET).remove([path]).catch(() => {});
+  }
+}
+
+/**
  * A short-lived URL for a shared bill photo. The bucket is private, so there is
  * no public link — every view is signed for the person asking, and the storage
  * policy checks the link again on the way through.

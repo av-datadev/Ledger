@@ -4,6 +4,7 @@ import { db } from "../db";
 import { inr, todayStr, formatDate } from "../lib/format";
 import {
   addLedgerRow,
+  updateLedgerRow,
   deleteLedgerRow,
   deleteSite,
   updateSite,
@@ -32,8 +33,13 @@ export function SiteDetail({
     [site.id],
   );
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [viewer, setViewer] = useState<string | null>(null);
+
+  // Only an approved link can carry a correction or a retraction to the owner.
+  const linkId = site.linkStatus === "approved" ? site.linkId : null;
 
   const sorted = (rows ?? [])
     .slice()
@@ -99,8 +105,9 @@ export function SiteDetail({
         </div>
 
         {adding && (
-          <AddRowForm
+          <RowForm
             siteId={site.id}
+            linkId={linkId}
             onDone={() => setAdding(false)}
           />
         )}
@@ -114,14 +121,25 @@ export function SiteDetail({
         )}
 
         <div className="space-y-1.5 mt-2">
-          {sorted.map((r) => (
-            <LedgerRowCard
-              key={r.id}
-              row={r}
-              onView={setViewer}
-              linkId={site.linkStatus === "approved" ? site.linkId : null}
-            />
-          ))}
+          {sorted.map((r) =>
+            editingId === r.id ? (
+              <RowForm
+                key={r.id}
+                siteId={site.id}
+                linkId={linkId}
+                row={r}
+                onDone={() => setEditingId(null)}
+              />
+            ) : (
+              <LedgerRowCard
+                key={r.id}
+                row={r}
+                onView={setViewer}
+                onEdit={() => setEditingId(r.id)}
+                linkId={linkId}
+              />
+            ),
+          )}
         </div>
       </div>
 
@@ -132,6 +150,9 @@ export function SiteDetail({
               Delete this site and all {sorted.length} logged rows? This can't be
               undone.
             </p>
+            {deleteErr && (
+              <p className="text-[12px] text-crimson">{deleteErr}</p>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <button
                 className="btn !py-2 !text-[13px]"
@@ -142,7 +163,13 @@ export function SiteDetail({
               <button
                 className="btn btn-primary !py-2 !text-[13px]"
                 onClick={() => {
-                  void deleteSite(site.id).then(onBack);
+                  void deleteSite(site.id)
+                    .then(onBack)
+                    .catch(() =>
+                      setDeleteErr(
+                        "Couldn't withdraw the rows the owner can see, so nothing was deleted. Try again when you have signal.",
+                      ),
+                    );
                 }}
               >
                 Delete
@@ -174,16 +201,21 @@ export function SiteDetail({
 function LedgerRowCard({
   row,
   onView,
+  onEdit,
   linkId,
 }: {
   row: SiteLedgerRow;
   onView: (url: string) => void;
+  onEdit: () => void;
   /** Set when this site is linked and approved — enables sharing a row up. */
   linkId: string | null;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [shareErr, setShareErr] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeErr, setRemoveErr] = useState<string | null>(null);
   useEffect(() => {
     if (!row.proof) return;
     const u = URL.createObjectURL(row.proof);
@@ -220,6 +252,21 @@ function LedgerRowCard({
       setSharing(false);
     }
   };
+  const remove = async () => {
+    setRemoving(true);
+    setRemoveErr(null);
+    try {
+      await deleteLedgerRow(row.id, linkId);
+    } catch {
+      // The only way this fails is the owner's copy not being reachable, and
+      // that is exactly when deleting anyway would be wrong.
+      setRemoveErr(
+        "Couldn't withdraw the owner's copy just now — nothing was deleted. Try again when you have signal.",
+      );
+      setRemoving(false);
+    }
+  };
+
   return (
     <div className="card p-2.5 flex gap-2.5">
       {url ? (
@@ -284,38 +331,97 @@ function LedgerRowCard({
             )}
           </div>
         )}
-      </div>
 
-      <button
-        type="button"
-        className="text-ink-soft text-lg leading-none shrink-0 self-start"
-        aria-label="Delete this row"
-        onClick={() => void deleteLedgerRow(row.id)}
-      >
-        ×
-      </button>
+        {confirming ? (
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <span className="text-[11px] text-crimson min-w-0">
+              Delete this {inr(row.amount)} row
+              {row.sharedId
+                ? "? The owner stops seeing it too."
+                : row.proof
+                  ? " and its bill photo?"
+                  : "?"}
+            </span>
+            <div className="flex gap-1.5 shrink-0">
+              <button
+                className="text-[11px] text-white bg-crimson rounded px-2 py-0.5 disabled:opacity-60"
+                disabled={removing}
+                onClick={() => void remove()}
+              >
+                {removing ? "…" : "Delete"}
+              </button>
+              <button
+                className="text-[11px] border border-rule rounded px-2 py-0.5"
+                onClick={() => {
+                  setConfirming(false);
+                  setRemoveErr(null);
+                }}
+              >
+                Keep
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-1.5 flex gap-3">
+            <button
+              type="button"
+              className="text-[11px] underline text-ink-soft"
+              onClick={onEdit}
+            >
+              edit
+            </button>
+            <button
+              type="button"
+              className="text-[11px] underline text-ink-soft"
+              onClick={() => setConfirming(true)}
+            >
+              remove
+            </button>
+          </div>
+        )}
+
+        {removeErr && (
+          <div className="text-[11px] text-crimson mt-0.5">{removeErr}</div>
+        )}
+      </div>
     </div>
   );
 }
 
-function AddRowForm({
+/**
+ * One form for both logging a row and correcting one.
+ *
+ * The same form on purpose: an edit that offered fewer fields than the original
+ * would quietly make some mistakes uncorrectable, which is how the app got here
+ * — a wrong amount could only be fixed by deleting the row and losing the bill
+ * photo with it.
+ */
+function RowForm({
   siteId,
+  linkId,
+  row,
   onDone,
 }: {
   siteId: string;
+  linkId: string | null;
+  /** Present = correcting this row; absent = logging a new one. */
+  row?: SiteLedgerRow;
   onDone: () => void;
 }) {
-  const [date, setDate] = useState(todayStr());
-  const [kind, setKind] = useState<SiteLedgerRow["kind"]>("received");
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [notes, setNotes] = useState("");
+  const [date, setDate] = useState(row?.date ?? todayStr());
+  const [kind, setKind] = useState<SiteLedgerRow["kind"]>(row?.kind ?? "received");
+  const [description, setDescription] = useState(row?.description ?? "");
+  const [amount, setAmount] = useState(row ? String(row.amount) : "");
+  const [notes, setNotes] = useState(row?.notes ?? "");
   const [proof, setProof] = useState<File | null>(null);
+  // Only meaningful while editing: whether the photo already on the row stays.
+  const [keepProof, setKeepProof] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isSpend = kind !== "received";
+  const hadProof = !!row?.proof;
 
   const save = async () => {
     const value = parseFloat(amount);
@@ -326,18 +432,40 @@ function AddRowForm({
     setError(null);
     setSaving(true);
     try {
-      await addLedgerRow({
-        siteId,
-        date,
-        kind,
-        description: description.trim(),
-        amount: value,
-        notes: notes.trim(),
-        proofFile: proof,
-      });
+      if (row) {
+        await updateLedgerRow(
+          row.id,
+          {
+            date,
+            kind,
+            description: description.trim(),
+            amount: value,
+            notes: notes.trim(),
+            // undefined keeps the existing photo, null drops it.
+            proofFile: proof ?? (hadProof && !keepProof ? null : undefined),
+          },
+          linkId,
+        );
+      } else {
+        await addLedgerRow({
+          siteId,
+          date,
+          kind,
+          description: description.trim(),
+          amount: value,
+          notes: notes.trim(),
+          proofFile: proof,
+        });
+      }
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save that.");
+      setError(
+        err instanceof Error && row?.sharedId
+          ? "Couldn't update the copy the owner sees, so nothing was changed. Try again when you have signal."
+          : err instanceof Error
+            ? err.message
+            : "Could not save that.",
+      );
     } finally {
       setSaving(false);
     }
@@ -403,15 +531,33 @@ function AddRowForm({
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="field-label !mb-0">Bill / slip photo</label>
-            {proof && <span className="text-[11px] text-moss">attached</span>}
+            {(proof || (hadProof && keepProof)) && (
+              <span className="text-[11px] text-moss">attached</span>
+            )}
           </div>
           <button
             type="button"
             className="btn w-full !py-2 !text-[13px]"
             onClick={() => fileRef.current?.click()}
           >
-            {proof ? `✓ ${proof.name}` : "📷 Attach the bill"}
+            {proof
+              ? `✓ ${proof.name}`
+              : hadProof && keepProof
+                ? "📷 Replace the bill photo"
+                : "📷 Attach the bill"}
           </button>
+          {hadProof && !proof && (
+            // Removing the photo has to be possible and has to be deliberate:
+            // a spend with no bill behind it is a different claim, and it moves
+            // the balance above into the column an owner asks about.
+            <button
+              type="button"
+              className="text-[11px] underline text-ink-soft mt-1"
+              onClick={() => setKeepProof((v) => !v)}
+            >
+              {keepProof ? "Remove the photo from this row" : "Keep the photo after all"}
+            </button>
+          )}
           <input
             ref={fileRef}
             type="file"
@@ -441,13 +587,30 @@ function AddRowForm({
 
       {error && <div className="text-[12px] text-crimson">{error}</div>}
 
-      <button
-        className="btn btn-primary w-full !py-2.5"
-        disabled={saving}
-        onClick={() => void save()}
-      >
-        {saving ? "Saving…" : "Save"}
-      </button>
+      {row?.sharedId && (
+        <p className="text-[11px] text-ink-soft">
+          The owner has been shown this row — saving corrects his copy too.
+        </p>
+      )}
+
+      <div className={row ? "grid grid-cols-2 gap-2" : ""}>
+        {row && (
+          <button
+            className="btn !py-2.5"
+            disabled={saving}
+            onClick={onDone}
+          >
+            Cancel
+          </button>
+        )}
+        <button
+          className="btn btn-primary w-full !py-2.5"
+          disabled={saving}
+          onClick={() => void save()}
+        >
+          {saving ? "Saving…" : row ? "Save changes" : "Save"}
+        </button>
+      </div>
     </div>
   );
 }
