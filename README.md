@@ -21,9 +21,11 @@ Stock · People · Data.
 
 **Contractor** (building it for someone) — multiple sites, each with its own
 money log and a balance that splits spend-with-a-bill from spend-with-nothing.
-Site books are device-local and deliberately outside household sync: a
-contractor has no household, and his other sites must not be visible to any
-homeowner. They have their own backup/restore because of that.
+Site books stay outside *household* sync: a contractor has no household, and
+his other sites must not be visible to any homeowner. They back up under his
+own sign-in instead (`src/lib/siteSync.ts`, scoped `user_id = auth.uid()` —
+strictly narrower than the household tables' membership rule), and keep their
+own file backup/restore alongside it.
 
 The two meet through a **site link**: the owner shares a site code, the
 contractor asks to link, the owner approves. That opens a third,
@@ -270,6 +272,33 @@ signing key before touching anything there.
   currently on screen**. Bulk actions: delete (one transaction — a bulk delete
   that fails halfway leaves a selection nobody can reason about), mark done,
   mark not done.
+- **A contractor's books, kept** (contractor side → *Back up my sites*) — the
+  one place in the app where a phone reset destroyed a year of records with
+  nothing to restore from, and they were the books of several families' houses
+  at once. Signing in now keeps a continuous copy under his own account:
+  sites, every logged row, and the bill photos (bytes in the private
+  `site-proofs` bucket, at `<user_id>/<row id>`). A new phone signs in and
+  reconciles them back. There is no realtime channel — unlike a household
+  these books have one author, so reconcile-on-open is the whole story. The
+  file backup stays, because it is the copy he can hold himself; restoring one
+  now also pushes the replacement up, since Dexie's bulk clear bypasses the row
+  hooks sync rides on and the cloud would otherwise refill what the restore
+  just replaced.
+- **Correcting a logged row** — a wrong amount could only be fixed by deleting
+  the row and typing it again, which threw the bill photo away with it: worse
+  than the paper diary, where you score a number out and write the right one.
+  The same form now opens on an existing row, and the photo has three states
+  that are genuinely different — kept (most edits are a typo in an amount),
+  replaced, or removed, which is a real claim about the spend and moves it into
+  the "no bill" half of the balance.
+- **A row the owner has seen** — when a row has been shared, correcting it
+  corrects his copy in place, and deleting it withdraws his copy first. Both
+  **fail the whole action** if that can't be reached rather than proceeding
+  locally. A row deleted here that stays on the owner's screen is precisely the
+  silent divergence the shared ledger exists to surface — discovered months
+  later as "you showed me this ₹80,000 and now it's not in your book". Removing
+  a row also asks first now; it used to delete on a single tap of an `×`, with
+  no sync and no undo behind it.
 - **Backups** — JSON is the complete one and the only format carrying entry
   photos. Excel (.xlsx) opens anywhere and can be corrected by hand and
   uploaded back, but holds no photos, so restoring one deliberately leaves the
@@ -333,6 +362,11 @@ Offline (airplane mode, after one full load):
       line · N rows kept" and puts a single line into Stock
 - [ ] A part-paid bill shows its balance on the BOQ list and against the vendor
       on People; one with nothing recorded shows no balance at all
+- [ ] Contractor side: a logged row can be edited — the amount changes and the
+      bill photo survives it; removing the photo moves the spend into **spent
+      with nothing attached**
+- [ ] Contractor side: **remove** on a row asks first, *Keep* leaves it, and
+      *Delete* takes it and its photo
 - [ ] Data: JSON and Excel backups download; both restore
 - [ ] Data → Bring in an old spreadsheet, with **"I'll pick the columns
       myself"** ticked: imports with no network call at all
@@ -352,6 +386,10 @@ Online only:
 - [ ] Dashboard **Refresh** pulls an entry added on the other phone, and
       backgrounding and returning does the same with no interaction
 - [ ] Site link: share code, approve, both sides post to the shared ledger
+- [ ] A contractor signs in, adds a site and a row, signs in on a second device
+      and gets both back — photos included
+- [ ] Correcting a row the owner has been shown changes his copy too; deleting
+      it withdraws his copy, and with no connection neither one half-happens
 - [ ] Push arrives on a real phone
 
 Round trip: export a backup → clear all data → import it → counts match.

@@ -96,10 +96,20 @@ A role gate on first launch, switchable from the header.
 **Owner** — 8 tabs: Dash · Entry · Ledger · Recent · BOQ · Stock · People · Data.
 
 **Contractor** — multiple sites, each with its own money log and a balance
-splitting spend-with-a-bill from spend-with-nothing. Device-local and outside
-household sync by design: a contractor has no household, and his other sites
-must never be visible to a homeowner. That means a lost phone loses the books,
-so the contractor side has its own JSON backup/restore.
+splitting spend-with-a-bill from spend-with-nothing. Outside *household* sync
+by design: a contractor has no household, and his other sites must never be
+visible to a homeowner. The conclusion that follows is "back these up under his
+own account", not "don't back them up" — a lost phone must not take several
+families' books with it. So they sync scoped to `user_id = auth.uid()`, which
+is a strictly narrower rule than household membership, and keep a JSON
+backup/restore as the copy he can hold himself.
+
+A row already logged can be corrected — same form, and the bill photo is kept,
+replaced or removed as three separate decisions. Removing a row asks first.
+When a row has been shown to the owner, a correction rewrites his copy and a
+deletion withdraws it, and either failing to reach him fails the whole action:
+two books that disagree with nobody able to say when they parted is the exact
+outcome the shared ledger exists to prevent.
 
 **Site linking** joins them. The owner shares a site code (separate from the
 family invite code, so revoking a contractor never disturbs family sync); the
@@ -509,6 +519,10 @@ any font: this app must not fetch from a CDN at runtime.
 - [ ] Two devices signed into one household see each other's entries, and an
       entry added on one appears on the other without restarting the app
 - [ ] A linked contractor reads zero rows of the private ledger
+- [ ] A contractor's sites, rows and bill photos come back on a second device
+      after signing in, and no other signed-in user can read any of them
+- [ ] A logged row can be corrected without losing its bill photo, and removing
+      one asks first
 - [ ] Deleting an account removes its login and its own rows, and leaves the
       remaining household members' books intact
 - [ ] No entry saves with a zero amount or empty description
