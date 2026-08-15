@@ -189,6 +189,29 @@ signing key before touching anything there.
   left unplaced is held as an **advance** with that dealer — derived from the
   ledger against what the bills record, not stored as a balance, so editing
   those entries moves it.
+- **Payments are records, not a running total** — a bill lists each payment
+  with **edit** and **remove**, and editing one rewrites its ledger entry and
+  the bill together. This is what `Entry.billAllocations` is for: a list of
+  `{billId, amount}`, a list rather than one `billId` because a dealer payment
+  settles several bills and is still one payment. Without that link a bill knew
+  only its total, so *"the ₹30,000 payment"* was not a thing that existed to
+  change — just a number that had been added to, and a ledger row that happened
+  to match. A linked entry shows a 🔗 marker in the Ledger and is edited on its
+  bill, so the two can never drift apart.
+- **Linking money already recorded twice** (bill → **Link a ledger entry**) —
+  a bill carrying a paid figure *and* a ledger entry for the same cash, with
+  nothing joining them. Linking is pure **re-attribution**: it names money the
+  bill already counts, so the total does not move. Candidates are ranked (exact
+  amount, then same category, then date proximity) but **never applied
+  automatically** — the app is guessing from an amount and a date, and a wrong
+  guess ties money to the wrong bill silently. Only unlinked entries are
+  offered, so one payment cannot land on two bills. The one case that *does*
+  change the total — an entry larger than the bill's unlinked figure — says so
+  on the candidate line before you tap.
+- **Money paid before payments were records** shows on the bill as one
+  editable *recorded earlier* line, marked *not linked to a ledger entry*
+  (there may well be a matching entry — the link was simply never stored, and
+  inventing it would be a guess).
 - **Paying a bill that already exists** (BOQ → tap a bill → **Record a
   payment**) — the review screen's Bill / Payment / Both choice only happens at
   the moment of saving, so picking *Bill only* by mistake used to be final: the

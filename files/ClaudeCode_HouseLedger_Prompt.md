@@ -46,8 +46,13 @@ Dexie tables: `entries`, `boqItems`, `stockItems`, `stockMoves`, `categories`,
 **entries** — the payment ledger:
 ```
 id, date (YYYY-MM-DD), category, event, detail, amount,
-mode, paidBy, notes, createdAt, updatedAt
+mode, paidBy, notes, createdAt, updatedAt,
+billAllocations
 ```
+`billAllocations` is `{billId, amount}[]` or null — which BOQ bills this
+payment was placed against. null on an ordinary entry, which is most spending.
+See §6: it is what makes a payment a record that can be corrected rather than a
+number that was added to a total.
 
 **boqItems** — bill line items, many-to-one with an invoice via `billId`:
 ```
@@ -263,6 +268,41 @@ that dealer, which is ordinary when paying ahead of the paperwork. It is
 placed — because there is no dealer table to bank a balance on. Anything relying
 on it should know that editing those ledger entries moves it.
 
+### Payments are records, not a running total
+
+`amountPaid` alone cannot be corrected. A bill knowing only that ₹30,000 has
+been paid means "the ₹30,000 payment" is not a thing that exists to edit — just
+a number that was added to, and a ledger row that happens to match it. So a
+payment carries `Entry.billAllocations`: `{billId, amount}[]`, a **list**
+because one payment routinely settles several bills of a dealer's account and is
+still one payment.
+
+A bill lists its payments individually, each editable and removable. Editing
+rewrites the ledger entry and the bill in one transaction — they are two halves
+of one fact. An entry that settled several bills has only its share of *this*
+bill changed, and is deleted outright only when this was the sole bill it paid.
+A linked entry is **not** editable from the Ledger, which would change the
+ledger and leave the bill still claiming the old figure; it says so and points
+at the bill.
+
+**Money recorded before the link existed is not lost and not guessed at.** It
+shows as one editable *recorded earlier* figure — the part of `amountPaid` that
+no entry stands behind — described as *not linked*, since a matching entry may
+well exist and inventing the link would be a fabrication.
+
+For the case where the same cash sits in both places, a bill can **link an
+existing ledger entry**. This is *re-attribution*, not payment: the entry fits
+inside what the bill already counted as unlinked, so the total does not move.
+Candidates are ranked (exact amount, then category, then date proximity) and
+**never applied automatically** — a wrong guess ties money to the wrong bill
+silently, which is found months later if ever. Only already-unlinked entries are
+offered, so one payment cannot reach two bills, and the single case that raises
+the total (an entry larger than the unlinked figure) is stated before it is
+applied.
+
+Deleting a bill keeps its payments in the ledger and clears their links. The
+money genuinely left; deleting the paperwork does not undo that.
+
 **A bill already saved must be payable.** The Bill / Payment / Both choice only
 exists at the moment of saving, so choosing *Bill only* by mistake would
 otherwise be final — the bill on record, the money against it invisible to the
@@ -456,6 +496,10 @@ any font: this app must not fetch from a CDN at runtime.
       leaves each bill's balance right
 - [ ] Placing less than the payment leaves the rest as an advance with that
       dealer
+- [ ] A payment on a bill can be edited and removed, and the ledger entry moves
+      with it; the same entry cannot be edited from the Ledger
+- [ ] A bill's pre-existing paid figure can be linked to the ledger entry that
+      was that money, **without** the bill's total changing
 - [ ] Removing a bill from Stock leaves the bill, the handouts, and any item
       with its own history intact
 - [ ] A timber size list computes cubic feet matching the dealer's own figure
