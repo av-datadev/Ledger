@@ -19,6 +19,7 @@ import {
   stopSync,
   type Household,
 } from "./lib/sync";
+import { startSiteSync, stopSiteSync } from "./lib/siteSync";
 import { AccountSection } from "./components/Auth";
 import { RoleGate } from "./components/RoleGate";
 import { ContractorHome } from "./components/ContractorHome";
@@ -70,6 +71,19 @@ export default function App() {
       void stopSync();
     };
   }, [household]);
+
+  // The contractor's site books back up to his own account, not to a
+  // household — he doesn't have one. Keyed on the user rather than on the role
+  // gate: which side of the app he happens to be looking at is not a reason to
+  // stop protecting his books, and a device with no sites simply syncs nothing.
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    void startSiteSync(uid).catch((e) => console.error("site sync start", e));
+    return () => {
+      void stopSiteSync();
+    };
+  }, [session?.user?.id]);
 
   if (!settled) return null; // near-instant local check — avoids a flash
   if (mode === "contractor") {

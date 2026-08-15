@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   exportSiteBackup,
   readSiteBackupFile,
@@ -6,20 +6,63 @@ import {
   type ParsedSiteBackup,
 } from "../lib/siteBackup";
 import { formatDate } from "../lib/format";
+import { supabase } from "../lib/supabase";
+import { resyncSites, siteSyncState } from "../lib/siteSync";
+import { agoLabel } from "../hooks/useSyncStatus";
+import { ContractorAuth } from "./ContractorAuth";
 
 /**
- * Save/restore for the contractor's site books.
+ * Save/restore for the contractor's site books, and the automatic cloud copy.
  *
- * These books are the only copy — they're device-local and deliberately outside
- * household sync — so this is the safety net, not a convenience. The restore
- * confirms with real counts before overwriting, because it replaces rather than
- * merges.
+ * The file backup came first, when these books were the only copy anywhere. It
+ * stays, because it is the one a contractor can keep himself — but a safety net
+ * that depends on remembering to use it is not one, so signing in now keeps a
+ * continuous copy under his own account. Both are offered here rather than one
+ * quietly replacing the other: the file is his, the cloud copy is automatic,
+ * and neither makes the other pointless.
  */
 export function SiteBackupPanel({ siteCount }: { siteCount: number }) {
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [pending, setPending] = useState<ParsedSiteBackup | null>(null);
   const [busy, setBusy] = useState(false);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [showSignIn, setShowSignIn] = useState(false);
+  const [cloud, setCloud] = useState(siteSyncState());
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (alive) setSignedIn(!!data.session);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) =>
+      setSignedIn(!!s),
+    );
+    // The sync module isn't reactive, so poll it — this panel is on screen for
+    // seconds at a time and a stale "backed up 5 min ago" is worse than none.
+    const id = setInterval(() => setCloud(siteSyncState()), 2000);
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+      clearInterval(id);
+    };
+  }, []);
+
+  const backUpNow = async () => {
+    setMsg(null);
+    setBusy(true);
+    try {
+      await resyncSites();
+      setCloud(siteSyncState());
+    } catch {
+      setMsg({
+        kind: "err",
+        text: "Couldn't reach your backup just now. Your books are safe on this phone.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const save = async () => {
     setMsg(null);
@@ -82,10 +125,60 @@ export function SiteBackupPanel({ siteCount }: { siteCount: number }) {
       <h3 className="eyebrow">
         Back up my sites
       </h3>
+
+      {cloud.on ? (
+        <div className="card p-3 space-y-1.5">
+          <div className="text-[13px] text-moss">
+            ✓ Backed up to your account
+          </div>
+          <p className="text-[11px] text-ink-soft">
+            Your sites, every logged row and the bill photos are kept under your
+            own sign-in. Lose this phone and you sign in on the next one to get
+            them back. Nobody else can see them — not the owners you're linked
+            with, not your other sites.
+          </p>
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <span className="text-[11px] text-ink-soft">
+              {cloud.syncing
+                ? "Backing up…"
+                : cloud.lastSyncAt
+                  ? `Last backed up ${agoLabel(cloud.lastSyncAt)}`
+                  : "Not backed up yet"}
+            </span>
+            <button
+              className="btn !py-1.5 !px-3 !text-[12px]"
+              disabled={busy || cloud.syncing}
+              onClick={() => void backUpNow()}
+            >
+              Back up now
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="card p-3 space-y-2">
+          <p className="text-[12px] text-ink-soft">
+            Your site books are on this phone only. That means a lost, reset or
+            wiped phone loses every site at once. Sign in and they're kept under
+            your own account instead — still private, still yours, and back on
+            the next phone the moment you sign in there.
+          </p>
+          {signedIn === false &&
+            (showSignIn ? (
+              <ContractorAuth />
+            ) : (
+              <button
+                className="btn btn-primary w-full !py-2 !text-[13px]"
+                onClick={() => setShowSignIn(true)}
+              >
+                Keep a backup of my books
+              </button>
+            ))}
+        </div>
+      )}
+
       <p className="text-[12px] text-ink-soft">
-        Your site books live on this phone only — nothing is uploaded, and no
-        one else can see them. That also means a lost phone loses them, so save
-        a copy now and then and keep it somewhere safe.
+        You can also keep a copy of your own as a file, and restore from it on
+        any phone.
       </p>
 
       <div className="grid grid-cols-2 gap-2">

@@ -16,6 +16,7 @@
 import { db } from "../db";
 import { downloadFile, timestampSlug } from "./csv";
 import { blobToBase64, base64ToBlob } from "./attach";
+import { replaceCloudWithLocal } from "./siteSync";
 import type { ContractorSite, SiteLedgerRow } from "../types";
 
 // Written into the file, so the Brick Book rename can't just replace it: every
@@ -153,4 +154,9 @@ export async function applySiteBackup(backup: ParsedSiteBackup): Promise<void> {
     await db.sites.bulkAdd(backup.sites);
     await db.siteLedger.bulkAdd(backup.ledger);
   });
+  // Carry the replacement through to the cloud copy, if there is one. Dexie's
+  // bulk operations bypass the row hooks sync relies on, so the cloud would
+  // otherwise still hold the replaced books — and reconcile, seeing rows the
+  // device lacks, would pull them straight back.
+  await replaceCloudWithLocal();
 }
