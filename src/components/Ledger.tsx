@@ -422,6 +422,15 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
                       Keep
                     </button>
                   </div>
+                ) : e.billAllocations && e.billAllocations.length > 0 ? (
+                  // A bill payment is edited on its bill, where the balance it
+                  // affects is visible. Editing it here would change the ledger
+                  // and leave the bill still claiming the old figure, and the
+                  // two would quietly disagree from then on.
+                  <div className="text-[11px] text-ink-soft mt-1 text-right">
+                    🔗 payment against a BOQ bill — edit it on the{" "}
+                    <b>BOQ</b> tab, on the bill itself
+                  </div>
                 ) : (
                   <div className="flex gap-2 mt-1 justify-end">
                     <button

@@ -285,6 +285,36 @@ db.version(12)
       });
   });
 
+// Payments become records rather than a running total. Without a link from the
+// entry back to the bill, "the ₹30,000 payment" is not a thing that exists to
+// edit — only a number that was added to, and a ledger row that happens to
+// match it.
+db.version(13)
+  .stores({
+    entries: "id, date, category, paidBy, createdAt, updatedAt",
+    boqItems: "id, invoiceNo, category, date, vendor, billId",
+    settings: "id",
+    stockItems: "id, category, name, createdAt",
+    stockMoves: "id, stockId, date, createdAt, billId",
+    categories: "id, name",
+    people: "id, name",
+    attachments: "id, entryId, createdAt",
+    sites: "id, status, createdAt, linkId",
+    siteLedger: "id, siteId, date, createdAt, sharedId",
+  })
+  .upgrade(async (tx) => {
+    await tx
+      .table("entries")
+      .toCollection()
+      .modify((e: Entry) => {
+        // null, not []: an existing entry is not a bill payment with no bills,
+        // it is an entry nobody ever linked. Payments recorded before this
+        // version keep showing on their bill as an unlinked opening figure —
+        // the link was never stored and cannot honestly be invented.
+        e.billAllocations ??= null;
+      });
+  });
+
 const SETTINGS_ID = "app";
 
 // Custom categories sort after every built-in (which occupy 0..N-1).
@@ -345,13 +375,33 @@ export async function renameCategory(
  * link on those receipts is cleared.
  */
 export async function deleteBill(billId: string): Promise<void> {
-  await db.transaction("rw", [db.boqItems, db.stockMoves], async () => {
-    await db.boqItems.where("billId").equals(billId).delete();
-    await db.stockMoves
-      .where("billId")
-      .equals(billId)
-      .modify({ billId: null });
-  });
+  await db.transaction(
+    "rw",
+    [db.boqItems, db.stockMoves, db.entries],
+    async () => {
+      await db.boqItems.where("billId").equals(billId).delete();
+      await db.stockMoves
+        .where("billId")
+        .equals(billId)
+        .modify({ billId: null });
+
+      // Payments against this bill stay in the ledger — the money really did
+      // leave, and deleting the paperwork does not undo that. They just stop
+      // pointing at a bill, and show up as spend with nothing behind it.
+      const paid = await db.entries
+        .filter((e) => !!e.billAllocations?.some((a) => a.billId === billId))
+        .toArray();
+      for (const e of paid) {
+        const rest = (e.billAllocations ?? []).filter(
+          (a) => a.billId !== billId,
+        );
+        await db.entries.update(e.id, {
+          billAllocations: rest.length > 0 ? rest : null,
+          updatedAt: Date.now(),
+        });
+      }
+    },
+  );
 }
 
 /** Delete a ledger entry and every photo attached to it. */

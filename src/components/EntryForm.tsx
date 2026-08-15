@@ -302,7 +302,14 @@ export function EntryForm({
     }
 
     await db.transaction("rw", [db.entries, db.attachments], async () => {
-      await db.entries.add({ id: entryId, ...fields, createdAt: Date.now() });
+      // Not a bill payment: an entry typed here stands on its own. Paying a
+      // bill is done from the bill, which is what links the two.
+      await db.entries.add({
+        id: entryId,
+        ...fields,
+        createdAt: Date.now(),
+        billAllocations: null,
+      });
       if (newRows.length) await db.attachments.bulkAdd(newRows);
     });
     // Reset for the next entry: clear fields and release the saved photos'

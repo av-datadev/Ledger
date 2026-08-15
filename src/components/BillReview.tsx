@@ -427,6 +427,13 @@ export function BillReview({
           .join(" · "),
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        // Linked when the bill is being saved too, so this payment is editable
+        // from the bill later rather than being a matching number in the
+        // ledger that nothing points at. "Payment only" saves no bill, so
+        // there is nothing to link it to.
+        billAllocations: wantsBoq
+          ? [{ billId: draft.billId, amount: entryAmount }]
+          : null,
       });
     }
     if (wantsBoq && addToStock) {

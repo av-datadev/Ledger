@@ -79,6 +79,8 @@ export async function commitImport(
         // the Recent tab instead of arriving as one indistinguishable blob.
         createdAt: now + i,
         updatedAt: now + i,
+        // Somebody else's spreadsheet has no notion of this app's bills.
+        billAllocations: null,
       })),
     );
   });

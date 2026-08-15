@@ -162,6 +162,9 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
     entries: data.entries.map((e) => ({
       ...e,
       updatedAt: e.updatedAt ?? e.createdAt,
+      // Pre-v13 entries predate the link back to a bill. null, not [] — they
+      // are entries nobody ever linked, not bill payments against no bills.
+      billAllocations: e.billAllocations ?? null,
     })),
     boqItems,
     stockItems: Array.isArray(data.stockItems) ? data.stockItems : [],

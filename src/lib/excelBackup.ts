@@ -69,6 +69,9 @@ const ENTRIES: TableSpec<Entry> = {
     { key: "notes", type: "text" },
     { key: "createdAt", type: "number" },
     { key: "updatedAt", type: "number" },
+    // Structured, so it rides in one cell as JSON rather than inventing a
+    // column per bill — the same treatment a person's contract lines get.
+    { key: "billAllocations", type: "json", nullable: true },
   ],
 };
 

@@ -10,6 +10,20 @@ export interface Entry {
   notes: string;
   createdAt: number;
   updatedAt: number; // bumped on every edit — powers the Recent tab
+  /**
+   * Which BOQ bills this payment was placed against, and how much on each.
+   *
+   * null on an ordinary ledger entry — most spending is not against a bill.
+   * A list rather than one `billId` because one payment routinely settles
+   * several bills of a dealer's running account, and it is still ONE payment:
+   * recording it as three entries would overstate how many times money moved.
+   *
+   * This is what makes a payment editable. Without it a bill knows only its
+   * running total, so "the ₹30,000 payment" is not a thing that exists to
+   * change — just a number that was added to, and a ledger row that happens to
+   * match it.
+   */
+  billAllocations: { billId: string; amount: number }[] | null;
 }
 
 /**
