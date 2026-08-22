@@ -33,3 +33,20 @@ export function formatDate(iso: string): string {
   const months = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
   return `${Number(d)} ${months[Number(m) - 1]} ${y.slice(2)}`;
 }
+
+/**
+ * Shift a YYYY-MM-DD by whole days, staying in local time.
+ *
+ * Built from the date's own parts rather than `new Date(iso)`, which parses a
+ * bare YYYY-MM-DD as UTC midnight — east of Greenwich that is already the
+ * previous evening locally, so stepping back a day from the date view would
+ * quietly land two days back for half the world.
+ */
+export function addDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  const dt = new Date(y, m - 1, d + days);
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${dt.getFullYear()}-${mm}-${dd}`;
+}

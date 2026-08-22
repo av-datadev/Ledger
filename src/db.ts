@@ -315,6 +315,76 @@ db.version(13)
       });
   });
 
+// A stock movement records WHO, not just how much. Until now the person was
+// whatever had been typed into the "To whom (optional)" box, which the form
+// stored in `note` — readable on the row, but not countable, so "what went to
+// the plumber this week" was not a question the data could answer.
+db.version(14)
+  .stores({
+    entries: "id, date, category, paidBy, createdAt, updatedAt",
+    boqItems: "id, invoiceNo, category, date, vendor, billId",
+    settings: "id",
+    stockItems: "id, category, name, createdAt",
+    // `person` is indexed: the date-wise and per-person rollups group by it.
+    stockMoves: "id, stockId, date, createdAt, billId, person",
+    categories: "id, name",
+    people: "id, name",
+    attachments: "id, entryId, createdAt",
+    sites: "id, status, createdAt, linkId",
+    siteLedger: "id, siteId, date, createdAt, sharedId",
+  })
+  .upgrade(async (tx) => {
+    await tx
+      .table("stockMoves")
+      .toCollection()
+      .modify((m: StockMove) => {
+        if (m.person !== undefined) return;
+        // On a manual movement the note IS the party — that box was labelled
+        // "From" / "To whom" and wrote here for want of anywhere better. So the
+        // value is moved into the field that now means what it always meant,
+        // rather than copied (which would print every old name twice).
+        //
+        // A receipt linked to a bill is the exception: its note is the bill's
+        // own label ("Bill #2310 Gopal Jee"), which is a document, not a
+        // recipient. Those keep their note and start with no person.
+        if (m.billId === null) {
+          m.person = m.note ?? "";
+          m.note = "";
+        } else {
+          m.person = "";
+        }
+      });
+  });
+
+// A trade and the man doing it, joined. Kept on the PERSON rather than on the
+// category: `categories` is not a synced table (sync.ts re-derives it by name
+// from entries), so a link stored there would live on one phone and be lost on
+// a restore.
+db.version(15)
+  .stores({
+    entries: "id, date, category, paidBy, createdAt, updatedAt",
+    boqItems: "id, invoiceNo, category, date, vendor, billId",
+    settings: "id",
+    stockItems: "id, category, name, createdAt",
+    stockMoves: "id, stockId, date, createdAt, billId, person",
+    categories: "id, name",
+    people: "id, name",
+    attachments: "id, entryId, createdAt",
+    sites: "id, status, createdAt, linkId",
+    siteLedger: "id, siteId, date, createdAt, sharedId",
+  })
+  .upgrade(async (tx) => {
+    await tx
+      .table("people")
+      .toCollection()
+      .modify((p: PersonDetails) => {
+        // [], not a guessed link. The pairing is the user's knowledge — that
+        // "Plumbing" is Vijay's work and not Rafi's — and inferring it from
+        // name similarity would silently attribute one man's money to another.
+        p.trades ??= [];
+      });
+  });
+
 const SETTINGS_ID = "app";
 
 // Custom categories sort after every built-in (which occupy 0..N-1).
@@ -365,6 +435,20 @@ export async function renameCategory(
       await db.stockItems.where("category").equals(oldName).modify({ category: next });
       const pd = await db.people.where("name").equals(oldName).first();
       if (pd) await db.people.update(pd.id, { name: next });
+
+      // Trade links are held by category NAME, so a rename has to follow them
+      // through or every linked trade silently comes apart — the person keeps
+      // pointing at a category that no longer exists, and the joined total
+      // quietly reverts to counting only half of itself.
+      const linked = await db.people
+        .filter((p) => (p.trades ?? []).includes(oldName))
+        .toArray();
+      for (const p of linked) {
+        await db.people.update(p.id, {
+          trades: (p.trades ?? []).map((t) => (t === oldName ? next : t)),
+          updatedAt: Date.now(),
+        });
+      }
     },
   );
 }
@@ -419,6 +503,18 @@ export async function deleteCategory(name: string): Promise<void> {
     if (row) await db.categories.delete(row.id);
     const pd = await db.people.where("name").equals(name).first();
     if (pd) await db.people.delete(pd.id);
+
+    // Drop the departing category from anyone who held it as a trade, so no
+    // person is left claiming work that no longer exists.
+    const linked = await db.people
+      .filter((p) => (p.trades ?? []).includes(name))
+      .toArray();
+    for (const p of linked) {
+      await db.people.update(p.id, {
+        trades: (p.trades ?? []).filter((t) => t !== name),
+        updatedAt: Date.now(),
+      });
+    }
   });
 }
 

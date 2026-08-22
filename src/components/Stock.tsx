@@ -2,14 +2,18 @@ import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
 import { useCategories } from "../hooks/useCategories";
-import { num, todayStr, formatDate } from "../lib/format";
+import { num, todayStr, formatDate, addDays } from "../lib/format";
 import {
   withBalances,
   billStockImpact,
   removeBillFromStock,
   deleteStockItems,
+  knownRecipients,
+  handoutsBetween,
+  byPerson,
   type StockWithBalance,
 } from "../lib/stock";
+import type { StockItem, StockMove } from "../types";
 import { BillStockPanel } from "./BillStockPanel";
 import { AddStockPicker } from "./AddStockPicker";
 
@@ -22,18 +26,63 @@ interface BillOpt {
   date: string;
 }
 
+/**
+ * The names offered when recording who material went to (or came from):
+ * everyone already handed something, plus the people/categories on the People
+ * tab. Typing a fresh name is still allowed — this is a shortcut to consistent
+ * spelling, not a gate. Without it "Plumber", "plumber" and "Plumber ji" become
+ * three men in every total.
+ */
+function PartyInput({
+  kind,
+  value,
+  known,
+  onChange,
+}: {
+  kind: MoveKind;
+  value: string;
+  known: string[];
+  onChange: (v: string) => void;
+}) {
+  const listId = `party-${kind}`;
+  return (
+    <>
+      <input
+        className="input !py-1.5 !text-[13px] flex-1"
+        list={listId}
+        placeholder={kind === "in" ? "From whom" : "Given to"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <datalist id={listId}>
+        {known.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+    </>
+  );
+}
+
 function MoveForm({
   item,
   kind,
   bills,
+  parties,
   onDone,
 }: {
   item: StockWithBalance;
   kind: MoveKind;
   bills: BillOpt[];
+  parties: string[];
   onDone: () => void;
 }) {
   const [qty, setQty] = useState("");
+  // Defaults to today because most handouts are recorded as they happen — but
+  // it is a field, not a stamp. Sitting down of an evening to write up three
+  // days of material given to the plumber is the ordinary case, and until now
+  // every one of those rows was dated the day it was typed.
+  const [date, setDate] = useState(todayStr());
+  const [person, setPerson] = useState("");
   const [note, setNote] = useState("");
   const [billId, setBillId] = useState<string>("");
   const [err, setErr] = useState("");
@@ -47,14 +96,19 @@ function MoveForm({
       setErr("Enter a quantity greater than zero.");
       return;
     }
+    if (!date) {
+      setErr("Pick the date this happened.");
+      return;
+    }
     const bill = catBills.find((b) => b.billId === billId);
     await db.stockMoves.add({
       id: crypto.randomUUID(),
       stockId: item.id,
-      date: todayStr(),
+      date,
       kind,
       qty: q,
-      note: note.trim() || (bill ? bill.label : ""),
+      person: person.trim(),
+      note: note.trim() || (bill && !person.trim() ? bill.label : ""),
       billId: kind === "in" && bill ? bill.billId : null,
       createdAt: Date.now(),
     });
@@ -75,9 +129,23 @@ function MoveForm({
           value={qty}
           onChange={(e) => setQty(e.target.value)}
         />
+        <PartyInput
+          kind={kind}
+          value={person}
+          known={parties}
+          onChange={setPerson}
+        />
+      </div>
+      <div className="flex gap-1.5">
+        <input
+          type="date"
+          className="input !py-1.5 !text-[13px] !w-36"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+        />
         <input
           className="input !py-1.5 !text-[13px] flex-1"
-          placeholder={kind === "in" ? "From (optional)" : "To whom (optional)"}
+          placeholder="Note (optional)"
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
@@ -176,12 +244,322 @@ function ItemEditForm({
   );
 }
 
+/**
+ * What went out, on the days you ask about.
+ *
+ * Two modes off one control. The day stepper answers "what did I hand over on
+ * Tuesday" — the question you get asked when a man says he was given nothing;
+ * the range answers "what has this plumber had off me all week", which is the
+ * question at settling-up time. Both group by person first, because that is who
+ * the argument is with.
+ */
+function DateView({
+  items,
+  moves,
+}: {
+  items: StockItem[];
+  moves: StockMove[];
+}) {
+  const [mode, setMode] = useState<"day" | "range">("day");
+  const [day, setDay] = useState(todayStr());
+  const [from, setFrom] = useState(addDays(todayStr(), -6));
+  const [to, setTo] = useState(todayStr());
+  const [editMoveId, setEditMoveId] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ qty: "", date: "", person: "" });
+
+  const [lo, hi] = mode === "day" ? [day, day] : [from, to];
+  const rows = useMemo(
+    () => handoutsBetween(items, moves, lo, hi),
+    [items, moves, lo, hi],
+  );
+  const groups = useMemo(() => byPerson(rows), [rows]);
+  const materials = new Set(rows.map((r) => r.stockId)).size;
+
+  /**
+   * The days either side that actually have something on them.
+   *
+   * The arrows step one calendar day, which is what "the day before" means. But
+   * a site does not hand out material every day, and a person tapping ◀ four
+   * times through empty Sundays to reach the last real entry has been made to
+   * do the searching. So the empty days are still reachable one tap at a time,
+   * and the next day with anything on it is offered by name.
+   */
+  const outDates = useMemo(
+    () => [...new Set(moves.filter((m) => m.kind === "out").map((m) => m.date))].sort(),
+    [moves],
+  );
+  const prevBusy = [...outDates].reverse().find((d) => d < day);
+  const nextBusy = outDates.find((d) => d > day);
+
+  const saveEdit = async () => {
+    const q = parseFloat(draft.qty);
+    if (editMoveId && q > 0 && draft.date)
+      await db.stockMoves.update(editMoveId, {
+        qty: q,
+        date: draft.date,
+        person: draft.person.trim(),
+      });
+    setEditMoveId(null);
+  };
+
+  return (
+    <div className="space-y-2 pb-4">
+      <div className="flex gap-1.5">
+        {(
+          [
+            ["day", "One day"],
+            ["range", "Date range"],
+          ] as const
+        ).map(([m, label]) => (
+          <button
+            key={m}
+            className={`badge !text-[11px] !py-1 !px-2.5 ${
+              mode === m ? "!bg-ink !text-paper !border-ink" : ""
+            }`}
+            onClick={() => setMode(m)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "day" ? (
+        <div className="card px-2 py-2 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <button
+              className="btn !py-1 !px-3 !text-[15px]"
+              aria-label="Previous day"
+              onClick={() => setDay((d) => addDays(d, -1))}
+            >
+              ◀
+            </button>
+            <div className="flex-1 text-center">
+              <div className="text-sm font-semibold">{formatDate(day)}</div>
+              {day === todayStr() && (
+                <div className="text-[10px] uppercase tracking-wider text-ink-soft">
+                  today
+                </div>
+              )}
+            </div>
+            <button
+              className="btn !py-1 !px-3 !text-[15px]"
+              aria-label="Next day"
+              onClick={() => setDay((d) => addDays(d, 1))}
+            >
+              ▶
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="date"
+              className="input !py-1 !text-[12px] flex-1"
+              value={day}
+              onChange={(e) => e.target.value && setDay(e.target.value)}
+            />
+            {day !== todayStr() && (
+              <button
+                className="btn !py-1 !px-2.5 !text-[11px]"
+                onClick={() => setDay(todayStr())}
+              >
+                Today
+              </button>
+            )}
+          </div>
+          {rows.length === 0 && (prevBusy || nextBusy) && (
+            <div className="flex gap-1.5 justify-center">
+              {prevBusy && (
+                <button
+                  className="text-[11px] underline text-ink-soft"
+                  onClick={() => setDay(prevBusy)}
+                >
+                  ← {formatDate(prevBusy)}
+                </button>
+              )}
+              {nextBusy && (
+                <button
+                  className="text-[11px] underline text-ink-soft"
+                  onClick={() => setDay(nextBusy)}
+                >
+                  {formatDate(nextBusy)} →
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="card px-2 py-2 space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <input
+              type="date"
+              className="input !py-1 !text-[12px] flex-1"
+              value={from}
+              onChange={(e) => e.target.value && setFrom(e.target.value)}
+            />
+            <span className="text-[11px] text-ink-soft">to</span>
+            <input
+              type="date"
+              className="input !py-1 !text-[12px] flex-1"
+              value={to}
+              onChange={(e) => e.target.value && setTo(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            {(
+              [
+                ["Last 7 days", () => [addDays(todayStr(), -6), todayStr()]],
+                ["Last 30 days", () => [addDays(todayStr(), -29), todayStr()]],
+                [
+                  "This month",
+                  () => [todayStr().slice(0, 8) + "01", todayStr()],
+                ],
+              ] as const
+            ).map(([label, span]) => (
+              <button
+                key={label}
+                className="badge !text-[11px] !py-1 !px-2.5"
+                onClick={() => {
+                  const [a, b] = span();
+                  setFrom(a);
+                  setTo(b);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {from > to && (
+            <div className="text-[11px] text-crimson">
+              The start date is after the end date, so nothing can fall inside
+              it.
+            </div>
+          )}
+        </div>
+      )}
+
+      {rows.length === 0 ? (
+        <div className="text-sm text-ink-soft text-center py-8">
+          Nothing was given out{" "}
+          {mode === "day" ? `on ${formatDate(day)}` : "in these dates"}.
+        </div>
+      ) : (
+        <>
+          <div className="text-[11px] text-ink-soft px-1">
+            {/* No grand total quantity: these rows can be pieces, bags and
+                litres at once, and one number across them would mean nothing. */}
+            <b>{materials}</b> material{materials === 1 ? "" : "s"} out to{" "}
+            <b>{groups.length}</b> {groups.length === 1 ? "person" : "people"}
+            {mode === "range" && ` · ${formatDate(from)} – ${formatDate(to)}`}
+          </div>
+          {groups.map((g) => (
+            <div key={g.person} className="card overflow-hidden">
+              <div className="px-3 py-1.5 flex justify-between items-baseline border-b border-rule">
+                <span className="text-sm font-semibold">{g.person}</span>
+                <span className="text-[11px] text-ink-soft">
+                  {g.items} item{g.items === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div className="divide-y divide-rule">
+                {g.rows.map((r) =>
+                  editMoveId === r.moveId ? (
+                    <div key={r.moveId} className="px-3 py-2 space-y-1">
+                      <div className="text-[12px] font-medium">{r.name}</div>
+                      <div className="flex gap-1.5">
+                        <input
+                          className="input !py-1 !text-[12px] money !w-16"
+                          inputMode="decimal"
+                          value={draft.qty}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, qty: e.target.value }))
+                          }
+                        />
+                        <input
+                          type="date"
+                          className="input !py-1 !text-[12px] flex-1"
+                          value={draft.date}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, date: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="flex gap-1.5 items-center">
+                        <input
+                          className="input !py-1 !text-[12px] flex-1"
+                          list="party-edit"
+                          placeholder="Given to"
+                          value={draft.person}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, person: e.target.value }))
+                          }
+                        />
+                        <button
+                          className="text-[11px] text-moss px-1"
+                          onClick={() => void saveEdit()}
+                        >
+                          save
+                        </button>
+                        <button
+                          className="text-[11px] text-ink-soft px-1"
+                          onClick={() => setEditMoveId(null)}
+                        >
+                          cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      key={r.moveId}
+                      className="px-3 py-1.5 flex items-center gap-2 text-[13px]"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate">{r.name}</div>
+                        <div className="text-[10px] text-ink-soft flex items-center gap-1.5">
+                          <span className="badge">{r.category}</span>
+                          {/* The date is shown per row in range mode, where
+                              rows from different days sit together. */}
+                          {mode === "range" && (
+                            <span className="money">{formatDate(r.date)}</span>
+                          )}
+                          {r.note && <span className="truncate">{r.note}</span>}
+                        </div>
+                      </div>
+                      <span className="money font-semibold text-crimson shrink-0">
+                        {num(r.qty)}
+                        {r.unit && (
+                          <span className="text-[10px] font-normal"> {r.unit}</span>
+                        )}
+                      </span>
+                      <button
+                        className="text-[11px] text-ink-soft px-0.5 shrink-0"
+                        onClick={() => {
+                          setEditMoveId(r.moveId);
+                          setDraft({
+                            qty: String(r.qty),
+                            date: r.date,
+                            person: r.person,
+                          });
+                        }}
+                      >
+                        edit
+                      </button>
+                    </div>
+                  ),
+                )}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function Stock() {
   const items = useLiveQuery(() => db.stockItems.toArray(), []);
   const moves = useLiveQuery(() => db.stockMoves.toArray(), []);
   const boqItems = useLiveQuery(() => db.boqItems.toArray(), []);
+  const people = useLiveQuery(() => db.people.toArray(), []);
   const categories = useCategories();
-  const [view, setView] = useState<"items" | "bill">("items");
+  const [view, setView] = useState<"items" | "bill" | "date">("items");
   const [filter, setFilter] = useState("");
   const [adding, setAdding] = useState(false);
   const [openMove, setOpenMove] = useState<{ id: string; kind: MoveKind } | null>(null);
@@ -189,7 +567,12 @@ export function Stock() {
   const [historyFor, setHistoryFor] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [editMoveId, setEditMoveId] = useState<string | null>(null);
-  const [moveDraft, setMoveDraft] = useState({ qty: "", note: "" });
+  const [moveDraft, setMoveDraft] = useState({
+    qty: "",
+    date: "",
+    person: "",
+    note: "",
+  });
   // Selected bill in the "By bill" view.
   const [billSel, setBillSel] = useState<string>("");
   /** Bill whose "remove everything this put into stock" is awaiting confirmation. */
@@ -219,6 +602,20 @@ export function Stock() {
     }
     return [...map.values()].sort((a, b) => (a.date < b.date ? 1 : -1));
   }, [boqItems]);
+
+  /**
+   * Names to offer when recording who something went to. People already handed
+   * material come first (that is who you are most likely handing to again),
+   * then the People/category list, so a plumber who has never been given
+   * anything is still one tap away the first time.
+   */
+  const parties = useMemo(() => {
+    const seen = knownRecipients(moves ?? []);
+    const rest = [...categories, ...(people ?? []).map((p) => p.name)].filter(
+      (n) => n && !seen.some((s) => s.toLowerCase() === n.toLowerCase()),
+    );
+    return [...seen, ...new Set(rest)];
+  }, [moves, categories, people]);
 
   const rows = useMemo(() => {
     if (!items || !moves) return [];
@@ -287,12 +684,29 @@ export function Stock() {
 
   const saveMoveEdit = async () => {
     const q = parseFloat(moveDraft.qty);
-    if (editMoveId && q > 0)
+    // The date is editable here too, not just on the way in: a handout written
+    // up late is exactly the row whose date needs correcting afterwards.
+    if (editMoveId && q > 0 && moveDraft.date)
       await db.stockMoves.update(editMoveId, {
         qty: q,
+        date: moveDraft.date,
+        person: moveDraft.person.trim(),
         note: moveDraft.note.trim(),
       });
     setEditMoveId(null);
+  };
+
+  const startMoveEdit = (m: StockMove) => {
+    setEditMoveId(m.id);
+    setMoveDraft({
+      qty: String(m.qty),
+      date: m.date,
+      // Both defended: a row synced from a device on an older build can reach
+      // here without them, and a null in a controlled input is a React warning
+      // and an uneditable field.
+      person: m.person ?? "",
+      note: m.note ?? "",
+    });
   };
 
   const selectedBill = bills.find((b) => b.billId === billSel);
@@ -338,9 +752,15 @@ export function Stock() {
           ))}
       </div>
 
-      {/* Items ↔ By-bill view toggle */}
+      {/* All-items ↔ By-date ↔ By-bill view toggle */}
       <div className="flex gap-1.5 mb-3">
-        {(["items", "bill"] as const).map((v) => (
+        {(
+          [
+            ["items", "All items"],
+            ["date", "By date"],
+            ["bill", "By BOQ bill"],
+          ] as const
+        ).map(([v, label]) => (
           <button
             key={v}
             className={`badge !text-[12px] !py-1 !px-3 ${
@@ -348,12 +768,21 @@ export function Stock() {
             }`}
             onClick={() => setView(v)}
           >
-            {v === "items" ? "All items" : "By BOQ bill"}
+            {label}
           </button>
         ))}
       </div>
 
-      {view === "bill" ? (
+      {/* One list, shared by every inline row editor on this screen. */}
+      <datalist id="party-edit">
+        {parties.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+
+      {view === "date" ? (
+        <DateView items={items ?? []} moves={moves ?? []} />
+      ) : view === "bill" ? (
         <div className="space-y-2 pb-4">
           <select
             className="input"
@@ -665,6 +1094,7 @@ export function Stock() {
                     item={it}
                     kind={openMove.kind}
                     bills={bills}
+                    parties={parties}
                     onDone={() => setOpenMove(null)}
                   />
                 ) : (
@@ -702,41 +1132,73 @@ export function Stock() {
                   <div className="mt-2 border-t border-rule pt-1.5">
                     {moves
                       .filter((m) => m.stockId === it.id)
-                      .sort((a, b) => b.createdAt - a.createdAt)
+                      // By the date it happened, not the order it was typed.
+                      // Now that a movement can be back-dated, those two come
+                      // apart — an evening's catch-up entered newest-first
+                      // would otherwise read 19th, 18th, 21st down the page.
+                      // createdAt breaks ties so a day's rows keep their order.
+                      .sort(
+                        (a, b) =>
+                          (a.date < b.date ? 1 : a.date > b.date ? -1 : 0) ||
+                          b.createdAt - a.createdAt,
+                      )
                       .map((m) =>
                         editMoveId === m.id ? (
-                          <div
-                            key={m.id}
-                            className="flex items-center gap-1.5 py-0.5"
-                          >
-                            <input
-                              className="input !py-1 !text-[12px] money !w-16"
-                              inputMode="decimal"
-                              value={moveDraft.qty}
-                              onChange={(e) =>
-                                setMoveDraft((d) => ({ ...d, qty: e.target.value }))
-                              }
-                            />
-                            <input
-                              className="input !py-1 !text-[12px] flex-1"
-                              placeholder="Note"
-                              value={moveDraft.note}
-                              onChange={(e) =>
-                                setMoveDraft((d) => ({ ...d, note: e.target.value }))
-                              }
-                            />
-                            <button
-                              className="text-[11px] text-moss px-1"
-                              onClick={() => void saveMoveEdit()}
-                            >
-                              save
-                            </button>
-                            <button
-                              className="text-[11px] text-ink-soft px-1"
-                              onClick={() => setEditMoveId(null)}
-                            >
-                              cancel
-                            </button>
+                          <div key={m.id} className="py-1 space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                className="input !py-1 !text-[12px] money !w-16"
+                                inputMode="decimal"
+                                value={moveDraft.qty}
+                                onChange={(e) =>
+                                  setMoveDraft((d) => ({ ...d, qty: e.target.value }))
+                                }
+                              />
+                              <input
+                                type="date"
+                                className="input !py-1 !text-[12px] flex-1"
+                                value={moveDraft.date}
+                                onChange={(e) =>
+                                  setMoveDraft((d) => ({ ...d, date: e.target.value }))
+                                }
+                              />
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                className="input !py-1 !text-[12px] flex-1"
+                                list="party-edit"
+                                placeholder={
+                                  m.kind === "in" ? "From whom" : "Given to"
+                                }
+                                value={moveDraft.person}
+                                onChange={(e) =>
+                                  setMoveDraft((d) => ({
+                                    ...d,
+                                    person: e.target.value,
+                                  }))
+                                }
+                              />
+                              <input
+                                className="input !py-1 !text-[12px] flex-1"
+                                placeholder="Note"
+                                value={moveDraft.note}
+                                onChange={(e) =>
+                                  setMoveDraft((d) => ({ ...d, note: e.target.value }))
+                                }
+                              />
+                              <button
+                                className="text-[11px] text-moss px-1"
+                                onClick={() => void saveMoveEdit()}
+                              >
+                                save
+                              </button>
+                              <button
+                                className="text-[11px] text-ink-soft px-1"
+                                onClick={() => setEditMoveId(null)}
+                              >
+                                cancel
+                              </button>
+                            </div>
                           </div>
                         ) : (
                           <div
@@ -752,18 +1214,27 @@ export function Stock() {
                               {m.kind === "in" ? "+" : "−"}
                               {num(m.qty)}
                             </span>
-                            <span className="text-ink-soft truncate flex-1">
-                              {m.note}
+                            <span className="truncate flex-1">
+                              {m.person && (
+                                <span
+                                  className={
+                                    m.kind === "out" ? "font-medium" : "text-ink-soft"
+                                  }
+                                >
+                                  {m.person}
+                                </span>
+                              )}
+                              {m.person && m.note && (
+                                <span className="text-ink-soft"> · </span>
+                              )}
+                              <span className="text-ink-soft">{m.note}</span>
                               {m.billId && (
                                 <span className="badge ml-1 !text-[9px]">bill</span>
                               )}
                             </span>
                             <button
                               className="text-[11px] text-ink-soft px-0.5 shrink-0"
-                              onClick={() => {
-                                setEditMoveId(m.id);
-                                setMoveDraft({ qty: String(m.qty), note: m.note });
-                              }}
+                              onClick={() => startMoveEdit(m)}
                             >
                               edit
                             </button>

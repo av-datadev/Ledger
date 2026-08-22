@@ -158,6 +158,27 @@ export interface PersonDetails {
   contractAmount: number | null; // agreed final price (₹) — sum of lines when floor-wise
   contractLines: ContractLine[]; // per-floor/section breakdown; [] = single total
   contractDetails: string; // scope / terms / anything else
+  /**
+   * The work categories this person is responsible for — ["Plumbing"] on
+   * Vijay Plumber, ["Contractor", "Site Prep"] on a contractor covering both.
+   *
+   * This is the link between a trade and the man doing it, and it is what makes
+   * "how much is plumbing costing me" answerable. The two halves of that number
+   * are already kept apart in the ledger — material spend under the trade
+   * ("Plumbing"), payments to the man under his own name ("Vijay Plumber") —
+   * but nothing joined them, so the trade's real cost was two figures on two
+   * rows that nobody added up.
+   *
+   * Stored on the PERSON, by category name, and deliberately not on the
+   * category: `categories` is not a synced table (sync.ts re-derives it by name
+   * from entries), so a link kept there would live on one phone and vanish on a
+   * restore. `people` syncs with a clock, so this reaches every phone.
+   *
+   * A list because one man can hold several trades. The reverse is not allowed:
+   * a trade has one person, since the data cannot say which of two painters a
+   * given payment went to, and a split it cannot justify would be a guess.
+   */
+  trades: string[];
   // Bank details for paying this person.
   bankName: string;
   accountHolder: string;
@@ -254,10 +275,23 @@ export interface SiteLedgerRow {
 export interface StockMove {
   id: string;
   stockId: string;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD — the day the material actually moved
   kind: "in" | "out";
   qty: number;
-  note: string; // e.g. "Bill #2310 Gopal Jee" or "Given to painter"
+  /**
+   * Who the material went to (out) or came from (in) — "Plumber", "Gopal Jee".
+   *
+   * Its own field rather than a phrase inside `note` because this is what gets
+   * counted: "how much went to the plumber this week" is only answerable if the
+   * name is stored as a name. Free text, but written through a picker of names
+   * already in use, so the same person doesn't become "Plumber", "plumber" and
+   * "Plumber ji" in three different totals.
+   *
+   * Empty string when nobody was named, which is allowed — a handout you can
+   * date but not attribute is still worth recording.
+   */
+  person: string;
+  note: string; // anything else worth saying — e.g. "for 2nd floor bathroom"
   // When this receipt came from a BOQ bill, the bill's stable id — the hard
   // link that powers the two-way BOQ↔Stock views. null for manual movements.
   billId: string | null;

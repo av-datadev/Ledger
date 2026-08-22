@@ -124,6 +124,7 @@ const STOCK_MOVES: TableSpec<StockMove> = {
     { key: "date", type: "text" },
     { key: "kind", type: "text" },
     { key: "qty", type: "number" },
+    { key: "person", type: "text" },
     { key: "note", type: "text" },
     { key: "billId", type: "text", nullable: true },
     { key: "createdAt", type: "number" },
@@ -154,6 +155,9 @@ const PEOPLE: TableSpec<PersonDetails> = {
     { key: "contractAmount", type: "number", nullable: true },
     { key: "contractLines", type: "json" },
     { key: "contractDetails", type: "text" },
+    // json, like contractLines: a blank cell decodes to [], which is exactly
+    // right for a sheet written before the link existed.
+    { key: "trades", type: "json" },
     { key: "bankName", type: "text" },
     { key: "accountHolder", type: "text" },
     { key: "accountNumber", type: "text" },

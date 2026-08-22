@@ -168,9 +168,25 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
     })),
     boqItems,
     stockItems: Array.isArray(data.stockItems) ? data.stockItems : [],
-    // Pre-v6 stock moves have no bill link.
+    // Pre-v6 stock moves have no bill link; pre-v14 have no named recipient.
+    // Read through a partial view: the file is older than the type, so the
+    // fields added since genuinely may not be there.
     stockMoves: (Array.isArray(data.stockMoves) ? data.stockMoves : []).map(
-      (m) => ({ ...m, billId: m.billId ?? null }),
+      (raw): StockMove => {
+        const m = raw as Partial<StockMove>;
+        const billId = m.billId ?? null;
+        const named = m.person !== undefined;
+        return {
+          ...(m as StockMove),
+          billId,
+          // Same reading as the Dexie v14 upgrade: on a manual movement the
+          // note WAS the party, because the form's "From" / "To whom" box
+          // wrote there for want of anywhere better. A bill-linked receipt's
+          // note is the bill's own label, which is a document, not a person.
+          person: named ? m.person! : billId ? "" : (m.note ?? ""),
+          note: !named && !billId ? "" : (m.note ?? ""),
+        };
+      },
     ),
     // Pre-v5 category rows have no `order` — slot them after the built-ins.
     categories: (Array.isArray(data.categories) ? data.categories : []).map(
@@ -189,6 +205,10 @@ export async function readBackupFile(file: File): Promise<ParsedBackup> {
       contractRate: p.contractRate ?? null,
       // Pre-v8 backups have no floor-wise lines.
       contractLines: Array.isArray(p.contractLines) ? p.contractLines : [],
+      // Pre-v15 backups predate the trade link. [] rather than a guess: the
+      // pairing is the user's knowledge, and inferring it from name similarity
+      // would attribute one man's money to another.
+      trades: Array.isArray(p.trades) ? p.trades : [],
       updatedAt: p.updatedAt ?? p.createdAt,
     })),
     // Added in v7 — decode each photo's base64 back into a Blob. Skip any row

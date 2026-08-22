@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, renameCategory, deleteCategory } from "../db";
 import { useBackClose } from "../hooks/useBackClose";
+import { useCategories } from "../hooks/useCategories";
 import { inr } from "../lib/format";
 import { decodeQrFromFile } from "../lib/qr";
 import { fileToOcrImage } from "../lib/scanImage";
@@ -110,6 +111,41 @@ function Fields({
       amount: l.amount != null ? String(l.amount) : "",
     })),
   );
+  // Work categories this person is responsible for. Held as a Set so the
+  // toggles below stay cheap and order-independent.
+  const [trades, setTrades] = useState<Set<string>>(
+    () => new Set(existing?.trades ?? []),
+  );
+  const allCategories = useCategories();
+  const allPeople = useLiveQuery(() => db.people.toArray(), []);
+
+  /**
+   * Which trades other people already hold, so one cannot be claimed twice.
+   * Keyed by category name → the person holding it.
+   */
+  const claimedBy = new Map<string, string>();
+  for (const p of allPeople ?? []) {
+    if (p.name === name) continue;
+    for (const t of p.trades ?? []) claimedBy.set(t, p.name);
+  }
+  // Anyone already acting as a person — they hold work of their own — is not
+  // offered as work. Ticking "Vijay Plumber" as Contractor's trade would nest
+  // one joined total inside another and read his labour as the contractor's
+  // material.
+  const holdsWork = new Set(
+    (allPeople ?? []).filter((p) => (p.trades ?? []).length > 0).map((p) => p.name),
+  );
+  // A person cannot be their own trade either: "Vijay Plumber" the payee and
+  // "Vijay Plumber" the work would double-count every rupee in the total.
+  const tradeOptions = allCategories.filter(
+    (c) =>
+      c !== name &&
+      c !== form.name.trim() &&
+      // …unless this person already holds it, so an existing link is never
+      // hidden by the very rule meant to prevent making a bad one.
+      (!holdsWork.has(c) || trades.has(c)),
+  );
+
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [scanBusy, setScanBusy] = useState<string | null>(null);
@@ -302,6 +338,7 @@ function Fields({
       contractAmount: amount,
       contractLines,
       contractDetails: form.contractDetails.trim(),
+      trades: [...trades],
       bankName: form.bankName.trim(),
       accountHolder: form.accountHolder.trim(),
       accountNumber: form.accountNumber.trim(),
@@ -316,6 +353,10 @@ function Fields({
       fields.contractAmount == null &&
       fields.contractLines.length === 0 &&
       !fields.contractDetails &&
+      // A row holding nothing but a trade link is still worth keeping: the
+      // link IS the information, and discarding it as "empty" would undo the
+      // pairing the moment it was made.
+      fields.trades.length === 0 &&
       !fields.bankName &&
       !fields.accountHolder &&
       !fields.accountNumber &&
@@ -398,6 +439,57 @@ function Fields({
               <option key={r} value={r} />
             ))}
           </datalist>
+        </div>
+
+        <div>
+          <span className="field-label">Work this person handles</span>
+          <p className="text-[11px] text-ink-soft mb-1.5">
+            Material for the work is recorded under the work's own name; what
+            you pay {form.name.trim() || "this person"} stays under theirs.
+            Linking the two is what lets the app total what the work is really
+            costing.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {tradeOptions.map((c) => {
+              const mine = trades.has(c);
+              const taken = claimedBy.get(c);
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  // A trade has one person. Letting two claim it would ask the
+                  // ledger which of them a payment went to, and nothing in the
+                  // data answers that — so the total would be a guess wearing
+                  // the clothes of a fact.
+                  disabled={!mine && !!taken}
+                  className={`badge !text-[12px] !py-1 !px-2.5 ${
+                    mine ? "!bg-ink !text-paper !border-ink" : ""
+                  } ${!mine && taken ? "opacity-40" : ""}`}
+                  title={
+                    !mine && taken ? `Already handled by ${taken}` : undefined
+                  }
+                  onClick={() =>
+                    setTrades((s) => {
+                      const next = new Set(s);
+                      if (!next.delete(c)) next.add(c);
+                      return next;
+                    })
+                  }
+                >
+                  {c}
+                  {!mine && taken && (
+                    <span className="font-normal"> · {taken}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {tradeOptions.length === 0 && (
+            <p className="text-[11px] text-ink-soft">
+              No other categories yet — add the work (e.g. Plumbing) on the
+              People tab first, then come back and link it here.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">

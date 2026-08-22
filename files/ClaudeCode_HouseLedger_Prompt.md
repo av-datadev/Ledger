@@ -124,8 +124,8 @@ disagreement is the entire point of the feature.
 ## 4. Screens
 
 1. **Dashboard** — sticky total in Indian digit grouping, budget bar, spend by
-   category (tap to drill into the Ledger), paid-by breakdown, stock in hand,
-   house address.
+   category (tap to drill into the Ledger), paid-by breakdown, **what has been
+   given out and what is left** of it, house address.
 
 2. **Entry** — date, category, description, detail, amount, mode, paid-by,
    notes, plus photo attachments. Can read a handwritten slip, cheque or Hindi
@@ -147,13 +147,17 @@ disagreement is the entire point of the feature.
    owed on them, behind a **Still to pay** filter (§6).
 
 6. **Stock** — received vs given out to labour, balance, hard-linked to the
-   source bill. Two ways to clear more than one row at a time, and they answer
-   different questions: a whole bill taken back out in one action, and a
-   selection mode for particular rows (both §6).
+   source bill. Every movement carries **the day it happened and the name it
+   went to**, both set by hand. A *By date* view steps a day at a time or totals
+   a range, grouped by who received it (§6). Two ways to clear more than one row
+   at a time, and they answer different questions: a whole bill taken back out
+   in one action, and a selection mode for particular rows (both §6).
 
 7. **People** — every category as an editable person: contact, contract
    pricing (lump sum, area×rate, or per-floor lines), bank details scannable
-   from a UPI QR, per-person totals.
+   from a UPI QR, per-person totals, and **the work each person handles** —
+   the link that lets a trade's material and its labour be totalled together
+   (§6).
 
 8. **Data** — JSON and Excel backup/restore, importing somebody else's
    spreadsheet (§7), CSV exports, notification toggle, text size, site code and
@@ -331,6 +335,51 @@ default in Postgres — announces every bill already on record, and every bill
 restored from an older backup, as fully outstanding. Outstanding is likewise
 null rather than the full total when there is no paid figure to work from, so
 only bills that have actually been answered reach a list of money owed.
+
+### A trade, and the man doing it
+
+The two halves of a trade's cost are kept apart in the ledger, and should be:
+material under the work's own name ("Plumbing"), payments to the man under his
+("Vijay Plumber"). They are different kinds of spending and merging them would
+destroy the distinction. But nothing added them back up, so what the plumbing
+was actually costing was two figures on two rows that no screen put together.
+
+Linking a person to the work they handle joins them — retroactively, over
+payments already recorded, with nothing re-tagged. The card states material,
+labour, the total, and the split, because ₹3.6 lakh of plumbing reads very
+differently at 87% pipes than at 87% labour.
+
+- **The link lives on the person, not the category.** `categories` is not a
+  synced table — sync re-derives it by name from entries — so a link kept there
+  would live on one phone and vanish on a restore. It is held by category *name*
+  on the person's row, which means renaming a category has to sweep the links
+  too; without that a renamed trade silently comes apart and the joined total
+  quietly reverts to counting half of itself.
+- **One person per trade.** Two claimants would ask the ledger which of them a
+  payment went to, and nothing in the data answers that. A person may hold
+  several trades; the reverse is a split the data cannot justify.
+- **No nesting.** Someone already holding work is not offered *as* work, or one
+  joined total ends up inside another and a man's labour is read as material.
+
+### What went out, and to whom
+
+A stock movement's date used to be stamped "today" on save, which is wrong for
+the ordinary case: writing up three days of material given to the plumber in one
+sitting dated every row the evening it was typed. The recipient was free text
+inside the note — fine to read, impossible to total. Both are now fields, set on
+the way in and editable afterwards, since a wrong date is usually noticed later.
+
+The name is written through a picker of names already in use, because "Plumber",
+"plumber" and "Plumber ji" otherwise become three men in every total. Free text
+is still allowed; the picker is a shortcut to consistent spelling, not a gate.
+
+The dashboard shows only materials **something has actually been given out of**.
+A bill saved with "add items to stock" ticked puts twenty rows into inventory at
+once and most just sit there, so a list of everything ever bought answers a
+question the BOQ already answers better while burying the handful actually
+moving. No view prints a grand total quantity: these rows are pieces, bags,
+kilos and litres at once, and one number spanning them would be arithmetic
+without a meaning.
 
 ### Taking a bill back out of Stock
 

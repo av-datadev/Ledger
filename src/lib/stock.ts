@@ -87,6 +87,9 @@ export async function addBillRowsToStock(
         date,
         kind: "in",
         qty: row.qty,
+        // The bill's vendor is on the bill; a receipt taken straight off it
+        // names no separate supplier.
+        person: "",
         note,
         billId,
         createdAt: Date.now(),
@@ -249,4 +252,249 @@ export async function findOrCreateStockItem(
     createdAt: Date.now(),
   });
   return id;
+}
+
+// ---------------------------------------------------------------------------
+// Handouts: what went out, when, and to whom
+// ---------------------------------------------------------------------------
+
+/**
+ * A movement's recipient, defended against absence.
+ *
+ * `person` is non-optional on the type, but a row does not always come from
+ * this build: sync puts a remote row straight into Dexie, so a movement written
+ * by a device on an older version — or one predating the column's backfill —
+ * arrives with the field missing. Reading it with a bare `.trim()` would throw
+ * inside the rollups rather than showing an unnamed handout, which is what an
+ * un-attributed movement honestly is.
+ */
+function personOf(m: StockMove): string {
+  return (m.person ?? "").trim();
+}
+
+/** Someone who has received material before — offered in the "to whom" picker. */
+export function knownRecipients(moves: StockMove[]): string[] {
+  const counts = new Map<string, number>();
+  for (const m of moves) {
+    const name = personOf(m);
+    if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  // Most-given-to first: the man you hand things to daily should not be the
+  // eleventh name in the list.
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name]) => name);
+}
+
+/** One material handed out on one day, resolved against its stock item. */
+export interface HandoutRow {
+  moveId: string;
+  stockId: string;
+  name: string;
+  category: string;
+  unit: string;
+  qty: number;
+  person: string;
+  note: string;
+  date: string;
+}
+
+/** Everything given out between two dates (inclusive), newest day first. */
+export function handoutsBetween(
+  items: StockItem[],
+  moves: StockMove[],
+  from: string,
+  to: string,
+): HandoutRow[] {
+  const byId = new Map(items.map((it) => [it.id, it]));
+  return moves
+    .filter((m) => m.kind === "out" && m.date >= from && m.date <= to)
+    .flatMap((m) => {
+      const it = byId.get(m.stockId);
+      // A movement whose item has been deleted is a dangling row. It is skipped
+      // rather than shown as "(unknown)": nobody can act on a quantity of a
+      // material that no longer has a name.
+      if (!it) return [];
+      return [
+        {
+          moveId: m.id,
+          stockId: m.stockId,
+          name: it.name,
+          category: it.category,
+          unit: it.unit,
+          qty: m.qty,
+          person: personOf(m),
+          note: m.note ?? "",
+          date: m.date,
+        },
+      ];
+    })
+    .sort(
+      (a, b) =>
+        (a.date < b.date ? 1 : a.date > b.date ? -1 : 0) ||
+        a.category.localeCompare(b.category) ||
+        a.name.localeCompare(b.name),
+    );
+}
+
+/** A recipient and everything they were given over the window in question. */
+export interface PersonTotal {
+  person: string;
+  /** Distinct materials, not movements — two bags on two days is one material. */
+  items: number;
+  rows: HandoutRow[];
+}
+
+/**
+ * Group handouts by who received them.
+ *
+ * Deliberately no grand total quantity: these rows can be pieces, bags, kilos
+ * and litres at once, and adding 40 pcs to 3 bags produces a number that means
+ * nothing. The count of materials is the only figure that survives mixing units.
+ */
+export function byPerson(rows: HandoutRow[]): PersonTotal[] {
+  const map = new Map<string, HandoutRow[]>();
+  for (const r of rows) {
+    const key = r.person || "Not recorded";
+    const list = map.get(key);
+    if (list) list.push(r);
+    else map.set(key, [r]);
+  }
+  return [...map.entries()]
+    .map(([person, list]) => ({
+      person,
+      items: new Set(list.map((r) => r.stockId)).size,
+      rows: list,
+    }))
+    .sort((a, b) => b.rows.length - a.rows.length || a.person.localeCompare(b.person));
+}
+
+/** One material's standing: bought, handed out, still here. */
+export interface IssuedItem {
+  id: string;
+  name: string;
+  category: string;
+  unit: string;
+  /** Everything ever received into stock. */
+  purchased: number;
+  /** Everything ever given out. */
+  given: number;
+  /** purchased − given. Negative means more went out than was ever booked in. */
+  left: number;
+  /** Who it went to, most-given first. */
+  recipients: string[];
+  /** The most recent day any of it was given out. */
+  lastGiven: string | null;
+}
+
+/** A category's materials that have actually been given out, plus its totals. */
+export interface IssuedCategory {
+  category: string;
+  items: IssuedItem[];
+  /** How many distinct materials of this category have gone out. */
+  itemCount: number;
+  /** Everyone who has received anything in this category. */
+  recipients: string[];
+  lastGiven: string | null;
+}
+
+/**
+ * Materials that have actually left the store, grouped by category.
+ *
+ * The point of the filter: a bill saved with "add to stock" ticked puts twenty
+ * rows into inventory at once, and most of them just sit there. A list of
+ * everything ever bought answers "what did I buy"; this answers the question
+ * actually being asked at the end of a day, which is what went out and to whom.
+ * An item is here the moment ONE piece of it has been given — including one
+ * that has since been marked done, because a settled material is still part of
+ * the record of what was handed over.
+ *
+ * `from`/`to` bound which handouts count as "given". The purchased and left
+ * figures are always lifetime: what is left with you today is not a function of
+ * the week you happen to be looking at.
+ */
+export function issuedByCategory(
+  items: StockItem[],
+  moves: StockMove[],
+  from?: string,
+  to?: string,
+): IssuedCategory[] {
+  const inWindow = (m: StockMove) =>
+    (from === undefined || m.date >= from) && (to === undefined || m.date <= to);
+
+  const byItem = new Map<string, StockMove[]>();
+  for (const m of moves) {
+    const list = byItem.get(m.stockId);
+    if (list) list.push(m);
+    else byItem.set(m.stockId, [m]);
+  }
+
+  const issued: IssuedItem[] = [];
+  for (const it of items) {
+    const mine = byItem.get(it.id) ?? [];
+    const outs = mine.filter((m) => m.kind === "out" && inWindow(m));
+    if (outs.length === 0) continue;
+
+    const purchased = mine
+      .filter((m) => m.kind === "in")
+      .reduce((s, m) => s + m.qty, 0);
+    // Lifetime, not windowed: "left with me" is a fact about the shelf today,
+    // and a figure that changed when you paged back a day would be a lie.
+    const givenEver = mine
+      .filter((m) => m.kind === "out")
+      .reduce((s, m) => s + m.qty, 0);
+
+    const counts = new Map<string, number>();
+    for (const m of outs) {
+      const name = personOf(m) || "Not recorded";
+      counts.set(name, (counts.get(name) ?? 0) + m.qty);
+    }
+
+    issued.push({
+      id: it.id,
+      name: it.name,
+      category: it.category,
+      unit: it.unit,
+      purchased: round3(purchased),
+      given: round3(outs.reduce((s, m) => s + m.qty, 0)),
+      left: round3(purchased - givenEver),
+      recipients: [...counts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([n]) => n),
+      lastGiven: outs.reduce<string | null>(
+        (latest, m) => (latest === null || m.date > latest ? m.date : latest),
+        null,
+      ),
+    });
+  }
+
+  const cats = new Map<string, IssuedItem[]>();
+  for (const it of issued) {
+    const list = cats.get(it.category);
+    if (list) list.push(it);
+    else cats.set(it.category, [it]);
+  }
+
+  return [...cats.entries()]
+    .map(([category, list]) => ({
+      category,
+      items: list.sort((a, b) => b.given - a.given || a.name.localeCompare(b.name)),
+      itemCount: list.length,
+      recipients: [...new Set(list.flatMap((i) => i.recipients))],
+      lastGiven: list.reduce<string | null>(
+        (latest, i) =>
+          i.lastGiven && (latest === null || i.lastGiven > latest)
+            ? i.lastGiven
+            : latest,
+        null,
+      ),
+    }))
+    // Busiest category first — the one with most materials moving is the one
+    // being asked about.
+    .sort((a, b) => b.itemCount - a.itemCount || a.category.localeCompare(b.category));
+}
+
+/** Quantities are counts of physical things; three decimals is already generous. */
+function round3(n: number): number {
+  return Math.round(n * 1000) / 1000;
 }

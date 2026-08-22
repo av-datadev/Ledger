@@ -74,6 +74,7 @@ export function BillStockPanel({
       date: line.date,
       kind: "in",
       qty: q,
+      person: "",
       note: billLabel,
       billId,
       createdAt: Date.now(),

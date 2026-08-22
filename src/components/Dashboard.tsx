@@ -2,35 +2,32 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
 import { useCategories } from "../hooks/useCategories";
 import { usePayers } from "../hooks/useFacets";
-import { inr, num } from "../lib/format";
-import { withBalances } from "../lib/stock";
+import { inr } from "../lib/format";
 import { BudgetCard } from "./BudgetCard";
+import { GivenOutCard } from "./GivenOutCard";
 import { AddressCard } from "./AddressCard";
 import { SyncButton } from "./SyncButton";
 
 export function Dashboard({
   onOpenCategory,
   onOpenPayer,
+  onOpenStock,
   synced = false,
 }: {
   onOpenCategory: (category: string) => void;
   onOpenPayer: (payer: string) => void;
+  /** Jump to the Stock tab — the card here is a summary, not the workspace. */
+  onOpenStock: () => void;
   /** True once a shared household is active — gates the refresh control, which
    * has nothing to do on a device that isn't syncing. */
   synced?: boolean;
 }) {
   // Computed live from Dexie on every change — never cached.
   const entries = useLiveQuery(() => db.entries.toArray(), []);
-  const stockItems = useLiveQuery(() => db.stockItems.toArray(), []);
-  const stockMoves = useLiveQuery(() => db.stockMoves.toArray(), []);
   const categories = useCategories();
   const payers = usePayers();
 
   if (!entries) return null;
-
-  const stock =
-    stockItems && stockMoves ? withBalances(stockItems, stockMoves) : [];
-  const openStock = stock.filter((s) => !s.done);
 
   const total = entries.reduce((s, e) => s + e.amount, 0);
 
@@ -127,39 +124,7 @@ export function Dashboard({
         </div>
       </section>
 
-      {openStock.length > 0 && (
-        <section className="px-4 pt-6 pb-6">
-          <h2 className="eyebrow mb-2">
-            Stock in hand ({openStock.length} materials)
-          </h2>
-          <div className="card overflow-hidden divide-y divide-rule">
-            {openStock
-              .filter((s) => s.balance !== 0)
-              .sort((a, b) => a.category.localeCompare(b.category))
-              .slice(0, 8)
-              .map((s) => (
-                <div
-                  key={s.id}
-                  className="flex justify-between items-center px-3 py-1.5 text-[13px]"
-                >
-                  <span className="truncate mr-2">
-                    <span className="badge mr-1.5">{s.category}</span>
-                    {s.name}
-                  </span>
-                  <span
-                    className={`money font-medium shrink-0 ${s.balance < 0 ? "text-crimson" : "text-moss"}`}
-                  >
-                    {num(s.balance)} {s.unit}
-                  </span>
-                </div>
-              ))}
-          </div>
-          <div className="text-[11px] text-ink-soft mt-1">
-            Full list and give-out tracking in the Stock tab.
-          </div>
-        </section>
-      )}
-      {openStock.length === 0 && <div className="pb-6" />}
+      <GivenOutCard onOpen={onOpenStock} />
     </div>
   );
 }

@@ -249,6 +249,45 @@ signing key before touching anything there.
 - **Paid vs billed** (Ledger) — money handed over that no bill accounts for
   yet. A gap isn't proof of anything; labour never has a bill. It's worth a
   question when the payment was for material.
+- **A trade and the man doing it** (People → *Edit* → *Work this person handles*)
+  — the ledger already keeps the two halves of a trade's cost apart, and should:
+  material under the work's own name (*Plumbing*), payments to the man under
+  his (*Vijay Plumber*). They are different kinds of spending and mixing them
+  would destroy the distinction. But nothing added them back up, so what the
+  plumbing was actually costing was two figures on two rows that no screen put
+  together. Linking a person to their work joins them — retroactively, over
+  every payment already recorded, with no re-tagging.
+  The link lives on the PERSON, not the category, because `categories` is **not
+  a synced table** (sync.ts re-derives it by name from entries) — kept there it
+  would live on one phone and vanish on a restore. `people` syncs with a clock.
+  Held by category *name*, so `renameCategory` sweeps the array too; without
+  that a renamed trade silently comes apart and the joined total quietly reverts
+  to counting half of itself.
+  **One person per trade.** Two claimants would ask the ledger which of them a
+  payment went to, and nothing in the data answers that — the split would be a
+  guess wearing the clothes of a fact. Someone who already holds work is not
+  offered as work, so one joined total can't nest inside another.
+- **What went out, and to whom** (Stock → *By date*, and the Dashboard card) —
+  a stock movement carries the day it happened and the name it went to, both
+  set by hand. The date used to be stamped as "today" on save, which is wrong
+  for the ordinary case: writing up three days of material given to the plumber
+  in one sitting dated every row the evening it was typed. The recipient used to
+  be free text inside the note, which reads fine on the row and cannot be
+  totalled — so it is now its own field, written through a picker of names
+  already in use, because "Plumber", "plumber" and "Plumber ji" otherwise become
+  three men. Both are editable afterwards, in the item's history and in the date
+  view, since a wrong date is usually noticed later.
+  *By date* steps a day at a time (and offers the nearest day that actually has
+  something on it, so nobody taps back through four empty Sundays) or totals a
+  range; both group by person first, because that is who the argument is with.
+  The Dashboard card shows only materials **something has actually been given
+  out of** — a bill saved with "add items to stock" ticked puts twenty rows into
+  inventory at once and most just sit there, so a list of everything ever bought
+  answers a question the BOQ already answers better, while burying the handful
+  actually moving. Expanding a category gives bought / given / left per item.
+  Neither view prints a grand total quantity: these rows are pieces, bags, kilos
+  and litres at once, and one number spanning them would be arithmetic without
+  a meaning.
 - **Taking a whole bill back out of Stock** (Stock → *By BOQ bill*) — line by
   line is right for one wrong row; a bill saved with every quantity wrong needs
   as many confirmations as it has rows. `removeBillFromStock` is deliberately
@@ -350,7 +389,19 @@ Offline (airplane mode, after one full load):
       range**), note expand-on-tap, edit, delete, CSV
 - [ ] BOQ: "Type manually" saves; a printed English bill still scans via
       on-device OCR; the lines-vs-total check holds
+- [ ] People → Edit → **Work this person handles**: linking *Plumbing* to
+      *Vijay Plumber* makes the trade row read "done by Vijay Plumber" and adds
+      a joined total (material + paid to him) with the material/labour split
+- [ ] A trade already held shows greyed with its holder's name and can't be
+      double-claimed; renaming a linked trade keeps the link intact
 - [ ] Stock: received / given out, balance, done-checkbox
+- [ ] Stock: a give-out saved with a **back-date** and a name lands on that day,
+      not today — and shows up under that person in *By date* and on the
+      Dashboard card
+- [ ] Stock → **By date**: the day stepper moves a day at a time, an empty day
+      offers the nearest day with handouts, and *Date range* totals a span
+- [ ] Dashboard **Given out · what's left**: a material nobody has been given
+      does not appear; expanding a category shows bought / given / left
 - [ ] Stock → By BOQ bill → **remove everything this bill put into stock**: a
       bill-only item disappears, one with its own history survives, a handout
       is kept, and the BOQ rows are untouched

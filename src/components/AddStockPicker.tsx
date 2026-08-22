@@ -112,6 +112,7 @@ export function AddStockPicker({ onClose }: { onClose: () => void }) {
             date: line.date,
             kind: "in",
             qty: q,
+            person: "",
             note: bill.label,
             billId: bill.billId,
             createdAt: Date.now(),

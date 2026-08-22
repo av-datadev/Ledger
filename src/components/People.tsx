@@ -5,6 +5,7 @@ import { useCategories } from "../hooks/useCategories";
 import { inr } from "../lib/format";
 import { contractTotal } from "../lib/measure";
 import { outstandingByCategory } from "../lib/billBalance";
+import { tradeCosts, personByTrade, type TradeCost } from "../lib/trades";
 import { PersonDetailsForm } from "./PersonDetailsForm";
 import type { PersonDetails } from "../types";
 
@@ -59,6 +60,57 @@ function ContractBar({
         Paid <span className="money">{inr(paid)}</span> · {Math.round(pct)}%
         settled
       </div>
+    </div>
+  );
+}
+
+/**
+ * What a trade is costing, once the work and the man doing it are linked.
+ *
+ * The two figures are already in the ledger and already correct; the only new
+ * thing here is that they are finally on the same line. The split matters more
+ * than the total on its own — ₹3.6 lakh of plumbing reads very differently when
+ * it is 87% pipes than when it is 87% labour.
+ */
+function TradeCostCard({ cost }: { cost: TradeCost }) {
+  const { labour, total, materialPct } = cost;
+  return (
+    <div className="mt-2 border-t border-rule pt-2">
+      <div className="text-[10px] uppercase tracking-wider text-ink-soft mb-1">
+        {cost.trades.join(" + ")} · joined total
+      </div>
+
+      <div className="space-y-0.5 text-[12px]">
+        {cost.byTrade.map((t) => (
+          <div key={t.trade} className="flex justify-between">
+            <span className="text-ink-soft">Material · {t.trade}</span>
+            <span className="money">{inr(t.material)}</span>
+          </div>
+        ))}
+        <div className="flex justify-between">
+          <span className="text-ink-soft">Paid to {cost.person}</span>
+          <span className="money">{inr(labour)}</span>
+        </div>
+        <div className="flex justify-between border-t border-rule pt-0.5 mt-0.5 font-semibold">
+          <span>Trade total</span>
+          <span className="money">{inr(total)}</span>
+        </div>
+      </div>
+
+      {materialPct != null && (
+        <>
+          {/* One bar, two parts — the split is a proportion, and a proportion
+              is read faster as a length than as a pair of percentages. */}
+          <div className="flex h-1.5 rounded-full overflow-hidden mt-1.5 bg-ink/10">
+            <div className="bg-ink-soft" style={{ width: `${materialPct}%` }} />
+            <div className="bg-moss" style={{ width: `${100 - materialPct}%` }} />
+          </div>
+          <div className="flex justify-between text-[10px] text-ink-soft mt-0.5">
+            <span>{materialPct}% material</span>
+            <span>{100 - materialPct}% labour</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -121,6 +173,17 @@ export function People({
     () => outstandingByCategory(boqItems ?? []),
     [boqItems],
   );
+
+  // Linked trades, and the reverse lookup so a work row can name its person.
+  const costs = useMemo(
+    () => tradeCosts(people ?? [], entries ?? []),
+    [people, entries],
+  );
+  const costFor = useMemo(
+    () => new Map(costs.map((c) => [c.person, c])),
+    [costs],
+  );
+  const doneBy = useMemo(() => personByTrade(people ?? []), [people]);
 
   const stats = categories.map((cat) => ({
     cat,
@@ -201,6 +264,13 @@ export function People({
                       📇 {detailSummary(details)}
                     </div>
                   )}
+                  {/* The whole point of the link, said plainly on the row the
+                      user is looking at. */}
+                  {doneBy.get(cat) && (
+                    <div className="text-[11px] text-ink-soft truncate mt-0.5">
+                      🔗 done by <b>{doneBy.get(cat)}</b>
+                    </div>
+                  )}
                 </button>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
@@ -230,6 +300,7 @@ export function People({
                   />
                 );
               })()}
+              {costFor.has(cat) && <TradeCostCard cost={costFor.get(cat)!} />}
             </div>
           );
         })}

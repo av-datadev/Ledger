@@ -231,6 +231,7 @@ function LedgerApp({
           <Dashboard
             onOpenCategory={(cat) => openLedger({ category: cat })}
             onOpenPayer={(payer) => openLedger({ paidBy: payer })}
+            onOpenStock={() => navigate("stock")}
             synced={!!household}
           />
         )}
