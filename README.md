@@ -288,6 +288,30 @@ signing key before touching anything there.
   Neither view prints a grand total quantity: these rows are pieces, bags, kilos
   and litres at once, and one number spanning them would be arithmetic without
   a meaning.
+- **Finding a material by typing** (Stock → *All items*, and the BOQ bill list)
+  — recording a handout means finding the material first, and the only way to
+  narrow the list was the category chips. One plumbing category holds Brass
+  Elbow, Brass Tee, Bush, Elbow 1", Elbow 1" 45°, Elbow 3/4", T 1 inch,
+  T 1.5 inch and T 3/4 inch, so reaching the row to press *Given out* on meant
+  scrolling past eight names that differ by a fraction.
+  **Search ignores the category chip rather than combining with it, and says
+  so.** Combining is the version that wastes time: search for something filed
+  under Electrical, a Plumbing chip set ten minutes ago hides it, and "no such
+  material" becomes indistinguishable from "not in this category". The chip is
+  kept rather than cleared, and shown dimmed, so what comes back on clearing the
+  box stays visible.
+  Tokens match in any order — "tee 1" finds `Brass Tee 1"` — because nobody
+  types a material's name in the order the dealer wrote it. **Deliberately not
+  fuzzy**: these names are dense with digits and fractions where an
+  edit-distance match ranks `T 1 inch` and `T 1.5 inch` as near-identical, and
+  picking the wrong one writes a handout against the wrong material.
+  The category is matched as a whole-query *prefix* rather than folded into the
+  token haystack, which was worse than useless: the one-letter token of "t 1.5"
+  matched the *t* in "Electrical", so hunting a plumbing tee surfaced a reel of
+  wire. Now "plumb" does what tapping the chip does and nothing else leaks.
+  On the BOQ a bill matches if **any of its rows** does, plus dealer and bill
+  number — the question there is asked from the item end ("which bill did this
+  come from, and at what rate?") and the bill is the thing that knows.
 - **Taking a whole bill back out of Stock** (Stock → *By BOQ bill*) — line by
   line is right for one wrong row; a bill saved with every quantity wrong needs
   as many confirmations as it has rows. `removeBillFromStock` is deliberately

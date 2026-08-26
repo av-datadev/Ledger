@@ -139,7 +139,8 @@ disagreement is the entire point of the feature.
 
 4. **Recent** — the 50 most recently added or edited entries.
 
-5. **BOQ** — four ways in: Take photo · Photo/PDF · Size list · Type manually.
+5. **BOQ** — a **search box** over the bills on record (item, dealer, bill
+   number). Four ways in: Take photo · Photo/PDF · Size list · Type manually.
    Photos accumulate in a tray and are read as one bill (§5). Everything lands
    in a review screen before saving. Rows summing to *more* than the printed
    total blocks the save; below it is fine, because that gap is the tax. Two-way
@@ -147,8 +148,8 @@ disagreement is the entire point of the feature.
    owed on them, behind a **Still to pay** filter (§6).
 
 6. **Stock** — received vs given out to labour, balance, hard-linked to the
-   source bill. Every movement carries **the day it happened and the name it
-   went to**, both set by hand. A *By date* view steps a day at a time or totals
+   source bill. A **search box** over the whole inventory (§6). Every movement
+   carries **the day it happened and the name it went to**, both set by hand. A *By date* view steps a day at a time or totals
    a range, grouped by who received it (§6). Two ways to clear more than one row
    at a time, and they answer different questions: a whole bill taken back out
    in one action, and a selection mode for particular rows (both §6).
@@ -380,6 +381,37 @@ question the BOQ already answers better while burying the handful actually
 moving. No view prints a grand total quantity: these rows are pieces, bags,
 kilos and litres at once, and one number spanning them would be arithmetic
 without a meaning.
+
+### Finding a material by typing
+
+Recording a handout means finding the material first, and the category chips
+were the only way to narrow the list. One plumbing category holds Brass Elbow,
+Brass Tee, Bush, Elbow 1", Elbow 1" 45°, Elbow 3/4", T 1 inch, T 1.5 inch and
+T 3/4 inch — eight names differing by a fraction, between you and the row you
+want to press *Given out* on.
+
+- **Search ignores the category chip rather than combining with it, and says so
+  on screen.** Combining is the version that wastes time: search for something
+  filed under Electrical, a Plumbing chip set ten minutes ago hides it, and "no
+  such material" becomes indistinguishable from "not in this category". The chip
+  is kept and dimmed rather than cleared, so what returns on emptying the box is
+  visible rather than remembered.
+- **Tokens match in any order**, because nobody types a material's name in the
+  order the dealer wrote it — "tee 1" finds `Brass Tee 1"`.
+- **Deliberately not fuzzy.** These names are dense with digits and fractions
+  where an edit-distance match ranks `T 1 inch` and `T 1.5 inch` as
+  near-identical, and picking the wrong one writes a handout against the wrong
+  material. Exactness beats forgiveness when the result is a written record.
+- **Category is a whole-query prefix, not another token.** Folding it into the
+  haystack was worse than useless: the one-letter token of "t 1.5" matches the
+  *t* in "Electrical", so hunting a plumbing tee surfaced a reel of wire. As a
+  prefix, "plumb" does what tapping the chip does and nothing else leaks.
+- On the BOQ, **a bill matches if any of its rows does**, plus dealer and bill
+  number. The bill is the unit on that tab, and returning one with the matching
+  row hidden inside is a result you cannot see the reason for.
+- Each empty state names **which** filter emptied the list. "Nothing
+  outstanding" is good news; said after a search that simply found nothing, it
+  answers a question nobody asked.
 
 ### Taking a bill back out of Stock
 
