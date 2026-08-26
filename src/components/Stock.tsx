@@ -14,6 +14,7 @@ import {
   type StockWithBalance,
 } from "../lib/stock";
 import type { StockItem, StockMove } from "../types";
+import { matchesQuery } from "../lib/search";
 import { BillStockPanel } from "./BillStockPanel";
 import { AddStockPicker } from "./AddStockPicker";
 
@@ -561,6 +562,17 @@ export function Stock() {
   const categories = useCategories();
   const [view, setView] = useState<"items" | "bill" | "date">("items");
   const [filter, setFilter] = useState("");
+  /**
+   * Free-text search over the all-items list.
+   *
+   * While it holds anything the category filter is IGNORED rather than
+   * combined. Combining them is the version that wastes your time: you search
+   * for a material filed under Electrical, a Plumbing chip you set ten minutes
+   * ago silently hides it, and the honest answer "no such material" is
+   * indistinguishable from "not in this category". The chip is kept, not
+   * cleared, so it comes back the moment the box is emptied.
+   */
+  const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const [openMove, setOpenMove] = useState<{ id: string; kind: MoveKind } | null>(null);
   const [editItemId, setEditItemId] = useState<string | null>(null);
@@ -617,17 +629,31 @@ export function Stock() {
     return [...seen, ...new Set(rest)];
   }, [moves, categories, people]);
 
+  const searching = query.trim().length > 0;
+
   const rows = useMemo(() => {
     if (!items || !moves) return [];
     const all = withBalances(items, moves);
     return all
-      .filter((it) => (filter ? it.category === filter : true))
+      // Name tokens, OR the WHOLE query as a category prefix — so "plumb"
+      // does what tapping the Plumbing chip does, without the category text
+      // polluting name searches. Folding the category into the token haystack
+      // was worse than useless: a one-letter token like the "t" of "t 1.5"
+      // matches the "t" in "Electrical", so hunting a plumbing tee surfaced a
+      // reel of wire.
+      .filter((it) =>
+        searching
+          ? matchesQuery(query, it.name) ||
+            it.category.toLowerCase().startsWith(query.trim().toLowerCase())
+          : true,
+      )
+      .filter((it) => (searching || !filter ? true : it.category === filter))
       .sort((a, b) => {
         if (a.done !== b.done) return a.done ? 1 : -1; // done items sink
         if (a.category !== b.category) return a.category < b.category ? -1 : 1;
         return a.name.localeCompare(b.name);
       });
-  }, [items, moves, filter]);
+  }, [items, moves, filter, query, searching]);
 
   const usedCats = useMemo(
     () => categories.filter((c) => items?.some((it) => it.category === c)),
@@ -905,10 +931,56 @@ export function Stock() {
         </div>
       ) : (
         <>
+          {items && items.length > 0 && (
+            <div className="relative mb-2">
+              <span
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-soft text-[13px] pointer-events-none"
+                aria-hidden="true"
+              >
+                ⌕
+              </span>
+              <input
+                className="input !py-2 !text-[14px] !pl-7 !pr-8"
+                type="search"
+                placeholder={`Search ${items.length} material${items.length === 1 ? "" : "s"}…`}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label="Search materials by name or category"
+              />
+              {searching && (
+                <button
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-soft text-[15px] px-1"
+                  aria-label="Clear search"
+                  onClick={() => setQuery("")}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
+
+          {searching && (
+            <div className="text-[11px] text-ink-soft mb-1.5 px-0.5">
+              <b>{rows.length}</b> of {items?.length ?? 0} material
+              {(items?.length ?? 0) === 1 ? "" : "s"}
+              {/* Said out loud, because a chip that is on screen but not being
+                  applied is otherwise a silent lie about what you're looking at. */}
+              {filter && <> · searching all categories, not just {filter}</>}
+            </div>
+          )}
+
           {usedCats.length > 0 && (
-            <div className="flex gap-1.5 overflow-x-auto pb-2 mb-1 -mx-4 px-4">
+            <div
+              className={`flex gap-1.5 overflow-x-auto pb-2 mb-1 -mx-4 px-4 ${
+                searching ? "opacity-40" : ""
+              }`}
+            >
               <button
                 className={`badge !text-[11px] !py-1 !px-2.5 shrink-0 ${filter === "" ? "!bg-ink !text-paper !border-ink" : ""}`}
+                // Disabled rather than hidden while searching: the chips
+                // vanishing would read as the app losing them, and the active
+                // one has to stay visible to show what returns on clearing.
+                disabled={searching}
                 onClick={() => setFilter("")}
               >
                 All
@@ -917,6 +989,7 @@ export function Stock() {
                 <button
                   key={c}
                   className={`badge !text-[11px] !py-1 !px-2.5 shrink-0 ${filter === c ? "!bg-ink !text-paper !border-ink" : ""}`}
+                  disabled={searching}
                   onClick={() => setFilter(filter === c ? "" : c)}
                 >
                   {c}
@@ -1278,7 +1351,17 @@ export function Stock() {
               </div>
             ))}
 
-            {items && rows.length === 0 && (
+            {items && rows.length === 0 && searching && (
+              <div className="text-sm text-ink-soft text-center py-8">
+                Nothing matches “{query.trim()}”.
+                <br />
+                <button className="underline mt-1" onClick={() => setQuery("")}>
+                  Clear the search
+                </button>
+              </div>
+            )}
+
+            {items && rows.length === 0 && !searching && (
               <div className="text-sm text-ink-soft text-center py-8">
                 No materials tracked yet.
                 <br />

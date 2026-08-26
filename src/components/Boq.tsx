@@ -16,6 +16,7 @@ import {
 } from "../lib/geminiScan";
 import { scanSizesWithGemini } from "../lib/sizeScan";
 import { billBalance } from "../lib/billBalance";
+import { matchesQuery } from "../lib/search";
 import {
   BillReview,
   recalcItem,
@@ -95,6 +96,13 @@ export function Boq({
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   /** Narrow the bill list to the ones a vendor is still owed money on. */
   const [dueOnly, setDueOnly] = useState(false);
+  /**
+   * Free-text search across the bills on record. Matches a bill's own
+   * identifying details AND its line items, because the question this answers
+   * is usually asked from the item end — "which bill did the 1.5 inch tee come
+   * from, and what did I pay for it?" — and the bill is the thing that knows.
+   */
+  const [query, setQuery] = useState("");
   /** Read the bills one at a time, or as what is owed to each dealer. */
   const [listView, setListView] = useState<"bills" | "dealers">("bills");
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -440,10 +448,26 @@ export function Boq({
 
   // Bills the vendor is still owed money on. Kept as a filter rather than a
   // separate screen: it is the same list of bills, asked a narrower question.
-  const shownGroups = useMemo(
-    () => (dueOnly ? groups.filter((g) => g.outstanding != null && g.outstanding > 0) : groups),
-    [groups, dueOnly],
-  );
+  const searching = query.trim().length > 0;
+
+  const shownGroups = useMemo(() => {
+    let list = dueOnly
+      ? groups.filter((g) => g.outstanding != null && g.outstanding > 0)
+      : groups;
+    if (searching) {
+      list = list.filter((g) =>
+        // A bill matches if ANY of its rows does. The bill is the unit on this
+        // tab, and returning it with the matching row hidden inside would be a
+        // result you cannot see the reason for.
+        g.rows.some(
+          (r) =>
+            matchesQuery(query, r.item, r.vendor, r.invoiceNo) ||
+            r.category.toLowerCase().startsWith(query.trim().toLowerCase()),
+        ),
+      );
+    }
+    return list;
+  }, [groups, dueOnly, query, searching]);
   const dueCount = useMemo(
     () => groups.filter((g) => g.outstanding != null && g.outstanding > 0).length,
     [groups],
@@ -694,8 +718,44 @@ export function Boq({
           <DealerAccounts />
         ) : (
         <>
+        {groups.length > 0 && (
+          <div className="relative mb-2">
+            <span
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-soft text-[13px] pointer-events-none"
+              aria-hidden="true"
+            >
+              ⌕
+            </span>
+            <input
+              className="input !py-2 !text-[14px] !pl-7 !pr-8"
+              type="search"
+              placeholder="Search item, dealer or bill no.…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search bills by item, dealer, bill number or category"
+            />
+            {searching && (
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-soft text-[15px] px-1"
+                aria-label="Clear search"
+                onClick={() => setQuery("")}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-2 mb-2">
-          <h3 className="eyebrow">Bills on record</h3>
+          <h3 className="eyebrow">
+            Bills on record
+            {searching && (
+              <span className="normal-case tracking-normal text-ink-soft font-normal">
+                {" "}
+                · {shownGroups.length} of {groups.length}
+              </span>
+            )}
+          </h3>
           {/* Only offered once a bill actually has money outstanding — a filter
               that can only ever empty the list is noise on a tab that most
               people open to add a bill, not to chase one. */}
@@ -815,7 +875,21 @@ export function Boq({
               No bills recorded yet.
             </div>
           )}
-          {items && groups.length > 0 && shownGroups.length === 0 && (
+          {/* Which of the two filters emptied the list decides what to say. The
+              "nothing outstanding" line is good news; said after a search that
+              simply found nothing, it would be an answer to a question nobody
+              asked. */}
+          {items && groups.length > 0 && shownGroups.length === 0 && searching && (
+            <div className="text-sm text-ink-soft text-center py-6">
+              No bill matches “{query.trim()}”
+              {dueOnly && <> among those still to pay</>}.
+              <br />
+              <button className="underline mt-1" onClick={() => setQuery("")}>
+                Clear the search
+              </button>
+            </div>
+          )}
+          {items && groups.length > 0 && shownGroups.length === 0 && !searching && (
             <div className="text-sm text-ink-soft text-center py-6">
               Nothing outstanding — every bill with a payment recorded against
               it is paid up.

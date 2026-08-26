@@ -394,6 +394,9 @@ Offline (airplane mode, after one full load):
       a joined total (material + paid to him) with the material/labour split
 - [ ] A trade already held shows greyed with its holder's name and can't be
       double-claimed; renaming a linked trade keeps the link intact
+- [ ] Stock + BOQ **search**: typing ignores the category chip (which stays
+      visible, dimmed, and re-applies when the box is cleared) and says so;
+      `t 1.5` returns only `T 1.5 inch`, never `T 1 inch`
 - [ ] Stock: received / given out, balance, done-checkbox
 - [ ] Stock: a give-out saved with a **back-date** and a name lands on that day,
       not today — and shows up under that person in *By date* and on the
