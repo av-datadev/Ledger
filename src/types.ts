@@ -258,10 +258,22 @@ export interface SiteLedgerRow {
   kind: "received" | "material" | "labour" | "other";
   description: string;
   amount: number;
-  /** Photographed bill/slip backing a spend. Held inline rather than in the
-   * `attachments` table, which is entry-scoped and part of household sync. */
-  proof: Blob | null;
-  proofName: string;
+  /**
+   * Whether a photographed bill/slip backs this row. The BYTES live in
+   * `siteProofs`, not here.
+   *
+   * A boolean on the row rather than the blob itself, because this flag is what
+   * the with-proof / without-proof balance split is computed from — the
+   * contractor's own defence against "you can't show me what you spent it on" —
+   * and that number must be reachable without decoding a single photo.
+   *
+   * Holding the blob inline meant the sites list pulled every bill photo across
+   * every site into memory purely to add up three figures: forty rows of
+   * ~300 KB each is over 10 MB of JPEG decoded on open, growing with every bill
+   * ever logged. This mirrors what the cloud copy already did, where the row
+   * carries `has_proof` and the bytes sit in a storage bucket.
+   */
+  hasProof: boolean;
   notes: string;
   /** Set once this row has been shown to the site owner — the id of its
    * `shared_entries` counterpart. null = private to this phone. Sharing is
@@ -269,6 +281,36 @@ export interface SiteLedgerRow {
   sharedId: string | null;
   createdAt: number;
   updatedAt: number;
+}
+
+/**
+ * The photographed bill behind one site-ledger row, kept out of the row itself.
+ *
+ * Its own table for the reason `attachments` is one for ledger entries: rows
+ * are read constantly to compute balances, photos are read only when somebody
+ * actually looks at one, and storing them together forces the cheap read to pay
+ * for the expensive one.
+ */
+export interface SiteProof {
+  id: string;
+  /** The SiteLedgerRow this belongs to. One photo per row. */
+  rowId: string;
+  /** Denormalised so deleting a site can clear its photos without first
+   * reading every row to find out which ones had any. */
+  siteId: string;
+  /** The full downscaled JPEG (max edge 1600) — what opens when tapped. */
+  blob: Blob;
+  /**
+   * A 192px copy for the 48px list thumbnail. Null on rows that predate
+   * thumbnails, and on devices that could not generate one; callers fall back
+   * to `blob`, which is what they did before this existed.
+   */
+  thumb: Blob | null;
+  mime: string;
+  name: string;
+  w: number;
+  h: number;
+  createdAt: number;
 }
 
 /** One quantity movement: received into stock, or given out to labour. */

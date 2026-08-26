@@ -382,6 +382,36 @@ moving. No view prints a grand total quantity: these rows are pieces, bags,
 kilos and litres at once, and one number spanning them would be arithmetic
 without a meaning.
 
+### Bill photos beside the row, not in it
+
+A contractor's ledger row held its bill photo inline. The sites list reads every
+row to add up three figures per site, so it pulled every photo on every site
+into memory to do it — ~300 KB a row, over 10 MB on a working site, growing
+with every bill ever logged. The cheap read was paying for the expensive one.
+
+- **The row keeps a `hasProof` boolean; the bytes live in `siteProofs`.** That
+  flag is what the with-bill / without-bill balance split is computed from — the
+  contractor's defence against "show me what you spent it on" — so it has to be
+  reachable without decoding a single image. The cloud copy already had this
+  shape (`has_proof` on the row, bytes in a bucket); local now matches it.
+- **A 192px thumbnail is stored alongside the full photo.** The list box is
+  48px and was rendering the 1600px original — about a hundred times the pixels
+  it can show, per row, every paint. Tapping still opens the full image, since
+  the viewer is where somebody actually reads the bill.
+- **Thumbnails are NOT generated in the upgrade.** Decoding and re-encoding
+  every stored photo inside a Dexie transaction holds it open across unbounded
+  canvas work on a phone, and an upgrade that stalls leaves the database
+  unopenable. Migrated photos carry `thumb: null` and get one on first view.
+- **The backup file format is unchanged.** `proofData` still travels inline on
+  the row, because backup files already sit in people's Drive and a reader that
+  no longer understands them turns a safety net into unreadable JSON. The split
+  happens on the way in and out, not in the format — and `hasProof` is
+  re-derived from whether bytes actually arrived, so a restored row cannot claim
+  a bill it cannot produce.
+- Deleting a row or a site deletes its photos. `siteId` is denormalised onto the
+  proof for exactly this: clearing a site's images otherwise means reading every
+  row first just to learn their ids.
+
 ### Finding a material by typing
 
 Recording a handout means finding the material first, and the category chips

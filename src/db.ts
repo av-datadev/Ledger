@@ -10,6 +10,7 @@ import type {
   Attachment,
   ContractorSite,
   SiteLedgerRow,
+  SiteProof,
 } from "./types";
 import { CATEGORIES } from "../shared/constants";
 
@@ -27,6 +28,7 @@ export const db = new Dexie("house-ledger") as Dexie & {
   attachments: EntityTable<Attachment, "id">;
   sites: EntityTable<ContractorSite, "id">;
   siteLedger: EntityTable<SiteLedgerRow, "id">;
+  siteProofs: EntityTable<SiteProof, "id">;
 };
 
 db.version(1).stores({
@@ -382,6 +384,72 @@ db.version(15)
         // "Plumbing" is Vijay's work and not Rafi's — and inferring it from
         // name similarity would silently attribute one man's money to another.
         p.trades ??= [];
+      });
+  });
+
+// Bill photos move out of the site-ledger row into their own table.
+//
+// Holding the blob inline made the cheap read pay for the expensive one: the
+// sites list calls `siteLedger.toArray()` to add up three figures per site, and
+// that pulled every bill photo across every site into memory — forty rows of
+// ~300 KB is over 10 MB of JPEG decoded on open, growing with every bill ever
+// logged. The row keeps a `hasProof` boolean, which is all the with-proof /
+// without-proof balance split ever needed.
+//
+// No thumbnails are generated here on purpose. Decoding and re-encoding every
+// stored photo inside an upgrade transaction would hold it open across an
+// unbounded amount of canvas work on a phone, and a Dexie upgrade that stalls
+// leaves the database unopenable. They are filled in lazily on first view
+// instead; `thumb: null` means "not made yet", and callers fall back to the
+// full photo exactly as they did before.
+db.version(16)
+  .stores({
+    entries: "id, date, category, paidBy, createdAt, updatedAt",
+    boqItems: "id, invoiceNo, category, date, vendor, billId",
+    settings: "id",
+    stockItems: "id, category, name, createdAt",
+    stockMoves: "id, stockId, date, createdAt, billId, person",
+    categories: "id, name",
+    people: "id, name",
+    attachments: "id, entryId, createdAt",
+    sites: "id, status, createdAt, linkId",
+    siteLedger: "id, siteId, date, createdAt, sharedId",
+    siteProofs: "id, rowId, siteId",
+  })
+  .upgrade(async (tx) => {
+    const proofs = tx.table("siteProofs");
+    const now = Date.now();
+    // Collected first, then written: modifying a table while iterating it is
+    // the kind of thing that works until the day it doesn't.
+    const rows = (await tx.table("siteLedger").toArray()) as (SiteLedgerRow & {
+      proof?: Blob | null;
+      proofName?: string;
+    })[];
+    for (const r of rows) {
+      if (r.proof) {
+        await proofs.add({
+          id: crypto.randomUUID(),
+          rowId: r.id,
+          siteId: r.siteId,
+          blob: r.proof,
+          thumb: null,
+          mime: r.proof.type || "image/jpeg",
+          name: r.proofName ?? "",
+          // Unknown for migrated photos, and not worth decoding every image to
+          // find out — nothing reads these dimensions.
+          w: 0,
+          h: 0,
+          createdAt: now,
+        });
+      }
+    }
+    await tx
+      .table("siteLedger")
+      .toCollection()
+      .modify((r: SiteLedgerRow & { proof?: Blob | null; proofName?: string }) => {
+        r.hasProof = !!r.proof;
+        delete r.proof;
+        delete r.proofName;
       });
   });
 

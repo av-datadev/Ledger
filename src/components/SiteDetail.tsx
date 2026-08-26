@@ -10,6 +10,8 @@ import {
   updateSite,
   balanceOf,
   markRowShared,
+  getProof,
+  proofThumb,
   LEDGER_KINDS,
 } from "../lib/sites";
 import { addSharedEntry } from "../lib/siteLink";
@@ -37,6 +39,25 @@ export function SiteDetail({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [viewer, setViewer] = useState<string | null>(null);
+
+  /**
+   * Open a row's bill full-screen, fetching the full-size photo on demand.
+   *
+   * The parent owns this URL rather than the row, because the row only ever
+   * holds the thumbnail now — and because the object URL has to outlive the
+   * row that opened it if the list re-renders underneath the viewer.
+   */
+  const showFull = async (rowId: string) => {
+    const p = await getProof(rowId);
+    if (p) setViewer(URL.createObjectURL(p.blob));
+  };
+
+  const closeViewer = () => {
+    setViewer((u) => {
+      if (u) URL.revokeObjectURL(u);
+      return null;
+    });
+  };
 
   // Only an approved link can carry a correction or a retraction to the owner.
   const linkId = site.linkStatus === "approved" ? site.linkId : null;
@@ -134,7 +155,7 @@ export function SiteDetail({
               <LedgerRowCard
                 key={r.id}
                 row={r}
-                onView={setViewer}
+                onViewFull={showFull}
                 onEdit={() => setEditingId(r.id)}
                 linkId={linkId}
               />
@@ -189,7 +210,7 @@ export function SiteDetail({
       {viewer && (
         <div
           className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setViewer(null)}
+          onClick={closeViewer}
         >
           <img src={viewer} alt="Bill" className="max-w-full max-h-full object-contain" />
         </div>
@@ -200,12 +221,12 @@ export function SiteDetail({
 
 function LedgerRowCard({
   row,
-  onView,
+  onViewFull,
   onEdit,
   linkId,
 }: {
   row: SiteLedgerRow;
-  onView: (url: string) => void;
+  onViewFull: (rowId: string) => void;
   onEdit: () => void;
   /** Set when this site is linked and approved — enables sharing a row up. */
   linkId: string | null;
@@ -216,12 +237,26 @@ function LedgerRowCard({
   const [confirming, setConfirming] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [removeErr, setRemoveErr] = useState<string | null>(null);
+  // Loaded per row, on render, and only the 192px copy — the whole reason the
+  // photo moved off the row. Before this the sites list decoded every full
+  // bill photo on every site just to add up three figures.
   useEffect(() => {
-    if (!row.proof) return;
-    const u = URL.createObjectURL(row.proof);
-    setUrl(u);
-    return () => URL.revokeObjectURL(u);
-  }, [row.proof]);
+    if (!row.hasProof) return;
+    let dead = false;
+    let created: string | null = null;
+    void proofThumb(row.id).then((blob) => {
+      if (!blob) return;
+      // The row may have been unmounted (or its photo removed) while this was
+      // in flight; creating a URL then would leak one nothing revokes.
+      if (dead) return;
+      created = URL.createObjectURL(blob);
+      setUrl(created);
+    });
+    return () => {
+      dead = true;
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [row.id, row.hasProof]);
 
   const isIn = row.kind === "received";
 
@@ -243,7 +278,9 @@ function LedgerRowCard({
         description: row.description || KIND_LABEL[row.kind],
         amount: row.amount,
         notes: row.notes,
-        proof: row.proof,
+        // The full photo, fetched now — the owner is being shown evidence, and
+        // a 192px list thumbnail is not a bill anybody can read.
+        proof: row.hasProof ? ((await getProof(row.id))?.blob ?? null) : null,
       });
       await markRowShared(row.id, shared.id);
     } catch (err) {
@@ -273,7 +310,10 @@ function LedgerRowCard({
         <button
           type="button"
           className="w-12 h-12 shrink-0 rounded overflow-hidden border border-rule"
-          onClick={() => onView(url)}
+          // Fetches the FULL photo rather than blowing the 192px list
+          // thumbnail up to full screen — the viewer is where somebody
+          // actually reads the bill.
+          onClick={() => void onViewFull(row.id)}
           aria-label="View the attached bill"
         >
           <img src={url} alt="" className="w-full h-full object-cover" />
@@ -338,7 +378,7 @@ function LedgerRowCard({
               Delete this {inr(row.amount)} row
               {row.sharedId
                 ? "? The owner stops seeing it too."
-                : row.proof
+                : row.hasProof
                   ? " and its bill photo?"
                   : "?"}
             </span>
@@ -421,7 +461,7 @@ function RowForm({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isSpend = kind !== "received";
-  const hadProof = !!row?.proof;
+  const hadProof = !!row?.hasProof;
 
   const save = async () => {
     const value = parseFloat(amount);

@@ -17,7 +17,7 @@ import { db } from "../db";
 import { downloadFile, timestampSlug } from "./csv";
 import { blobToBase64, base64ToBlob } from "./attach";
 import { replaceCloudWithLocal } from "./siteSync";
-import type { ContractorSite, SiteLedgerRow } from "../types";
+import type { ContractorSite, SiteLedgerRow, SiteProof } from "../types";
 
 // Written into the file, so the Brick Book rename can't just replace it: every
 // sites backup already on a contractor's phone says "brick-flow-contractor".
@@ -29,7 +29,15 @@ const LEGACY_APP_TAG = "brick-flow-contractor";
 const PROOF_MIME = "image/jpeg";
 
 // The proof photo is a Blob, which JSON can't hold — carry it as base64.
-type SerializedRow = Omit<SiteLedgerRow, "proof"> & { proofData: string | null };
+//
+// The FILE format is deliberately unchanged now that photos live in their own
+// table: `proofData` stays on the row on the wire, because backup files already
+// exist in people's Drive and a reader that no longer understands them turns a
+// safety net into a pile of unreadable JSON. The split happens on the way in
+// and out, not in the format.
+type SerializedRow = Omit<SiteLedgerRow, "hasProof"> & {
+  proofData: string | null;
+};
 
 interface SiteBackupFile {
   app: typeof APP_TAG | typeof LEGACY_APP_TAG;
@@ -43,20 +51,30 @@ export interface ParsedSiteBackup {
   exportedAt: string;
   sites: ContractorSite[];
   ledger: SiteLedgerRow[];
+  /** Photos, split back out of the rows they arrived attached to. */
+  proofs: SiteProof[];
 }
 
 /** Write every site and its money log out as one JSON file, photos included. */
 export async function exportSiteBackup(): Promise<{ sites: number; rows: number }> {
-  const [sites, rows] = await Promise.all([
+  const [sites, rows, proofs] = await Promise.all([
     db.sites.toArray(),
     db.siteLedger.toArray(),
+    db.siteProofs.toArray(),
   ]);
+  const byRow = new Map(proofs.map((p) => [p.rowId, p]));
 
   const ledger: SerializedRow[] = await Promise.all(
-    rows.map(async ({ proof, ...rest }) => ({
-      ...rest,
-      proofData: proof ? await blobToBase64(proof) : null,
-    })),
+    rows.map(async ({ hasProof, ...rest }) => {
+      const p = hasProof ? byRow.get(rest.id) : undefined;
+      return {
+        ...rest,
+        // Only the full photo travels. A thumbnail is a derived convenience
+        // that any device can rebuild in milliseconds; carrying it would grow
+        // every backup file for nothing.
+        proofData: p ? await blobToBase64(p.blob) : null,
+      };
+    }),
   );
 
   const payload: SiteBackupFile = {
@@ -120,7 +138,9 @@ export async function readSiteBackupFile(file: File): Promise<ParsedSiteBackup> 
   // Drop rows pointing at a site the file doesn't contain — they'd be
   // unreachable in the UI and would silently distort no balance at all.
   const siteIds = new Set(sites.map((s) => s.id));
-  const ledger: SiteLedgerRow[] = data.ledger
+  // Carries proofData one step further than the final shape so the photos can
+  // be split off below without walking the source array twice.
+  const ledger: (SiteLedgerRow & { proofData: string | null })[] = data.ledger
     .filter(
       (r): r is SerializedRow =>
         !!r && typeof r.id === "string" && siteIds.has(r.siteId),
@@ -129,13 +149,37 @@ export async function readSiteBackupFile(file: File): Promise<ParsedSiteBackup> 
       ...rest,
       amount: Number(rest.amount) || 0,
       sharedId: rest.sharedId ?? null,
-      proof: proofData ? base64ToBlob(proofData, PROOF_MIME) : null,
+      hasProof: !!proofData,
+      proofData,
     }));
+
+  const proofs: SiteProof[] = ledger.flatMap((r) =>
+    r.proofData
+      ? [
+          {
+            id: crypto.randomUUID(),
+            rowId: r.id,
+            siteId: r.siteId,
+            blob: base64ToBlob(r.proofData, PROOF_MIME),
+            thumb: null, // rebuilt on first view
+            mime: PROOF_MIME,
+            name: "",
+            w: 0,
+            h: 0,
+            createdAt: Date.now(),
+          },
+        ]
+      : [],
+  );
 
   return {
     exportedAt: typeof data.exportedAt === "string" ? data.exportedAt : "",
     sites,
-    ledger,
+    ledger: ledger.map(({ proofData, ...row }) => {
+      void proofData;
+      return row;
+    }),
+    proofs,
   };
 }
 
@@ -148,12 +192,18 @@ export async function readSiteBackupFile(file: File): Promise<ParsedSiteBackup> 
  * with the counts first.
  */
 export async function applySiteBackup(backup: ParsedSiteBackup): Promise<void> {
-  await db.transaction("rw", [db.sites, db.siteLedger], async () => {
-    await db.siteLedger.clear();
-    await db.sites.clear();
-    await db.sites.bulkAdd(backup.sites);
-    await db.siteLedger.bulkAdd(backup.ledger);
-  });
+  await db.transaction(
+    "rw",
+    [db.sites, db.siteLedger, db.siteProofs],
+    async () => {
+      await db.siteProofs.clear();
+      await db.siteLedger.clear();
+      await db.sites.clear();
+      await db.sites.bulkAdd(backup.sites);
+      await db.siteLedger.bulkAdd(backup.ledger);
+      await db.siteProofs.bulkAdd(backup.proofs);
+    },
+  );
   // Carry the replacement through to the cloud copy, if there is one. Dexie's
   // bulk operations bypass the row hooks sync relies on, so the cloud would
   // otherwise still hold the replaced books — and reconcile, seeing rows the

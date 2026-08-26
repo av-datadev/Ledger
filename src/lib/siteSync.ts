@@ -22,6 +22,7 @@
 // the cost of a live channel buys nothing that reconcile-on-open doesn't.
 
 import { supabase } from "./supabase";
+import { getProof } from "./sites";
 import { db } from "../db";
 import type { ContractorSite, SiteLedgerRow } from "../types";
 
@@ -37,7 +38,10 @@ interface Infra {
 }
 
 /** A ledger row as it travels: the photo's bytes go to Storage, not the row. */
-type RemoteLedger = Omit<SiteLedgerRow, "proof"> & Infra & { has_proof: boolean };
+// The remote row and the local row now agree on shape: `hasProof` on the row,
+// the bytes in a bucket. Before the local split this type existed to paper over
+// the difference; it stays only because the column is snake_case.
+type RemoteLedger = Omit<SiteLedgerRow, "hasProof"> & Infra & { has_proof: boolean };
 type RemoteSite = ContractorSite & Infra;
 
 let userId: string | null = null;
@@ -83,22 +87,21 @@ function siteFromRemote(r: RemoteSite): ContractorSite {
   return rest as ContractorSite;
 }
 
-function ledgerFromRemote(r: RemoteLedger, proof: Blob | null): SiteLedgerRow {
+function ledgerFromRemote(r: RemoteLedger): SiteLedgerRow {
   const { user_id, updated_at, deleted, has_proof, ...rest } = r;
   void user_id;
   void updated_at;
   void deleted;
-  void has_proof;
-  return { ...(rest as Omit<SiteLedgerRow, "proof">), proof };
+  return { ...(rest as Omit<SiteLedgerRow, "hasProof">), hasProof: has_proof };
 }
 
-/** Strip the Blob before a row goes near PostgREST — it is not a column. */
+/** Map the local flag onto the remote column name. */
 function ledgerToRemote(row: SiteLedgerRow, deleted = false) {
-  const { proof, ...rest } = row;
+  const { hasProof, ...rest } = row;
   return {
     ...rest,
     user_id: userId!,
-    has_proof: !!proof,
+    has_proof: hasProof,
     deleted,
   };
 }
@@ -125,16 +128,21 @@ function pushSite(site: ContractorSite, deleted = false): void {
  */
 async function pushLedgerRow(row: SiteLedgerRow, withProof: boolean): Promise<void> {
   if (!userId) return;
-  if (withProof && row.proof) {
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(proofPath(row.id), row.proof, {
-        upsert: true,
-        contentType: row.proof.type || "image/jpeg",
-      });
-    if (error) {
-      console.error("site proof upload failed", error);
-      return;
+  if (withProof && row.hasProof) {
+    // Read the bytes only when they are about to be uploaded — the whole point
+    // of moving them off the row is that carrying one never costs anything.
+    const proof = await getProof(row.id);
+    if (proof) {
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(proofPath(row.id), proof.blob, {
+          upsert: true,
+          contentType: proof.blob.type || "image/jpeg",
+        });
+      if (error) {
+        console.error("site proof upload failed", error);
+        return;
+      }
     }
   }
   const { error } = await supabase.from(LEDGER).upsert(ledgerToRemote(row));
@@ -146,7 +154,7 @@ async function pushLedgerDelete(row: SiteLedgerRow): Promise<void> {
   if (!userId) return;
   const { error } = await supabase.from(LEDGER).upsert(ledgerToRemote(row, true));
   if (error) console.error("site ledger delete push failed", error);
-  if (row.proof) await supabase.storage.from(BUCKET).remove([proofPath(row.id)]);
+  if (row.hasProof) await supabase.storage.from(BUCKET).remove([proofPath(row.id)]);
 }
 
 // ---------- inbound ----------
@@ -238,11 +246,30 @@ async function reconcileLedger(): Promise<void> {
   for (const r of pulls) {
     // Keep the bytes we already hold rather than re-downloading them; only a
     // row we've never seen, or one whose photo we're missing, costs a fetch.
-    const existing = await db.siteLedger.get(r.id);
-    const proof =
-      r.has_proof && !existing?.proof ? await downloadProof(r.id) : (existing?.proof ?? null);
+    const held = await getProof(r.id);
+    const fetched = r.has_proof && !held ? await downloadProof(r.id) : null;
     await runApplying(async () => {
-      await db.siteLedger.put(ledgerFromRemote(r, proof));
+      await db.siteLedger.put(ledgerFromRemote(r));
+      if (fetched) {
+        await db.siteProofs.put({
+          id: crypto.randomUUID(),
+          rowId: r.id,
+          siteId: r.siteId,
+          blob: fetched,
+          // Made on first view rather than here: a restore pulling fifty
+          // photos should not also decode and re-encode fifty images before
+          // the contractor can see anything.
+          thumb: null,
+          mime: fetched.type || "image/jpeg",
+          name: "",
+          w: 0,
+          h: 0,
+          createdAt: Date.now(),
+        });
+      } else if (!r.has_proof && held) {
+        // The photo was removed on another device; drop our copy to match.
+        await db.siteProofs.delete(held.id);
+      }
     });
   }
 

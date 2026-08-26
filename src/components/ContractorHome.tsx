@@ -27,6 +27,10 @@ export function ContractorHome({
   const [openSiteId, setOpenSiteId] = useState<string | null>(null);
 
   const sites = useLiveQuery(() => db.sites.toArray(), []);
+  // Cheap now that the photos live in `siteProofs`: this reads only the scalar
+  // fields the balances need. It used to pull every bill photo on every site
+  // into memory — ~300 KB a row, over 10 MB on a working site — purely to add
+  // up taken, spent-with-proof and spent-without.
   const ledger = useLiveQuery(() => db.siteLedger.toArray(), []);
   const openSite = sites?.find((s) => s.id === openSiteId) ?? null;
 

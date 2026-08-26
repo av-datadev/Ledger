@@ -7,6 +7,8 @@ import type { Attachment } from "../types";
 
 const MAX_EDGE = 1600;
 const JPEG_QUALITY = 0.82;
+const THUMB_EDGE = 192;
+const THUMB_QUALITY = 0.7;
 
 export interface ProcessedImage {
   blob: Blob;
@@ -39,6 +41,45 @@ export async function fileToAttachment(file: File): Promise<ProcessedImage> {
     return { blob, mime: "image/jpeg", name: file.name || "photo.jpg", w, h };
   } finally {
     bitmap.close();
+  }
+}
+
+/**
+ * A list-sized copy of an already-downscaled photo.
+ *
+ * 192px because the row thumbnail is a 48px box, and 4x covers the densest
+ * phone screens with room to spare. Rendering the 1600px original into that box
+ * asks the device to decode roughly a hundred times the pixels it can show —
+ * per row, every time the list paints.
+ *
+ * Quality is lower than the original's too: at this size JPEG artefacts are
+ * invisible, and the point is a file small enough that a whole list of them
+ * costs less than one full photo.
+ */
+export async function makeThumb(source: Blob): Promise<Blob | null> {
+  try {
+    const bitmap = await createImageBitmap(source);
+    try {
+      const scale = Math.min(1, THUMB_EDGE / Math.max(bitmap.width, bitmap.height));
+      const w = Math.max(1, Math.round(bitmap.width * scale));
+      const h = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      return await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", THUMB_QUALITY),
+      );
+    } finally {
+      bitmap.close();
+    }
+  } catch {
+    // A thumbnail is an optimisation, never a requirement. If this device
+    // can't decode the image the caller falls back to the full photo, which
+    // is exactly what it did before thumbnails existed.
+    return null;
   }
 }
 

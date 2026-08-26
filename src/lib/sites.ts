@@ -6,10 +6,10 @@
 // real numbers in.
 
 import { db } from "../db";
-import { fileToAttachment } from "./attach";
+import { fileToAttachment, makeThumb, type ProcessedImage } from "./attach";
 import { siteBalance, type SiteBalance } from "./advance";
 import { updateSharedEntry, unshareEntry } from "./siteLink";
-import type { ContractorSite, SiteLedgerRow } from "../types";
+import type { ContractorSite, SiteLedgerRow, SiteProof } from "../types";
 
 export type { SiteBalance };
 
@@ -67,13 +67,69 @@ export async function deleteSite(id: string): Promise<void> {
     if (!r.sharedId) continue;
     await unshareEntry(
       r.sharedId,
-      r.proof && site?.linkId ? `${site.linkId}/${r.sharedId}.jpg` : null,
+      r.hasProof && site?.linkId ? `${site.linkId}/${r.sharedId}.jpg` : null,
     );
   }
-  await db.transaction("rw", [db.sites, db.siteLedger], async () => {
+  await db.transaction("rw", [db.sites, db.siteLedger, db.siteProofs], async () => {
+    // Keyed by siteId, which is why the proof row carries it: clearing a site's
+    // photos otherwise means reading every row first just to learn their ids.
+    await db.siteProofs.where("siteId").equals(id).delete();
     await db.siteLedger.where("siteId").equals(id).delete();
     await db.sites.delete(id);
   });
+}
+
+/**
+ * Store (or replace) the photo behind one row, thumbnail and all.
+ *
+ * One photo per row, so an existing one is cleared first — otherwise replacing
+ * a mis-shot bill would silently leave both, and the reader picks whichever
+ * comes back first.
+ */
+async function putProof(
+  rowId: string,
+  siteId: string,
+  img: ProcessedImage,
+): Promise<void> {
+  const thumb = await makeThumb(img.blob);
+  await db.transaction("rw", db.siteProofs, async () => {
+    await db.siteProofs.where("rowId").equals(rowId).delete();
+    await db.siteProofs.add({
+      id: crypto.randomUUID(),
+      rowId,
+      siteId,
+      blob: img.blob,
+      thumb,
+      mime: img.mime,
+      name: img.name,
+      w: img.w,
+      h: img.h,
+      createdAt: Date.now(),
+    });
+  });
+}
+
+/** The photo behind a row, or null. */
+export async function getProof(rowId: string): Promise<SiteProof | null> {
+  return (await db.siteProofs.where("rowId").equals(rowId).first()) ?? null;
+}
+
+/**
+ * The thumbnail for a row's photo, made on demand if it doesn't exist yet.
+ *
+ * Photos migrated from before this table had no thumbnail — generating them all
+ * inside the upgrade would have held a Dexie transaction open across an
+ * unbounded amount of canvas work. So the first view of an old row pays for
+ * one, and every view after that is free. A device that cannot generate one
+ * falls back to the full photo, which is what it displayed before.
+ */
+export async function proofThumb(rowId: string): Promise<Blob | null> {
+  const p = await getProof(rowId);
+  if (!p) return null;
+  if (p.thumb) return p.thumb;
+  const thumb = await makeThumb(p.blob);
+  if (thumb) await db.siteProofs.update(p.id, { thumb });
+  return thumb ?? p.blob;
 }
 
 export async function addLedgerRow(input: {
@@ -87,28 +143,23 @@ export async function addLedgerRow(input: {
 }): Promise<void> {
   // Compress the proof photo the same way ledger attachments are, so a site
   // with a year of bills doesn't balloon the on-device database.
-  let proof: Blob | null = null;
-  let proofName = "";
-  if (input.proofFile) {
-    const img = await fileToAttachment(input.proofFile);
-    proof = img.blob;
-    proofName = img.name;
-  }
+  const img = input.proofFile ? await fileToAttachment(input.proofFile) : null;
   const now = Date.now();
+  const id = crypto.randomUUID();
   await db.siteLedger.add({
-    id: crypto.randomUUID(),
+    id,
     siteId: input.siteId,
     date: input.date,
     kind: input.kind,
     description: input.description,
     amount: input.amount,
-    proof,
-    proofName,
+    hasProof: !!img,
     notes: input.notes,
     sharedId: null,
     createdAt: now,
     updatedAt: now,
   });
+  if (img) await putProof(id, input.siteId, img);
 }
 
 /**
@@ -155,16 +206,21 @@ export async function updateLedgerRow(
     updatedAt: Date.now(),
   };
 
+  // The photo is written AFTER the shared copy is accepted, further down, so a
+  // failed share leaves the row and its photo exactly as they were.
+  let nextImg: ProcessedImage | null = null;
   if (input.proofFile === null) {
-    patch.proof = null;
-    patch.proofName = "";
+    patch.hasProof = false;
   } else if (input.proofFile) {
-    const img = await fileToAttachment(input.proofFile);
-    patch.proof = img.blob;
-    patch.proofName = img.name;
+    nextImg = await fileToAttachment(input.proofFile);
+    patch.hasProof = true;
   }
 
-  const proof = "proof" in patch ? patch.proof! : existing.proof;
+  // What the owner's copy should carry: the replacement if there is one, the
+  // existing photo if this edit doesn't touch it, and nothing if it was removed.
+  const proof =
+    nextImg?.blob ??
+    (input.proofFile === null ? null : ((await getProof(id))?.blob ?? null));
 
   if (existing.sharedId && linkId) {
     await updateSharedEntry({
@@ -218,16 +274,21 @@ export async function deleteLedgerRow(
   if (existing?.sharedId) {
     await unshareEntry(
       existing.sharedId,
-      existing.proof && linkId ? `${linkId}/${existing.sharedId}.jpg` : null,
+      existing.hasProof && linkId ? `${linkId}/${existing.sharedId}.jpg` : null,
     );
   }
-  await db.siteLedger.delete(id);
+  // The photo goes with the row. Left behind it is unreachable bytes — nothing
+  // can display a proof whose row no longer exists — quietly filling the phone.
+  await db.transaction("rw", [db.siteLedger, db.siteProofs], async () => {
+    await db.siteProofs.where("rowId").equals(id).delete();
+    await db.siteLedger.delete(id);
+  });
 }
 
 /** The running position on one site — see siteBalance() for what it means. */
 export function balanceOf(rows: SiteLedgerRow[]): SiteBalance {
   return siteBalance(
-    rows.map((r) => ({ kind: r.kind, amount: r.amount, hasProof: !!r.proof })),
+    rows.map((r) => ({ kind: r.kind, amount: r.amount, hasProof: r.hasProof })),
   );
 }
 

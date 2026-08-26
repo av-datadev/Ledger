@@ -312,6 +312,27 @@ signing key before touching anything there.
   On the BOQ a bill matches if **any of its rows** does, plus dealer and bill
   number — the question there is asked from the item end ("which bill did this
   come from, and at what rate?") and the bill is the thing that knows.
+- **Bill photos live beside the row, not in it** (contractor side) — a
+  `SiteLedgerRow` used to carry its photo inline, so the sites list called
+  `siteLedger.toArray()` to add up three figures per site and pulled **every
+  bill photo on every site** into memory to do it: ~300 KB a row, over 10 MB on
+  a working site, growing with every bill ever logged. Photos now live in
+  `siteProofs` and the row keeps a `hasProof` boolean, which is all the
+  with-proof / without-proof balance split ever needed — the contractor's own
+  defence against "show me what you spent it on", and a figure that must be
+  reachable without decoding a single image. This mirrors what the cloud copy
+  already did, where the row carries `has_proof` and the bytes sit in a bucket.
+  Each photo also stores a **192px thumbnail** for the 48px list box, which was
+  rendering the full 1600px image — roughly a hundred times the pixels it can
+  show, per row, every paint. Migrated photos have `thumb: null` and get one
+  made on first view: decoding and re-encoding every stored image inside the
+  upgrade transaction would hold it open across unbounded canvas work, and a
+  Dexie upgrade that stalls leaves the database unopenable.
+  The **backup file format is deliberately unchanged** — `proofData` still
+  travels on the row — because backup files already exist in people's Drive and
+  a reader that no longer understands them turns a safety net into unreadable
+  JSON. `hasProof` is re-derived from whether bytes actually arrived, so a
+  restored row cannot claim a bill it can't produce.
 - **Taking a whole bill back out of Stock** (Stock → *By BOQ bill*) — line by
   line is right for one wrong row; a bill saved with every quantity wrong needs
   as many confirmations as it has rows. `removeBillFromStock` is deliberately
@@ -418,6 +439,13 @@ Offline (airplane mode, after one full load):
       a joined total (material + paid to him) with the material/labour split
 - [ ] A trade already held shows greyed with its holder's name and can't be
       double-claimed; renaming a linked trade keeps the link intact
+- [ ] Contractor side works **signed out** — sites, money log, photos, balances;
+      sign-in is only for cloud backup and owner linking
+- [ ] Upgrading a v15 database moves inline proofs into `siteProofs`, sets
+      `hasProof`, and the with-bill / without-bill split still matches
+- [ ] A row's photo opens **full size** from the list, which itself shows only
+      the 192px copy; deleting a row or a site takes its photos with it
+- [ ] Site backup round-trips a photo: export → wipe → restore, byte-identical
 - [ ] Stock + BOQ **search**: typing ignores the category chip (which stays
       visible, dimmed, and re-applies when the box is cleared) and says so;
       `t 1.5` returns only `T 1.5 inch`, never `T 1 inch`
