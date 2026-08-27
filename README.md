@@ -42,6 +42,7 @@ Most of the app works in airplane mode. These don't:
 | Feature | Why |
 | --- | --- |
 | Bill / note / size-list scanning | Gemini vision, via Supabase Edge Functions |
+| Speaking a record instead of typing it | Gemini audio, via `scan-voice` |
 | Working out an outside spreadsheet's layout | Gemini, via `analyse-import` — skippable, see below |
 | Household sync + sign-in | Supabase |
 | Push notifications | Web Push via the `send-push` function |
@@ -80,8 +81,8 @@ src/lib/               sync, scanning, import, backup, stock, measures, push
 public/tesseract/      self-hosted OCR worker, wasm cores, English data
 public/*.html          privacy, terms and delete-account — static, no JS
 scripts/               icon generator, tesseract vendoring, user-guide build
-supabase/functions/    scan-bill, scan-note, scan-sizes, analyse-import,
-                       send-push, delete-account
+supabase/functions/    scan-bill, scan-note, scan-sizes, scan-voice,
+                       analyse-import, send-push, delete-account
 supabase/migrations/   SQL for columns the sync engine pushes
 android-twa/           Play Store packaging only — no Android source
 design/                HTML mockups the current skin came from
@@ -89,7 +90,25 @@ files/                 the build spec (ClaudeCode_HouseLedger_Prompt.md)
 Ref_img/               real bills used as scanner test fixtures
 ```
 
-Three things that will bite you:
+Four things that will bite you:
+
+**An Edge Function in this repo is not a deployed one.** `supabase/functions/`
+is source; the running copy lives in the Supabase project and only changes when
+something pushes it there. Nothing in `npm run build` or the Vercel deploy does
+— committing a new function and shipping the client that calls it gives a
+green build, a green deploy, and a feature that answers
+`{"code":"NOT_FOUND"}` on every phone. `scan-voice` shipped that way and stayed
+dead until it was deployed by hand. After adding or editing one, deploy it and
+then curl it:
+
+```bash
+curl -s -X POST "$SUPABASE_URL/functions/v1/<slug>" -H "apikey: $KEY" -d '{}'
+```
+
+A 400 complaining about the body is the healthy answer — it means the function
+is there and validating. A 404 means the client is calling nothing. Match
+`verify_jwt` to its siblings: the scanners run with it **off**, because the app
+scans before anyone signs in.
 
 **Sync pushes whole rows** (`upsert({...obj})` in `src/lib/sync.ts`), so any
 new field on a synced type needs its column added remotely *first*. PostgREST
@@ -246,6 +265,43 @@ signing key before touching anything there.
   paper is a bill, not just a payment** and offers to send it to the BOQ, where
   the same Bill / Payment / Both choice decides where it lands. Which tab the
   paper was scanned from no longer decides what survives of it.
+- **Saying it instead of typing it** (Entry, Stock → *given out*, contractor
+  site log) — hold the microphone, say *"do hazaar ka cement Gopal se liya"* in
+  Hindi, Hinglish or English, and the form below fills itself. One button on
+  three screens: the three things being recorded differ only in the shape that
+  comes back, and everything that can go wrong with them is identical.
+  `scan-voice` **transcribes and extracts in one call**. Plain transcription
+  would leave a sentence still to be typed into fields; what pays for the round
+  trip is that the fields come back filled. The prompt carries the number words
+  people actually say — *dedh* 1.5, *dhai* 2.5, *sava* +¼, *paune* −¼, so
+  *"saadhe teen hazaar"* is 3500 — and a Devanagari construction glossary,
+  because a generic model reads *sariya* as a name.
+  **Today's date is sent from the phone**, not taken from the server: *aaj* and
+  *kal* must resolve in the speaker's timezone, and an edge function runs in
+  UTC, where a phone at 00:30 IST is still yesterday — enough to date every
+  late-night entry one day early.
+  Nothing is written. Every result lands in the form beside it, under a
+  **Heard:** line showing the verbatim transcript in its original script. That
+  line is not decoration: when a figure comes back wrong the person has to know
+  whether the machine misheard the words or misunderstood the sentence, and
+  those have different fixes. A missing amount leaves the field alone rather
+  than zeroing one already typed, and a category or payment mode the app doesn't
+  recognise is ignored instead of being written in.
+  On the **Stock** screen the spoken material name is *shown, not acted on* —
+  the form is already scoped to one item, and quietly moving a handout onto a
+  different material because the reader heard a different name is the one
+  mistake here that writes a wrong record silently. Offered on the way *out*
+  only; a receipt normally comes from a bill, which the reader beside it handles
+  better than speech could.
+  Opt-in per device behind the same consent as the photo reader, said plainly
+  before anything is recorded, because the audio leaves the phone. Recording
+  stops itself at 30s, and the microphone track is released on **every** path
+  including unmount — a live `getUserMedia` track keeps the phone's recording
+  indicator lit after the person has navigated away, which on an app holding
+  their financial records looks exactly like being spied on.
+  There is **no on-device fallback**. Nothing in the browser reads Hinglish
+  construction talk, and falling back to a generic speech API would produce a
+  confidently wrong number, which is worse than an error.
 - **Paid vs billed** (Ledger) — money handed over that no bill accounts for
   yet. A gap isn't proof of anything; labour never has a bill. It's worth a
   question when the payment was for material.
@@ -467,6 +523,14 @@ Offline (airplane mode, after one full load):
 - [ ] Stock + BOQ **search**: typing ignores the category chip (which stays
       visible, dimmed, and re-applies when the box is cleared) and says so;
       `t 1.5` returns only `T 1.5 inch`, never `T 1 inch`
+- [ ] **Speak it instead** (needs network): the consent panel names Gemini
+      before the first recording; *"do hazaar ka cement Gopal se liya"* fills
+      ₹2,000 / Cement / Gopal, *"paanch T one inch plumber ko diye"* fills 5 pcs
+      to Plumber, *"aaj maalik se pachas hazaar liye"* logs ₹50,000 **received**
+      and not a spend; the Heard line shows the original script
+- [ ] A sentence with no amount in it leaves an already-typed amount alone; on
+      Stock, a spoken item name unlike the row says so instead of switching rows
+- [ ] Leaving the screen mid-recording clears the phone's recording indicator
 - [ ] Stock: received / given out, balance, done-checkbox
 - [ ] Stock: a give-out saved with a **back-date** and a name lands on that day,
       not today — and shows up under that person in *By date* and on the

@@ -5,7 +5,7 @@ a specification of what it now is, so it can be rebuilt or handed to someone
 new. Where the original brief was overtaken by reality, this says so — those
 reversals are the most useful part of the document.
 
-Last updated: 2026-08-14.
+Last updated: 2026-08-27.
 
 ---
 
@@ -22,12 +22,14 @@ full-screen with no browser chrome.
 - **Offline** — `vite-plugin-pwa` (Workbox), precached app shell
 - **Backend** — Supabase: Postgres with row-level security, Auth (email OTP),
   Storage, and Edge Functions. No Express server.
-- **AI** — Gemini vision, called *only* from Edge Functions so the key never
-  reaches a device
+- **AI** — Gemini vision *and* audio, called *only* from Edge Functions so the
+  key never reaches a device
 - **Deployment** — Vercel for the client (auto-deploys from `main`), Supabase
-  CLI for functions. Android ships as a Trusted Web Activity wrapping that same
-  site (`android-twa/`), so there is no second codebase and a content change
-  needs no store submission.
+  CLI for functions — which is a **separate, manual step**: a function committed
+  here but not pushed to the project 404s on every phone while the build and the
+  deploy both stay green. Android ships as a Trusted Web Activity wrapping that
+  same site (`android-twa/`), so there is no second codebase and a content
+  change needs no store submission.
 
 > **Reversed from the original brief.** It specified an Express/Vercel
 > serverless backend calling the Anthropic API, and "no cloud sync, on-device
@@ -129,7 +131,8 @@ disagreement is the entire point of the feature.
 
 2. **Entry** — date, category, description, detail, amount, mode, paid-by,
    notes, plus photo attachments. Can read a handwritten slip, cheque or Hindi
-   diary page into the form (opt-in per device — the photo leaves the phone).
+   diary page into the form, or take the whole thing **spoken aloud** (§5) —
+   both opt-in per device, since the photo or the audio leaves the phone.
 
 3. **Ledger** — search; four filters: category, mode, payer, and **date range**
    (from, to, or either alone). Long notes fold behind a "note" chip. Inline
@@ -148,11 +151,13 @@ disagreement is the entire point of the feature.
    owed on them, behind a **Still to pay** filter (§6).
 
 6. **Stock** — received vs given out to labour, balance, hard-linked to the
-   source bill. A **search box** over the whole inventory (§6). Every movement
-   carries **the day it happened and the name it went to**, both set by hand. A *By date* view steps a day at a time or totals
-   a range, grouped by who received it (§6). Two ways to clear more than one row
-   at a time, and they answer different questions: a whole bill taken back out
-   in one action, and a selection mode for particular rows (both §6).
+   source bill. A handout can be **spoken** rather than typed (§5). A **search
+   box** over the whole inventory (§6). Every movement carries **the day it
+   happened and the name it went to**, both set by hand. A *By date* view steps
+   a day at a time or totals a range, grouped by who received it (§6). Two ways
+   to clear more than one row at a time, and they answer different questions: a
+   whole bill taken back out in one action, and a selection mode for particular
+   rows (both §6).
 
 7. **People** — every category as an editable person: contact, contract
    pricing (lump sum, area×rate, or per-floor lines), bank details scannable
@@ -170,15 +175,16 @@ The Dashboard also carries a **Refresh** control, on a device that has a
 household. It re-pulls the shared ledger and shows when the last pull happened,
 so "is this up to date?" is answered on screen rather than by pressing it.
 
-## 5. Scanning
+## 5. Reading a record instead of entering it
 
-Three Edge Functions, deliberately separate because the outputs differ:
+Four Edge Functions, deliberately separate because the outputs differ:
 
 | Function | Input | Output |
 | --- | --- | --- |
 | `scan-bill` | printed invoice **or** handwritten kaccha bill | line items + totals + payment |
 | `scan-note` | a slip that is *only* a payment | one ledger entry |
 | `scan-sizes` | a dealer's size list | one `cft` row per size |
+| `scan-voice` | a spoken sentence, Hindi / Hinglish / English | one entry, stock move, or site row |
 
 `scan-bill` also reads what a kaccha bill records and a printed invoice never
 does — जमा (paid) and शेष (balance) — so one sheet of paper can become a bill,
@@ -220,6 +226,55 @@ confidently wrong bill that looked exactly like a right one.
 
 > **Gemini's free tier allows 20 requests/day.** Exhaust it and every scan
 > degrades to the fallback. Enable billing if more than one person scans.
+
+### Speech
+
+`scan-voice` is the same bargain as `scan-note`, from the other direction: the
+people who keep these books do not want to fill in a form on a phone. A
+contractor saying *"do hazaar ka cement Gopal se liya"* does in three seconds
+what the Entry screen asks eight taps for.
+
+It **transcribes and extracts in one call**. Plain transcription leaves a
+sentence that still has to be typed into fields; the round trip is only worth
+making if the fields come back filled.
+
+Three request shapes, not one loose schema, because the app records three
+different kinds of thing and a single schema guesses wrong at the one that
+matters — `entry` (a ledger payment), `stock` (material in or out), `site` (a
+contractor's money-log row). The `site` prompt is told in as many words that
+*received from the owner* versus *spent* is the distinction the whole running
+balance is built on.
+
+What the prompt has to carry, each from a real misread:
+
+- The number words people say, not the ones the model knows: *hazaar* 1000,
+  *lakh* 100000, *dedh* 1.5, *dhai* 2.5, *sava* +¼, *paune* −¼, *saadhe* +½ —
+  so *"saadhe teen hazaar"* is 3500 and *"paune do lakh"* is 175000
+- A Devanagari construction glossary (सरिया steel rod, गिट्टी aggregate,
+  मिस्त्री mason), or *sariya* comes back as somebody's name
+- Sizes stay in the item name exactly as spoken — *"T 1.5 inch"*, *"Elbow 3/4"*
+  — because the size **is** the identity of a fitting
+- Descriptions and names in English, the transcript untouched in its original
+  script, and names transliterated rather than translated
+- **Never invent an amount.** Return 0, and say so in `unclear`
+
+**Today's date is a request field, sent by the phone.** *aaj* and *kal* resolve
+in the speaker's timezone; the function runs in UTC, where a phone at 00:30 IST
+is still yesterday — enough to date every late-night entry one day early.
+
+Every result is a draft. It lands in the form for review under the verbatim
+transcript, which is what lets a person tell *misheard the words* from
+*misunderstood the sentence* — different fixes. Nothing writes.
+
+There is **no on-device fallback**, unlike printed bills: no browser API reads
+Hinglish construction talk, and a generic one would return a confidently wrong
+number. An error the person can see beats a figure they cannot check.
+
+Consent is per device and asked before the first recording, naming the service
+by name — the audio leaves the phone, and that is the whole bargain. Recording
+self-terminates at 30s, and the microphone track is released on every path
+including unmount: an indicator left lit on an app holding somebody's financial
+records reads as surveillance.
 
 ## 6. A bill kept as one line, and a bill part paid
 
@@ -623,6 +678,13 @@ any font: this app must not fetch from a CDN at runtime.
       was that money, **without** the bill's total changing
 - [ ] Removing a bill from Stock leaves the bill, the handouts, and any item
       with its own history intact
+- [ ] A spoken *"do hazaar ka cement Gopal se liya"* fills ₹2,000, Cement and
+      Gopal without writing anything, and shows the sentence back verbatim in
+      the script it was said in
+- [ ] A spoken sentence carrying no amount leaves an amount already typed alone
+- [ ] *"aaj maalik se pachas hazaar liye"* logs money **received**, not spent
+- [ ] A stock handout spoken with a material name unlike the open row warns
+      instead of moving the handout to another material
 - [ ] A timber size list computes cubic feet matching the dealer's own figure
 - [ ] Backup → clear → restore, for **both** JSON and Excel
 - [ ] An outside spreadsheet imports on top of existing entries, summing to the
