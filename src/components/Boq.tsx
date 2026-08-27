@@ -664,7 +664,42 @@ export function Boq({
         </div>
       )}
 
-      <section className="mt-2">
+      {/* Above the coverage table on purpose. It used to sit below it, which on
+          a phone is seventeen category rows of scrolling past something you
+          aren't looking at — a search box you have to hunt for is one nobody
+          knows exists. */}
+      {groups.length > 0 && (
+        <div className="relative mt-2">
+          <span
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-soft text-[13px] pointer-events-none"
+            aria-hidden="true"
+          >
+            ⌕
+          </span>
+          <input
+            className="input !py-2 !text-[14px] !pl-7 !pr-8"
+            type="search"
+            placeholder="Search item, dealer or bill no.…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search bills by item, dealer, bill number or category"
+          />
+          {searching && (
+            <button
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-soft text-[15px] px-1"
+              aria-label="Clear search"
+              onClick={() => setQuery("")}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* While a search is running the coverage table is noise — it answers a
+          different question and pushes the results the person asked for off
+          the screen. */}
+      <section className={`mt-2 ${searching ? "hidden" : ""}`}>
         <h3 className="eyebrow mb-2">
           Coverage: BOQ vs ledger
         </h3>
@@ -718,34 +753,6 @@ export function Boq({
           <DealerAccounts />
         ) : (
         <>
-        {groups.length > 0 && (
-          <div className="relative mb-2">
-            <span
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-soft text-[13px] pointer-events-none"
-              aria-hidden="true"
-            >
-              ⌕
-            </span>
-            <input
-              className="input !py-2 !text-[14px] !pl-7 !pr-8"
-              type="search"
-              placeholder="Search item, dealer or bill no.…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label="Search bills by item, dealer, bill number or category"
-            />
-            {searching && (
-              <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-soft text-[15px] px-1"
-                aria-label="Clear search"
-                onClick={() => setQuery("")}
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        )}
-
         <div className="flex items-center justify-between gap-2 mb-2">
           <h3 className="eyebrow">
             Bills on record

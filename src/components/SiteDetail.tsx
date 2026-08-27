@@ -15,6 +15,8 @@ import {
   LEDGER_KINDS,
 } from "../lib/sites";
 import { addSharedEntry } from "../lib/siteLink";
+import { VoiceCapture, VoiceHeard } from "./VoiceCapture";
+import type { VoiceSite } from "../lib/voice";
 import { SiteBalanceCard } from "./SiteBalanceCard";
 import { SiteLinkPanel } from "./SiteLinkPanel";
 import type { ContractorSite, SiteLedgerRow } from "../types";
@@ -458,6 +460,7 @@ function RowForm({
   const [keepProof, setKeepProof] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [heard, setHeard] = useState<VoiceSite | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isSpend = kind !== "received";
@@ -513,6 +516,37 @@ function RowForm({
 
   return (
     <div className="card p-3 space-y-2.5 mb-2">
+      {/* Offered only when logging, not when correcting. Speaking a whole row
+          over a row you opened to fix one figure would overwrite the three
+          fields you were happy with to change the one you weren't. */}
+      {!row && (
+        <>
+          <VoiceCapture
+            mode="site"
+            hint="aaj maalik se pachas hazaar liye"
+            onResult={(v) => {
+              setError(null);
+              setHeard(v);
+              if (v.date) setDate(v.date);
+              if (LEDGER_KINDS.some((k) => k.value === v.kind)) {
+                setKind(v.kind as SiteLedgerRow["kind"]);
+              }
+              if (v.description) setDescription(v.description);
+              // Never clears a figure already typed — see the entry form.
+              if (v.amount > 0) setAmount(String(v.amount));
+              if (v.notes) setNotes(v.notes);
+            }}
+          />
+          {heard && (
+            <VoiceHeard
+              transcript={heard.transcript}
+              confidence={heard.confidence}
+              unclear={heard.unclear}
+              onDismiss={() => setHeard(null)}
+            />
+          )}
+        </>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="field-label" htmlFor="s-date">Date</label>

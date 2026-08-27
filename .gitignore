@@ -23,3 +23,4 @@ android-twa/.gradle/
 android-twa/app/build/
 android-twa/build/
 android-twa/local.properties
+supabase/.temp/

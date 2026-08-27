@@ -15,6 +15,8 @@ import {
 } from "../lib/stock";
 import type { StockItem, StockMove } from "../types";
 import { matchesQuery } from "../lib/search";
+import { VoiceCapture, VoiceHeard } from "./VoiceCapture";
+import type { VoiceStock } from "../lib/voice";
 import { BillStockPanel } from "./BillStockPanel";
 import { AddStockPicker } from "./AddStockPicker";
 
@@ -86,6 +88,7 @@ function MoveForm({
   const [person, setPerson] = useState("");
   const [note, setNote] = useState("");
   const [billId, setBillId] = useState<string>("");
+  const [heard, setHeard] = useState<VoiceStock | null>(null);
   const [err, setErr] = useState("");
 
   // Only offer bills in the same category — that's where this material belongs.
@@ -151,6 +154,41 @@ function MoveForm({
           onChange={(e) => setNote(e.target.value)}
         />
       </div>
+      {/* Only on the way OUT. A receipt is normally taken from a bill, which
+          the reader beside it already handles far better than speech could. */}
+      {kind === "out" && (
+        <VoiceCapture
+          mode="stock"
+          hint="paanch T one inch plumber ko diye"
+          onResult={(v) => {
+            setErr("");
+            if (v.qty > 0) setQty(String(v.qty));
+            if (v.person) setPerson(v.person);
+            if (v.date) setDate(v.date);
+            setHeard(v);
+          }}
+        />
+      )}
+      {heard && (
+        <VoiceHeard
+          transcript={heard.transcript}
+          confidence={heard.confidence}
+          unclear={heard.unclear}
+          onDismiss={() => setHeard(null)}
+        />
+      )}
+      {/* The spoken material name is shown rather than acted on. This form is
+          already scoped to ONE item, and quietly moving a handout onto a
+          different material because the reader heard a different name is the
+          one mistake here that writes a wrong record silently. */}
+      {heard?.item &&
+        !heard.item.toLowerCase().includes(item.name.toLowerCase().slice(0, 6)) && (
+          <div className="text-[12px] text-crimson">
+            You said “{heard.item}”, but this row is <b>{item.name}</b>. Save it
+            here only if that is the same thing.
+          </div>
+        )}
+
       {kind === "in" && catBills.length > 0 && (
         <select
           className="input !py-1.5 !text-[13px]"

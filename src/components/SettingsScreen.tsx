@@ -7,7 +7,7 @@ import { withBalances } from "../lib/stock";
 import { toCsv, downloadFile, downloadBlob, timestampSlug } from "../lib/csv";
 import { currentHouseholdId } from "../lib/sync";
 import { useTextScale, TEXT_SCALES } from "../hooks/useTextScale";
-import { useNoteAiConsent } from "../hooks/useNoteAiConsent";
+import { useNoteAiConsent, useVoiceAiConsent } from "../hooks/useNoteAiConsent";
 import { PushToggle } from "./PushToggle";
 import { ImportWizard } from "./ImportWizard";
 import { Faq } from "./Faq";
@@ -29,6 +29,7 @@ export function SettingsScreen() {
   const importExcelRef = useRef<HTMLInputElement>(null);
   const { scale, setScale } = useTextScale();
   const noteAi = useNoteAiConsent();
+  const voiceAi = useVoiceAiConsent();
   // While the shared cloud ledger is active, restoring/resetting local data
   // fights the live sync (and isn't needed — the cloud already holds it).
   const synced = currentHouseholdId() != null;
@@ -224,6 +225,31 @@ export function SettingsScreen() {
           diary page. Handwriting can't be read on the phone itself, so that
           photo is sent over the internet to an AI reader. Applies to this
           device only — not the others sharing this ledger.
+        </p>
+      </section>
+
+      {/* A separate switch from the one above, not a second use of it. Sending
+          a photo of a piece of paper and sending a recording of your own voice
+          are different things to agree to, and somebody may well want one
+          without the other. */}
+      <section className="space-y-2">
+        <h2 className="eyebrow">Speaking an entry</h2>
+        <button
+          className={`btn w-full !py-2.5 ${
+            voiceAi.granted ? "!bg-ink !text-paper !border-ink" : ""
+          }`}
+          aria-pressed={voiceAi.granted}
+          onClick={() => (voiceAi.granted ? voiceAi.revoke() : voiceAi.grant())}
+        >
+          {voiceAi.granted ? "On — recordings are sent to be read" : "Off"}
+        </button>
+        <p className="text-[13px] text-ink-soft">
+          Lets you say a payment, a material handout or a site row in Hindi,
+          Hinglish or English instead of typing it — "do hazaar ka cement Gopal
+          se liya" — and have the fields fill themselves for you to check.
+          Speech can't be read on the phone itself, so the recording is sent
+          over the internet to an AI reader. Applies to this device only — not
+          the others sharing this ledger.
         </p>
       </section>
 

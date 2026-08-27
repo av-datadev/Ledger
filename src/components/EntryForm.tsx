@@ -7,6 +7,8 @@ import { useNoteAiConsent } from "../hooks/useNoteAiConsent";
 import { todayStr, inr } from "../lib/format";
 import { fileToAttachment, type ProcessedImage } from "../lib/attach";
 import { scanNoteWithGemini, matchMode, type ScannedNote } from "../lib/noteScan";
+import { VoiceCapture, VoiceHeard } from "./VoiceCapture";
+import type { VoiceEntry } from "../lib/voice";
 import type { ScannedBill } from "../lib/scanParse";
 import type { Entry, Attachment } from "../types";
 
@@ -122,6 +124,7 @@ export function EntryForm({
   const [askConsent, setAskConsent] = useState(false);
   const [reading, setReading] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
+  const [heard, setHeard] = useState<VoiceEntry | null>(null);
   const [read, setRead] = useState<ScannedNote | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
 
@@ -367,6 +370,39 @@ export function EntryForm({
           />
           {noteError && (
             <div className="text-[12px] text-crimson mt-2">{noteError}</div>
+          )}
+
+          {/* Beside the note reader because they answer the same question —
+              "must I really type all this?" — one from paper, one from speech. */}
+          <div className="mt-2">
+            <VoiceCapture
+              mode="entry"
+              hint="do hazaar ka cement Gopal se liya"
+              onResult={(v) => {
+                setHeard(v);
+                setNoteError(null);
+                setForm((f) => ({
+                  ...f,
+                  date: v.date || f.date,
+                  category: categories.includes(v.category) ? v.category : f.category,
+                  event: v.description || f.event,
+                  detail: v.detail || f.detail,
+                  // Only when a figure was actually heard: a spoken sentence
+                  // with no amount in it must not wipe one already typed.
+                  amount: v.amount > 0 ? String(v.amount) : f.amount,
+                  mode: matchMode(v.mode, modes) ?? f.mode,
+                  notes: v.notes || f.notes,
+                }));
+              }}
+            />
+          </div>
+          {heard && (
+            <VoiceHeard
+              transcript={heard.transcript}
+              confidence={heard.confidence}
+              unclear={heard.unclear}
+              onDismiss={() => setHeard(null)}
+            />
           )}
           {read && (
             <div className="mt-2 rounded-md border border-rule bg-surface p-2.5 text-[12px]">
