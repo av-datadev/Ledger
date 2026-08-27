@@ -25,6 +25,7 @@ import {
   blankItem,
 } from "./BillReview";
 import { BillStockPanel } from "./BillStockPanel";
+import { BoqItemResults } from "./BoqItemResults";
 import { BillPaymentPanel } from "./BillPaymentPanel";
 import { DealerAccounts } from "./DealerAccounts";
 import type { BoqItem } from "../types";
@@ -103,6 +104,8 @@ export function Boq({
    * from, and what did I pay for it?" — and the bill is the thing that knows.
    */
   const [query, setQuery] = useState("");
+  /** Whether the (secondary) bill matches are expanded during a search. */
+  const [billsOpen, setBillsOpen] = useState(false);
   /** Read the bills one at a time, or as what is owed to each dealer. */
   const [listView, setListView] = useState<"bills" | "dealers">("bills");
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -753,16 +756,31 @@ export function Boq({
           <DealerAccounts />
         ) : (
         <>
+        {/* What you searched for comes first: the LINES, each with the bill it
+            sits on and a control to take it into stock. The bill list answers a
+            different question and is folded away below. */}
+        {searching && (
+          <div className="mb-3">
+            <BoqItemResults query={query} />
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-2 mb-2">
-          <h3 className="eyebrow">
-            Bills on record
-            {searching && (
+          {searching ? (
+            <button
+              className="eyebrow flex items-center gap-1.5"
+              aria-expanded={billsOpen}
+              onClick={() => setBillsOpen((v) => !v)}
+            >
+              Bills
               <span className="normal-case tracking-normal text-ink-soft font-normal">
-                {" "}
-                · {shownGroups.length} of {groups.length}
+                · {shownGroups.length} match{shownGroups.length === 1 ? "" : "es"}
               </span>
-            )}
-          </h3>
+              <span className="text-ink-soft">{billsOpen ? "▾" : "▸"}</span>
+            </button>
+          ) : (
+            <h3 className="eyebrow">Bills on record</h3>
+          )}
           {/* Only offered once a bill actually has money outstanding — a filter
               that can only ever empty the list is noise on a tab that most
               people open to add a bill, not to chase one. */}
@@ -780,7 +798,7 @@ export function Boq({
             </button>
           )}
         </div>
-        <div className="space-y-2">
+        <div className={`space-y-2 ${searching && !billsOpen ? "hidden" : ""}`}>
           {shownGroups.map(({ key, rows, paid, outstanding }) => {
             const head = rows[0];
             const open = expanded === key;
@@ -886,7 +904,7 @@ export function Boq({
               "nothing outstanding" line is good news; said after a search that
               simply found nothing, it would be an answer to a question nobody
               asked. */}
-          {items && groups.length > 0 && shownGroups.length === 0 && searching && (
+          {items && groups.length > 0 && shownGroups.length === 0 && searching && billsOpen && (
             <div className="text-sm text-ink-soft text-center py-6">
               No bill matches “{query.trim()}”
               {dueOnly && <> among those still to pay</>}.

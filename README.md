@@ -309,9 +309,24 @@ signing key before touching anything there.
   token haystack, which was worse than useless: the one-letter token of "t 1.5"
   matched the *t* in "Electrical", so hunting a plumbing tee surfaced a reel of
   wire. Now "plumb" does what tapping the chip does and nothing else leaks.
-  On the BOQ a bill matches if **any of its rows** does, plus dealer and bill
-  number — the question there is asked from the item end ("which bill did this
-  come from, and at what rate?") and the bill is the thing that knows.
+  **On the BOQ the search returns the LINES, not the bills.** The first version
+  returned bills — type "tape", get the bills containing tape, then open one and
+  find the row yourself. That answers "which document mentions this" when the
+  question being asked is "where is my tape, and can I take it into stock". So
+  each matching line comes back carrying its bill, date, quantity and rate, with
+  an add-to-stock control on the row: the quantity box is prefilled with
+  whatever is *not yet stocked from that line* (falling back to the full bill
+  quantity), so the common case is one tap and the number is on screen before it
+  is written. A line already fully taken says so instead of offering a button
+  that would do nothing.
+  Adding **does not touch the bill** — the row stays where it is, and the
+  receipt is hard-linked back by `billId`, so the two-way BOQ↔Stock views still
+  tie up and removing that bill's stock later still finds it. The receipt is
+  dated to the *bill's* date, not today: it records when the material was
+  bought. Tax, freight and rounding rows are never offered — they are not things
+  that go on a shelf.
+  Bill matches are still there, folded into a **"Bills · N matches"** section
+  below, so searching a dealer name or an invoice number still works.
 - **Bill photos live beside the row, not in it** (contractor side) — a
   `SiteLedgerRow` used to carry its photo inline, so the sites list called
   `siteLedger.toArray()` to add up three figures per site and pulled **every
@@ -446,6 +461,9 @@ Offline (airplane mode, after one full load):
 - [ ] A row's photo opens **full size** from the list, which itself shows only
       the 192px copy; deleting a row or a site takes its photos with it
 - [ ] Site backup round-trips a photo: export → wipe → restore, byte-identical
+- [ ] BOQ search for an item name lists the matching **bill lines**, adds one to
+      stock with the quantity prefilled to what is left, leaves the bill row
+      untouched, and flips to "already in stock" once the line is fully taken
 - [ ] Stock + BOQ **search**: typing ignores the category chip (which stays
       visible, dimmed, and re-applies when the box is cleared) and says so;
       `t 1.5` returns only `T 1.5 inch`, never `T 1 inch`
