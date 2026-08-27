@@ -44,14 +44,41 @@
   .btn{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px;
     padding:13px 22px;border-radius:10px;border:1px solid transparent;cursor:pointer;
     transition:background .2s var(--ease),border-color .2s var(--ease),transform .2s var(--ease),box-shadow .2s var(--ease)}
-  .btn-primary{background:var(--accent);color:#fff;box-shadow:0 8px 20px -8px rgba(192,86,47,.6)}
-  .btn-primary:hover{background:var(--accent-deep);transform:translateY(-1px);box-shadow:0 12px 26px -10px rgba(192,86,47,.66)}
-  .btn-ghost{background:transparent;border-color:var(--line-2);color:var(--ink)}
-  .btn-ghost:hover{border-color:var(--ink);background:rgba(21,35,46,.03);transform:translateY(-1px)}
-  .btn-light{background:#fff;color:var(--ink)}
-  .btn-light:hover{transform:translateY(-1px)}
-  .btn-outline-light{background:transparent;color:#fff;border-color:rgba(255,255,255,.3)}
-  .btn-outline-light:hover{border-color:#fff;background:rgba(255,255,255,.06)}
+  /* Primary — a real depth press. The solid bar underneath is the button's
+     side, so pressing it travels DOWN by exactly that height and the side
+     disappears. A button that only changes colour on :active feels like a
+     picture of a button; this one reads as a physical control, which suits an
+     app people use standing on a site with one thumb. */
+  .btn-primary{
+    background:var(--accent);color:#fff;
+    box-shadow:0 4px 0 var(--accent-deep), 0 10px 22px -10px rgba(192,86,47,.65);
+    will-change:transform}
+  .btn-primary:hover{background:#C95E36;transform:translateY(-1px);
+    box-shadow:0 5px 0 var(--accent-deep), 0 14px 26px -10px rgba(192,86,47,.7)}
+  .btn-primary:active{transform:translateY(4px);
+    box-shadow:0 0 0 var(--accent-deep), 0 4px 10px -6px rgba(192,86,47,.5)}
+
+  /* Secondary — pearl. A soft top-lit surface rather than a hollow outline,
+     which was the weakest thing on the page: an outline button beside a solid
+     one reads as disabled. */
+  .btn-ghost{
+    background:linear-gradient(180deg,#fff 0%,#F7F5EF 100%);
+    border-color:var(--line-2);color:var(--ink);
+    box-shadow:inset 0 1px 0 #fff, 0 3px 0 rgba(21,35,46,.07), 0 6px 14px -10px rgba(21,35,46,.4)}
+  .btn-ghost:hover{border-color:rgba(21,35,46,.28);transform:translateY(-1px);
+    box-shadow:inset 0 1px 0 #fff, 0 4px 0 rgba(21,35,46,.07), 0 10px 18px -10px rgba(21,35,46,.45)}
+  .btn-ghost:active{transform:translateY(3px);
+    box-shadow:inset 0 1px 0 #fff, 0 0 0 rgba(21,35,46,.07), 0 3px 8px -6px rgba(21,35,46,.35)}
+
+  /* Same two treatments, inverted for the dark CTA band. */
+  .btn-light{background:linear-gradient(180deg,#fff 0%,#EFEDE6 100%);color:var(--ink);
+    box-shadow:0 4px 0 rgba(0,0,0,.35), 0 10px 22px -12px rgba(0,0,0,.6)}
+  .btn-light:hover{transform:translateY(-1px);box-shadow:0 5px 0 rgba(0,0,0,.35), 0 14px 26px -12px rgba(0,0,0,.65)}
+  .btn-light:active{transform:translateY(4px);box-shadow:0 0 0 rgba(0,0,0,.35), 0 4px 10px -8px rgba(0,0,0,.5)}
+  .btn-outline-light{background:rgba(255,255,255,.04);color:#fff;border-color:rgba(255,255,255,.28);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 3px 0 rgba(0,0,0,.28)}
+  .btn-outline-light:hover{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.08);transform:translateY(-1px)}
+  .btn-outline-light:active{transform:translateY(3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 rgba(0,0,0,.28)}
 
   /* ---------- Nav ---------- */
   header.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
@@ -87,36 +114,39 @@
   .hero-note{margin-top:20px;font-size:13px;color:var(--ink-3);display:flex;align-items:center;gap:8px}
   .dot{width:6px;height:6px;border-radius:50%;background:var(--moss);box-shadow:0 0 0 3px rgba(62,107,82,.15);flex:0 0 auto}
 
-  /* Phone mock */
-  .mock{position:relative}
-  .phone{background:var(--ink);border-radius:30px;padding:12px;box-shadow:var(--shadow-lg);max-width:336px;margin:0 auto}
-  .screen{background:#0E1922;border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}
-  .s-top{padding:16px 18px 6px;display:flex;justify-content:space-between;align-items:center}
-  .s-top .t{color:#fff;font-weight:700;letter-spacing:.16em;font-size:11px}
-  .s-top .m{color:rgba(255,255,255,.4);font-size:14px}
-  .s-total{padding:2px 18px 16px}
-  .s-total .lbl{color:rgba(255,255,255,.45);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase}
-  .s-total .amt{color:#fff;font-size:30px;font-weight:700;margin-top:3px}
-  .s-body{background:#0B141B;padding:14px 16px 18px;border-top:1px solid rgba(255,255,255,.06)}
-  .s-cap{color:rgba(255,255,255,.4);font-size:9px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:11px}
-  .barrow{margin-bottom:12px}
-  .barrow:last-child{margin-bottom:0}
-  .barrow .r{display:flex;justify-content:space-between;color:#E7EBEE;font-size:12px;margin-bottom:5px;gap:12px}
-  .barrow .r .c{color:rgba(255,255,255,.55);font-size:11px}
-  .track{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
-  .fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),#D9784F);
-    transform:scaleX(0);transform-origin:left;transition:transform 1.1s var(--ease)}
-  .in .fill,.mock.in .fill{transform:scaleX(1)}
-  .float{position:absolute;background:var(--surface);border:1px solid var(--line);border-radius:12px;
-    box-shadow:var(--shadow);padding:12px 14px;font-size:12.5px}
-  /* The floats overlap the phone's bezel on purpose, but must never cover a
-     figure on the screen inside it — that reads as a rendering bug. */
-  .float-1{top:-4%;left:-10%;display:flex;align-items:center;gap:10px;max-width:236px}
-  .float-2{bottom:-5%;right:-10%;display:flex;align-items:center;gap:10px;max-width:236px}
-  @media(max-width:1040px){.float-1,.float-2{display:none}}
-  .chip{width:34px;height:34px;border-radius:9px;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent-deep);flex:0 0 auto}
-  .float b{font-weight:700}
-  .float .sub{color:var(--ink-3);font-size:11px}
+  /* Phone mock — a real screenshot in a frame, not a CSS drawing of one.
+     The drawn phone had to be kept in sync with an app it didn't come from,
+     and it always looked illustrated. This is the actual screen, seeded with
+     invented figures (see site/README.md). */
+  .mock{position:relative;display:flex;justify-content:center;align-items:center}
+  .mock::before{content:"";position:absolute;inset:-6% -14%;z-index:0;pointer-events:none;
+    background:radial-gradient(ellipse 58% 48% at 50% 46%, rgba(192,86,47,.20), transparent 70%)}
+  .device{position:relative;z-index:1;width:min(318px,76vw);background:#0A0F14;
+    border-radius:40px;padding:9px;
+    box-shadow:var(--shadow-lg), inset 0 0 0 1px rgba(255,255,255,.09)}
+  .device img{display:block;width:100%;height:auto;border-radius:32px;
+    background:#0E1922}
+  /* Perspective lives on the parent so the tilt below has something to tilt in. */
+  .mock{perspective:1400px}
+
+  /* A single scroll-linked moment, in NATIVE CSS — no library, no main-thread
+     work. The device sits back slightly and rises to flat as it scrolls into
+     place. Wrapped in @supports so browsers without scroll-driven animations
+     simply get the flat, finished state. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) and (min-width:941px) {
+      @keyframes device-settle{
+        from{transform:rotateX(11deg) translateY(14px) scale(.965)}
+        to{transform:rotateX(0deg) translateY(0) scale(1)}
+      }
+      .device{
+        transform-origin:50% 100%;
+        animation:device-settle linear both;
+        animation-timeline:view();
+        animation-range:entry 10% cover 42%;
+      }
+    }
+  }
 
   /* ---------- Stat band ---------- */
   .stats{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--paper-2)}
@@ -150,18 +180,27 @@
   .quote span{display:block;font-family:var(--sans);font-style:normal;font-size:13px;color:rgba(255,255,255,.5);margin-top:12px}
 
   /* Steps */
-  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:52px}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:52px}
   @media(max-width:900px){.steps{grid-template-columns:1fr;gap:20px}}
   .step{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 24px;
+    display:flex;flex-direction:column;min-width:0;
     box-shadow:var(--shadow);transition:transform .3s var(--ease),box-shadow .3s var(--ease)}
   .step:hover{transform:translateY(-3px);box-shadow:0 2px 4px rgba(21,35,46,.05),0 20px 40px -20px rgba(21,35,46,.3)}
   .step .num{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--accent);font-weight:600}
   .step h3{font-size:21px;margin:14px 0 10px}
   .step p{color:var(--ink-2);font-size:15px;line-height:1.6}
-  .said{margin-top:16px;background:var(--paper);border:1px solid var(--line);border-radius:10px;
-    padding:11px 13px;font-size:13.5px;color:var(--ink-2);display:flex;gap:9px;align-items:flex-start}
-  .said b{color:var(--ink);font-weight:600}
-  .said .mic{color:var(--accent);flex:0 0 auto;margin-top:1px}
+
+  /* The real screen inside a step card. Pinned to the bottom with margin-top
+     auto so the three screenshots line up across the row however much copy
+     sits above them. min-width:0 because a grid/flex item will not shrink
+     below a 760px-wide replaced element without it, and the row blows out. */
+  .shot{margin-top:auto;padding-top:18px;min-width:0}
+  /* Cropped to the top of the screen: the part that makes the point is always
+     up there, and a whole 19.5:9 phone shrunk into a card is unreadable. */
+  .shot img{display:block;width:100%;max-width:100%;height:auto;border-radius:14px;
+    aspect-ratio:760/560;object-fit:cover;object-position:top center;
+    background:#0E1922;border:1px solid rgba(21,35,46,.14);
+    box-shadow:0 1px 2px rgba(21,35,46,.06), 0 14px 30px -20px rgba(21,35,46,.5)}
 
   /* Two sides */
   .sides{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
@@ -274,7 +313,6 @@
     html{scroll-behavior:auto}
     *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
     .js .reveal{opacity:1;transform:none}
-    .fill{transform:scaleX(1)}
   }
 </style>
 </head>
@@ -317,60 +355,10 @@
     </div>
 
     <div class="mock reveal d2">
-      <div class="float float-1">
-        <div class="chip">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>
-        </div>
-        <div>
-          <b>“do hazaar ka cement”</b>
-          <div class="sub">Heard · filled in ₹2,000</div>
-        </div>
-      </div>
-
-      <div class="phone">
-        <div class="screen">
-          <div class="s-top">
-            <div class="t">BRICK BOOK</div>
-            <div class="m" aria-hidden="true">☀</div>
-          </div>
-          <div class="s-total">
-            <div class="lbl">Total spent · 214 payments</div>
-            <div class="amt money">₹48,62,400</div>
-          </div>
-          <div class="s-body">
-            <div class="s-cap">Spend by category</div>
-            <div class="barrow">
-              <div class="r"><span>Contractor <span class="c">· 46</span></span><span class="money">₹18,40,000</span></div>
-              <div class="track"><div class="fill" style="width:100%"></div></div>
-            </div>
-            <div class="barrow">
-              <div class="r"><span>Marble <span class="c">· 9</span></span><span class="money">₹6,15,000</span></div>
-              <div class="track"><div class="fill" style="width:34%"></div></div>
-            </div>
-            <div class="barrow">
-              <div class="r"><span>Plumbing <span class="c">· 31</span></span><span class="money">₹4,12,500</span></div>
-              <div class="track"><div class="fill" style="width:23%"></div></div>
-            </div>
-            <div class="barrow">
-              <div class="r"><span>Electrical <span class="c">· 27</span></span><span class="money">₹3,68,000</span></div>
-              <div class="track"><div class="fill" style="width:20%"></div></div>
-            </div>
-            <div class="barrow">
-              <div class="r"><span>Architect <span class="c">· 6</span></span><span class="money">₹1,80,000</span></div>
-              <div class="track"><div class="fill" style="width:10%"></div></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="float float-2">
-        <div class="chip">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6"/></svg>
-        </div>
-        <div>
-          <b>Bill scanned</b>
-          <div class="sub">14 line items · Verma Traders</div>
-        </div>
+      <div class="device">
+        <img src="img/dash.webp" width="760" height="1645"
+             fetchpriority="high" decoding="async"
+             alt="The Brick Book dashboard: total spent ₹48,62,400 across 182 transactions, a budget bar at 81%, and spend broken down by category." />
       </div>
     </div>
   </div>
@@ -440,15 +428,19 @@
         <p>A printed GST invoice, a PDF, or a handwritten kaccha bill in Hindi — it comes back as editable
           line items, with the totals and what's still owed. A bill spread over three notebook pages reads
           as one bill. The photo stays attached as proof.</p>
+        <div class="shot">
+          <img src="img/boq.webp" width="760" height="560" loading="lazy" decoding="async"
+               alt="The Bills screen: four ways to add a bill, and a search for &quot;tee 1&quot; returning four matching bill lines from different dealers." />
+        </div>
       </div>
       <div class="step reveal d1">
         <div class="num">02 — SAY IT</div>
         <h3>Or just say it out loud</h3>
         <p>Hold the microphone and speak in Hindi, English, or the mix everyone actually uses. The form
           below fills itself, and shows you exactly what it heard before anything is saved.</p>
-        <div class="said">
-          <svg class="mic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>
-          <span>“paanch T one inch plumber ko diye” → <b>5 pcs · T 1 inch · given to Plumber</b></span>
+        <div class="shot">
+          <img src="img/voice.webp" width="760" height="560" loading="lazy" decoding="async"
+               alt="A new entry filled in from speech: the Heard line reads &quot;2000 ka cement Gopal se liya&quot;, with Cement, Gopal and ₹2,000 filled into the form below." />
         </div>
       </div>
       <div class="step reveal d2">
@@ -456,6 +448,10 @@
         <h3>The whole picture, instantly</h3>
         <p>Spend by category, what each person has been paid, what's been bought against what's been used,
           and the gap between money paid and bills accounted for. Tap any figure to see the payments behind it.</p>
+        <div class="shot">
+          <img src="img/ledger.webp" width="760" height="560" loading="lazy" decoding="async"
+               alt="The Ledger's paid-vs-billed panel: ₹48,62,400 paid, ₹2,17,750 billed, and the gap no bill accounts for, above the list of payments." />
+        </div>
       </div>
     </div>
   </div>

@@ -1,0 +1,4 @@
+# The deploy serves this directory as-is, so anything here that isn't part of
+# the page would be published at the marketing domain. These two aren't.
+README.md
+shoot.mjs
