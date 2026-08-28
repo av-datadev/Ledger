@@ -2,8 +2,15 @@
 
 The public landing page for the domain the Play Store listing points at.
 A hand-written `index.html` plus four screenshots in `img/`. No build step, no
-dependencies, no framework — the only JavaScript on the page is ~20 lines for
-the sticky nav and the scroll reveals.
+dependencies, no framework — the JavaScript on the page is ~110 lines, all of it
+in one inline block: the sticky nav, the scroll reveals, the pinned phone in
+"Watch it work", and the voice demo.
+
+**The page shows the app rather than describing it.** It carries about half the
+words it used to (roughly 1,470 → 700) because the things that were being
+claimed in prose are now on screen: an entry writing itself from speech, three
+real screens under a phone that changes as you scroll, and what the app
+understands shown as input → output rather than as nine feature cards.
 
 ## Why it is a separate deployment, not a page in the app
 
@@ -24,8 +31,8 @@ the domain. Pushes to `main` deploy it, independently of the app's project.
 
 ## Before it goes live
 
-- [ ] Point the two `ledger-nu-ashen.vercel.app` CTAs at the **Play Store
-      listing** once the app is published (marked with a `TODO` in the HTML).
+- [ ] Point the `ledger-nu-ashen.vercel.app` CTA at the **Play Store listing**
+      once the app is published (marked with a `TODO` in the HTML).
       The footer's privacy / terms / delete-account links must keep pointing at
       the app's own origin — those are the URLs the store listing declares, and
       the pages live with the app.
@@ -61,6 +68,10 @@ node -e "const s=require('sharp');for(const n of ['dash','voice','boq','ledger']
 **Re-shoot whenever the app's UI changes.** A landing page showing a version of
 the app nobody can install is worse than one showing no screenshots at all.
 
+All four are in use: `boq`, `dash` and `ledger` are the three screens in
+"Watch it work", `dash` is also the hero, and `voice` sits beside the live demo
+as proof that the thing the demo replays is really in the app.
+
 One caveat worth knowing: the `voice` shot needs the "Heard" panel on screen,
 which only exists after a real recording. `shoot.mjs` loads the app with
 `?shot=voice`, and **that query parameter is not handled in the app** — the
@@ -71,13 +82,33 @@ voice shot needs redoing, and revert it before committing.
 ## Notes on the page itself
 
 - Every figure and name on it is **invented**. Payer 1, Contractor, Plumber,
-  Architect, Verma Traders. No real person, contractor or family total appears
+  Verma Traders, Gopal. No real person, contractor or family total appears
   anywhere, and none should be added — this page is public and indexed. The
   app's own blank-state defaults are already generic ("Owner 1", "UPI 1"), so
   the screenshots needed no doctoring.
 - The figures in the copy (182 payments, ₹48,62,400) **match the hero
   screenshot exactly**. If you re-seed with different data, change the copy too
   — a page whose text disagrees with its own screenshot reads as fake.
+- **The voice demo is the one thing on the page you can operate.** It replays
+  two real phrases: the transcript types in, the fields fill top to bottom, the
+  row saves. The second take is the point of the feature — "saadhe teen hazaar"
+  becomes ₹3,500 with no keyboard involved. Nothing is recorded and no
+  microphone is touched; the card says so, because a mic button that isn't a mic
+  button would otherwise be a small lie. It plays itself once on scroll, and the
+  three links pointing at `#say` (nav, hero, final CTA) replay it.
+- **"Watch it work" pins one phone and changes its screen.** Which step is
+  current is decided by re-measuring and taking the one nearest the middle of
+  the viewport, *not* by trusting the IntersectionObserver entry — on a fast
+  scroll three steps cross the band in one batch and the last one processed
+  wins, which is not the one you are looking at. Below 941px the pinned frame is
+  dropped and each step carries its own screenshot; the same four files, so
+  nothing extra is downloaded. The dimming of inactive steps is gated on a
+  `.live` class that only JavaScript adds, so a broken or skipped script leaves
+  every step fully legible instead of at 42% opacity.
+- **What the app understands is shown as input → output** — "dedh lakh" →
+  ₹1,50,000, "tee 1" → Brass Tee 1″, a UPI QR → account and IFSC. This replaced
+  a nine-card feature grid of short paragraphs. Nine thin ideas nobody reads are
+  worth less than eight pairs anyone can scan.
 - **Buttons carry a real depth press** rather than a colour change: a solid bar
   sits under the primary button as its side, and pressing travels down by
   exactly that height. The secondary is a pearl surface, not a hollow outline —
@@ -94,4 +125,13 @@ voice shot needs redoing, and revert it before committing.
   first paint, so with JavaScript off the page renders fully visible rather than
   blank. Two timers act as a safety net if the IntersectionObserver misses
   something — content that never reveals is worse than an animation that never
-  plays. `prefers-reduced-motion` disables all of it.
+  plays. `prefers-reduced-motion` disables all of it, and the voice demo then
+  renders its finished state instead of animating.
+- The demo card's markup **is** the finished entry — filled fields, saved line.
+  JavaScript empties it before replaying. With no JavaScript at all you see a
+  completed entry rather than an empty card.
+
+## Previewing it locally
+
+`.claude/launch.json` has a `brick-book-site` configuration that serves this
+directory on port 4321 with `python3 -m http.server`. There is nothing to build.
