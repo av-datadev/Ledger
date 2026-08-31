@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, updateSettings } from "../db";
 import { STATES, CITIES_BY_STATE } from "../../shared/locations";
+import { Icon } from "./Icon";
 
 /**
  * House/project address for the Dashboard: shows the saved address with an
@@ -134,7 +135,7 @@ export function AddressCard() {
         <div className="eyebrow mb-1">
           House address
         </div>
-        <div className="text-sm">🏠 {line}</div>
+        <div className="text-sm flex items-center gap-1.5"><Icon name="house" size={16} className="text-ink-faint" />{line}</div>
       </button>
     </div>
   );

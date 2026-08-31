@@ -8,6 +8,7 @@ import { outstandingByCategory } from "../lib/billBalance";
 import { tradeCosts, personByTrade, type TradeCost } from "../lib/trades";
 import { PersonDetailsForm } from "./PersonDetailsForm";
 import type { PersonDetails } from "../types";
+import { Icon } from "./Icon";
 
 // Custom categories sort after every built-in (mirrors CUSTOM_ORDER in db.ts).
 const CUSTOM_ORDER = 1000;
@@ -261,14 +262,14 @@ export function People({
                   )}
                   {details && detailSummary(details) && (
                     <div className="text-[11px] text-ink-soft truncate mt-0.5">
-                      📇 {detailSummary(details)}
+                      <Icon name="card" size={14} className="inline align-[-2px] mr-1" />{detailSummary(details)}
                     </div>
                   )}
                   {/* The whole point of the link, said plainly on the row the
                       user is looking at. */}
                   {doneBy.get(cat) && (
                     <div className="text-[11px] text-ink-soft truncate mt-0.5">
-                      🔗 done by <b>{doneBy.get(cat)}</b>
+                      <Icon name="link" size={14} className="inline align-[-2px] mr-1" />done by <b>{doneBy.get(cat)}</b>
                     </div>
                   )}
                 </button>

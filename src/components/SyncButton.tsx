@@ -52,18 +52,22 @@ export function SyncButton() {
         </svg>
         {label}
       </button>
-      {/* Errors matter more than the timestamp, so they replace it. */}
-      {error ? (
-        <div className="text-[10px] text-onhead/70 mt-1 max-w-[8.5rem] leading-tight">
-          {error}
-        </div>
-      ) : (
-        lastSyncedAt !== null && (
-          <div className="text-[10px] text-onhead/50 mt-1">
-            Synced {agoLabel(lastSyncedAt)}
+      {/* Errors matter more than the timestamp, so they replace it.
+          ONE atomic status region for the whole control — a live region per
+          badge makes a screen reader read the furniture, not the news. */}
+      <div role="status" aria-atomic="true">
+        {error ? (
+          <div className="text-[11px] text-onhead/70 mt-1 max-w-[9.5rem] leading-tight">
+            {error}
           </div>
-        )
-      )}
+        ) : (
+          lastSyncedAt !== null && (
+            <div className="text-[11px] text-onhead/50 mt-1">
+              Synced {agoLabel(lastSyncedAt)}
+            </div>
+          )
+        )}
+      </div>
     </div>
   );
 }

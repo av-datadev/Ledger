@@ -19,6 +19,8 @@ import { VoiceCapture, VoiceHeard } from "./VoiceCapture";
 import type { VoiceStock } from "../lib/voice";
 import { BillStockPanel } from "./BillStockPanel";
 import { AddStockPicker } from "./AddStockPicker";
+import { EmptyState } from "./EmptyState";
+import { Icon } from "./Icon";
 
 type MoveKind = "in" | "out";
 
@@ -991,7 +993,7 @@ export function Stock() {
                   aria-label="Clear search"
                   onClick={() => setQuery("")}
                 >
-                  ✕
+                  <Icon name="x" size={16} />
                 </button>
               )}
             </div>
@@ -1340,7 +1342,7 @@ export function Stock() {
                               )}
                               <span className="text-ink-soft">{m.note}</span>
                               {m.billId && (
-                                <span className="badge ml-1 !text-[9px]">bill</span>
+                                <span className="badge ml-1 !text-[10px]">bill</span>
                               )}
                             </span>
                             <button
@@ -1390,22 +1392,21 @@ export function Stock() {
             ))}
 
             {items && rows.length === 0 && searching && (
-              <div className="text-sm text-ink-soft text-center py-8">
-                Nothing matches “{query.trim()}”.
-                <br />
-                <button className="underline mt-1" onClick={() => setQuery("")}>
-                  Clear the search
-                </button>
-              </div>
+              <EmptyState
+                icon="search"
+                line={`Nothing matches “${query.trim()}”`}
+                hint="Search runs across material names and their categories."
+                actionLabel="Clear the search"
+                onAction={() => setQuery("")}
+              />
             )}
 
             {items && rows.length === 0 && !searching && (
-              <div className="text-sm text-ink-soft text-center py-8">
-                No materials tracked yet.
-                <br />
-                Tap <b>+ Add item</b> to pull materials from a BOQ bill, or save
-                <br />a scanned bill with “Add items to Stock” ticked.
-              </div>
+              <EmptyState
+                icon="ruler"
+                line="No materials tracked yet."
+                hint="Add an item to pull materials straight off a BOQ bill — or tick “Add items to Stock” when you save a scanned bill."
+              />
             )}
           </div>
         </>

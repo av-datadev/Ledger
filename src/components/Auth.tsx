@@ -13,6 +13,7 @@ import {
   type Household,
 } from "../lib/sync";
 import { clearAllData } from "../db";
+import { useConfirm } from "./ConfirmSheet";
 
 /**
  * Sign out AND wipe this ledger off the device — the shared/public-machine
@@ -308,6 +309,7 @@ function AccountPanel({
   email: string | undefined;
 }) {
   const [copied, setCopied] = useState(false);
+  const [confirm, confirmSheet] = useConfirm();
   const copy = async () => {
     if (!household.invite_code) return;
     try {
@@ -346,17 +348,21 @@ function AccountPanel({
       <button
         className="text-[13px] text-crimson mt-3"
         onClick={() => {
-          if (
-            window.confirm(
-              "Sign out and remove this ledger from this device? Your data stays safe in the cloud and comes back when you sign in again. (Recommended on a shared phone.)",
-            )
-          )
-            void signOutAndClear();
+          void (async () => {
+            const ok = await confirm({
+              title: "Sign out and clear this phone?",
+              body: "This ledger is removed from this device. Your book stays safe in the cloud and comes back the moment you sign in again.",
+              note: "Worth doing on a shared or borrowed phone.",
+              confirmLabel: "Sign out & clear",
+            });
+            if (ok) void signOutAndClear();
+          })();
         }}
       >
         Sign out &amp; clear this device
       </button>
       <DeleteAccountRow />
+      {confirmSheet}
     </Card>
   );
 }

@@ -5,6 +5,7 @@ import { inr, num, formatDate } from "../lib/format";
 import { matchesQuery } from "../lib/search";
 import { findOrCreateStockItem, isMaterialRow } from "../lib/stock";
 import type { BoqItem } from "../types";
+import { Icon } from "./Icon";
 
 /**
  * Searching the BOQ by what you bought, not by which paper it was on.
@@ -131,7 +132,7 @@ export function BoqItemResults({ query }: { query: string }) {
                 {line.vendor || "Unnamed dealer"}
                 {line.invoiceNo && <> · #{line.invoiceNo}</>} ·{" "}
                 {formatDate(line.date)}
-                <span className="badge ml-1.5 !text-[9px]">{line.category}</span>
+                <span className="badge ml-1.5 !text-[10px]">{line.category}</span>
               </div>
 
               <div className="flex items-center gap-1.5 mt-1.5">
@@ -146,14 +147,14 @@ export function BoqItemResults({ query }: { query: string }) {
 
                 {added != null ? (
                   <span className="text-[12px] text-moss shrink-0">
-                    ✓ added <span className="money">{num(added)}</span> to stock
+                    <Icon name="check" size={12} className="inline align-[-1px] mr-1" />added <span className="money">{num(added)}</span> to stock
                   </span>
                 ) : done ? (
                   // Not a disabled button: there is nothing left of this line to
                   // take, and offering a control that would do nothing invites
                   // pressing it and wondering why nothing happened.
                   <span className="text-[12px] text-ink-soft shrink-0">
-                    ✓ already in stock
+                    <Icon name="check" size={12} className="inline align-[-1px] mr-1" />already in stock
                   </span>
                 ) : (
                   <>

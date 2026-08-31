@@ -17,6 +17,7 @@ import {
   type ContractBasis,
 } from "../lib/measure";
 import type { ContractLine, PersonDetails } from "../types";
+import { Icon } from "./Icon";
 
 const toNum = (s: string): number | null => {
   const n = parseFloat(s);
@@ -782,7 +783,7 @@ function Fields({
               disabled={!!scanBusy}
               onClick={() => scanCameraRef.current?.click()}
             >
-              📷 Scan QR / photo
+              <Icon name="camera" size={18} /> Scan QR / photo
             </button>
             <button
               type="button"

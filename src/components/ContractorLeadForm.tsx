@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { submitContractorLead } from "../lib/contractors";
 import { FindContractor } from "./FindContractor";
+import { Icon } from "./Icon";
 
 const SENT_KEY = "hl-contractor-lead-sent";
 
@@ -86,7 +87,7 @@ export function ContractorLeadForm({
 
         {sent ? (
           <div className="text-center space-y-3">
-            <div className="text-2xl">✅</div>
+            <div className="text-moss"><Icon name="check" size={24} /></div>
             <div className="text-sm">
               Thanks — we've got your details and will call you to get you
               listed.

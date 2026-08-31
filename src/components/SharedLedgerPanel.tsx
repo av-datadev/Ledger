@@ -11,6 +11,7 @@ import {
   type SharedEntry,
   type AuthorRole,
 } from "../lib/siteLink";
+import { Icon } from "./Icon";
 
 /**
  * The one view both sides look at.
@@ -199,12 +200,12 @@ function SharedRow({
           {url ? (
             <img src={url} alt="" className="w-full h-full object-cover" />
           ) : (
-            <span className="text-[9px] text-ink-soft">…</span>
+            <span className="text-[11px] text-ink-soft">…</span>
           )}
         </button>
       ) : (
         <div
-          className="w-11 h-11 shrink-0 rounded border border-dashed border-rule grid place-items-center text-[9px] text-ink-soft text-center leading-tight px-1"
+          className="w-11 h-11 shrink-0 rounded border border-dashed border-rule grid place-items-center text-[11px] text-ink-soft text-center leading-tight px-1"
           title="No bill attached to this row"
         >
           No bill
@@ -378,7 +379,7 @@ function AddSharedForm({
           className="btn w-full !py-2 !text-[13px]"
           onClick={() => fileRef.current?.click()}
         >
-          {proof ? `✓ ${proof.name}` : "📷 Attach the bill"}
+          {proof ? <><Icon name="check" size={16} /> {proof.name}</> : <><Icon name="camera" size={18} /> Attach the bill</>}
         </button>
         <input
           ref={fileRef}

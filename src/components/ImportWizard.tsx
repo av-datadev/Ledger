@@ -18,6 +18,7 @@ import {
 import { analyseStructure, suggestCategories } from "../lib/importMap";
 import { commitImport } from "../lib/importCommit";
 import { inr, formatDate } from "../lib/format";
+import { Icon } from "./Icon";
 
 type Stage = "pick" | "review" | "done";
 
@@ -352,7 +353,7 @@ export function ImportWizard() {
       </div>
 
       {mapping.warnings.map((w, i) => (
-        <div key={i} className="text-[12px] text-crimson">⚠ {w}</div>
+        <div key={i} className="text-[12px] text-crimson flex items-start gap-1.5"><Icon name="warn" size={16} className="mt-px" />{w}</div>
       ))}
 
       {/* Anything the reader couldn't settle. Answering re-maps immediately. */}

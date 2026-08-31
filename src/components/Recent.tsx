@@ -4,6 +4,9 @@ import { db } from "../db";
 import { useBackClose } from "../hooks/useBackClose";
 import { inr, formatDate } from "../lib/format";
 import { EntryForm } from "./EntryForm";
+import { EmptyState } from "./EmptyState";
+import { SkeletonRows } from "./Skeleton";
+import { Icon } from "./Icon";
 import type { Entry } from "../types";
 
 function EditOverlay({ entry, onClose }: { entry: Entry; onClose: () => void }) {
@@ -67,7 +70,7 @@ export function Recent() {
               onClick={() => setEditing(e)}
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
+                <div className="row-main min-w-0">
                   <div className="text-sm font-medium truncate">{e.event}</div>
                   {e.detail && (
                     <div className="text-[12px] text-ink-soft truncate">
@@ -78,12 +81,16 @@ export function Recent() {
                     <span className="money">{formatDate(e.date)}</span>
                     <span className="badge">{e.category}</span>
                     <span>· {e.paidBy}</span>
-                    {withPhotos.has(e.id) && <span className="badge">📎</span>}
+                    {withPhotos.has(e.id) && (
+                      <span className="badge inline-flex items-center gap-1">
+                        <Icon name="clip" size={11} />
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="text-right shrink-0">
+                <div className="row-fig text-right shrink-0">
                   <div className="money font-semibold">{inr(e.amount)}</div>
-                  <div className="text-[10px] text-ink-soft mt-1">
+                  <div className="text-[11px] text-ink-soft mt-1">
                     {edited ? "edited" : "added"} {relTime(e.updatedAt)}
                   </div>
                 </div>
@@ -92,11 +99,15 @@ export function Recent() {
           );
         })}
         {entries && entries.length === 0 && (
-          <div className="px-3 py-8 text-center text-sm text-ink-soft">
-            No entries yet — add one from the Entry tab.
-          </div>
+          <EmptyState
+            icon="clip"
+            line="Nothing has changed recently."
+            hint="Payments you add or correct show up here, newest first. This list fills itself."
+          />
         )}
       </div>
+
+      {!entries && <SkeletonRows rows={5} />}
 
       {editing && (
         <EditOverlay entry={editing} onClose={() => setEditing(null)} />

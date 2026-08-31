@@ -11,8 +11,10 @@ import { useNoteAiConsent, useVoiceAiConsent } from "../hooks/useNoteAiConsent";
 import { PushToggle } from "./PushToggle";
 import { ImportWizard } from "./ImportWizard";
 import { Faq } from "./Faq";
+import { useConfirm } from "./ConfirmSheet";
 
 export function SettingsScreen() {
+  const [confirm, confirmSheet] = useConfirm();
   const settings = useLiveQuery(() => db.settings.get("app"), []);
   const counts = useLiveQuery(
     async () => ({
@@ -51,10 +53,12 @@ export function SettingsScreen() {
     }
     try {
       const backup = await readBackupFile(file);
-      const ok = window.confirm(
-        `This backup contains ${backup.entries.length} ledger entries, ${backup.boqItems.length} BOQ items and ${backup.stockItems.length} stock items.\n\n` +
-          `Importing will REPLACE the current data (${counts?.entries ?? "?"} entries, ${counts?.boq ?? "?"} BOQ items, ${counts?.stock ?? "?"} stock items).\n\nContinue?`,
-      );
+      const ok = await confirm({
+        title: "Replace this phone's book with the backup?",
+        body: `The file holds ${backup.entries.length} payments, ${backup.boqItems.length} bill lines and ${backup.stockItems.length} materials. They replace what is on this phone now — ${counts?.entries ?? "?"} payments, ${counts?.boq ?? "?"} bill lines and ${counts?.stock ?? "?"} materials.`,
+        note: "This cannot be undone from here. Export a backup first if you are unsure.",
+        confirmLabel: "Replace the book",
+      });
       if (!ok) return;
       await applyBackup(backup);
       setMsg({
@@ -80,11 +84,12 @@ export function SettingsScreen() {
     }
     try {
       const backup = await readExcelBackupFile(file);
-      const ok = window.confirm(
-        `This workbook contains ${backup.entries.length} ledger entries, ${backup.boqItems.length} BOQ items and ${backup.stockItems.length} stock items.\n\n` +
-          `Importing will REPLACE the current data (${counts?.entries ?? "?"} entries, ${counts?.boq ?? "?"} BOQ items, ${counts?.stock ?? "?"} stock items).\n\n` +
-          `Entry photos are NOT in an Excel file and will be left exactly as they are on this phone.\n\nContinue?`,
-      );
+      const ok = await confirm({
+        title: "Replace this phone's book with the workbook?",
+        body: `The workbook holds ${backup.entries.length} payments, ${backup.boqItems.length} bill lines and ${backup.stockItems.length} materials. They replace what is on this phone now — ${counts?.entries ?? "?"} payments, ${counts?.boq ?? "?"} bill lines and ${counts?.stock ?? "?"} materials.`,
+        note: "Photos are not in an Excel file, so the ones on this phone are left exactly as they are.",
+        confirmLabel: "Replace the book",
+      });
       if (!ok) return;
       // version 7 = the current shape, so none of the legacy re-seeding runs.
       // keepAttachments because the workbook has no photos to restore and the
@@ -161,18 +166,16 @@ export function SettingsScreen() {
       });
       return;
     }
-    if (
-      !window.confirm(
-        "Clear all data? This deletes ALL entries, BOQ items and stock on this device.",
-      )
-    )
-      return;
-    if (
-      !window.confirm(
-        "Are you absolutely sure? This cannot be undone unless you exported a backup.",
-      )
-    )
-      return;
+    // One sheet, not two dialogs. The second `window.confirm` was there
+    // because the first could not say what was actually at stake; naming the
+    // counts does that job once.
+    const ok = await confirm({
+      title: "Clear everything on this phone?",
+      body: `This removes ${counts?.entries ?? 0} payments, ${counts?.boq ?? 0} bill lines and ${counts?.stock ?? 0} materials from this phone, along with their photos.`,
+      note: "It cannot be undone unless you have exported a backup.",
+      confirmLabel: "Clear all data",
+    });
+    if (!ok) return;
     await clearAllData();
     setMsg({ kind: "ok", text: "All on-device data cleared." });
   };
@@ -461,6 +464,7 @@ export function SettingsScreen() {
           </a>
         </div>
       </div>
+      {confirmSheet}
     </div>
   );
 }

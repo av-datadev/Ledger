@@ -124,7 +124,7 @@ export function GivenOutCard({ onOpen }: { onOpen?: () => void }) {
                       >
                         {num(it.left)}
                         {it.unit && (
-                          <span className="text-[9px] font-normal"> {it.unit}</span>
+                          <span className="text-[11px] font-normal"> {it.unit}</span>
                         )}
                       </span>
                     </div>

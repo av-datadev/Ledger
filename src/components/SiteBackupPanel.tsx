@@ -10,6 +10,7 @@ import { supabase } from "../lib/supabase";
 import { resyncSites, siteSyncState } from "../lib/siteSync";
 import { agoLabel } from "../hooks/useSyncStatus";
 import { ContractorAuth } from "./ContractorAuth";
+import { Icon } from "./Icon";
 
 /**
  * Save/restore for the contractor's site books, and the automatic cloud copy.
@@ -129,7 +130,7 @@ export function SiteBackupPanel({ siteCount }: { siteCount: number }) {
       {cloud.on ? (
         <div className="card p-3 space-y-1.5">
           <div className="text-[13px] text-moss">
-            ✓ Backed up to your account
+            <Icon name="check" size={14} className="inline align-[-2px] mr-1" />Backed up to your account
           </div>
           <p className="text-[11px] text-ink-soft">
             Your sites, every logged row and the bill photos are kept under your

@@ -125,6 +125,10 @@ function LedgerApp({
   // goods rows, so the read bill moves to the BOQ tab rather than collapsing
   // into one ledger line and losing the table.
   const [boqPreset, setBoqPreset] = useState<ScannedBill | null>(null);
+  // "Take me to the bill this payment sits on" — the Ledger row has no edit
+  // control because a bill payment is edited on its bill, so the row hands the
+  // billId over instead of describing where to go.
+  const [boqBillId, setBoqBillId] = useState<string | null>(null);
 
   // Android back button: from any non-dashboard tab, back returns to the
   // dashboard instead of exiting the app. Sub-screens (BOQ review, entry
@@ -162,6 +166,7 @@ function LedgerApp({
     setLedgerPreset(null);
     setEntryPreset(null);
     setBoqPreset(null);
+    setBoqBillId(null);
     navigate(t);
   };
 
@@ -179,6 +184,12 @@ function LedgerApp({
   const openEntry = (category: string) => {
     navigate("entry");
     setEntryPreset(category);
+  };
+
+  /** Open the BOQ tab on one particular bill, marked. */
+  const openBill = (billId: string) => {
+    navigate("boq");
+    setBoqBillId(billId);
   };
 
   return (
@@ -242,10 +253,17 @@ function LedgerApp({
             onBillDetected={openBoqBill}
           />
         )}
-        {tab === "ledger" && <Ledger preset={ledgerPreset} />}
+        {tab === "ledger" && (
+          <Ledger preset={ledgerPreset} onOpenBill={openBill} />
+        )}
         {tab === "recent" && <Recent />}
         {tab === "boq" && (
-          <Boq preset={boqPreset} onPresetUsed={() => setBoqPreset(null)} />
+          <Boq
+            preset={boqPreset}
+            onPresetUsed={() => setBoqPreset(null)}
+            highlightBillId={boqBillId}
+            onHighlightUsed={() => setBoqBillId(null)}
+          />
         )}
         {tab === "stock" && <Stock />}
         {tab === "people" && (

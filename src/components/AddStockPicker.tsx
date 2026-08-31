@@ -196,7 +196,7 @@ export function AddStockPicker({ onClose }: { onClose: () => void }) {
                             {line.qty != null ? num(line.qty) : "?"}{" "}
                             {line.unit ?? ""}
                             {added && (
-                              <span className="badge ml-1.5 !text-[9px]">
+                              <span className="badge ml-1.5 !text-[10px]">
                                 already added
                               </span>
                             )}

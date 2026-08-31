@@ -7,6 +7,8 @@ import { BudgetCard } from "./BudgetCard";
 import { GivenOutCard } from "./GivenOutCard";
 import { AddressCard } from "./AddressCard";
 import { SyncButton } from "./SyncButton";
+import { EmptyState } from "./EmptyState";
+import { SkeletonRows } from "./Skeleton";
 
 export function Dashboard({
   onOpenCategory,
@@ -27,7 +29,15 @@ export function Dashboard({
   const categories = useCategories();
   const payers = usePayers();
 
-  if (!entries) return null;
+  // Reserve the shape rather than returning null and flashing a blank page.
+  if (!entries)
+    return (
+      <div className="px-4 pt-6 space-y-4">
+        <div className="h-[11px] w-2/5 rounded-sm bg-rule" />
+        <div className="h-8 w-3/5 rounded-sm bg-rule" />
+        <SkeletonRows rows={5} />
+      </div>
+    );
 
   const total = entries.reduce((s, e) => s + e.amount, 0);
 
@@ -79,6 +89,17 @@ export function Dashboard({
         <div className="text-[11px] text-ink-soft mb-3">
           Tap a row to see all its payments.
         </div>
+        {/* A blank ledger listing every category at zero says nothing. Until
+            there is a first payment, say that instead. */}
+        {entries.length === 0 ? (
+          <div className="card">
+            <EmptyState
+              icon="clip"
+              line="No payments yet."
+              hint="Record the first one and this fills in — every category, ranked by what it has cost."
+            />
+          </div>
+        ) : (
         <div className="space-y-1">
           {byCategory.map(({ cat, count, total: t }) => (
             <button
@@ -104,8 +125,10 @@ export function Dashboard({
             </button>
           ))}
         </div>
+        )}
       </section>
 
+      {entries.length > 0 && (
       <section className="px-4 pt-6">
         <h2 className="eyebrow mb-2">
           Paid by <span className="normal-case tracking-normal">(tap for details)</span>
@@ -123,6 +146,7 @@ export function Dashboard({
           ))}
         </div>
       </section>
+      )}
 
       <GivenOutCard onOpen={onOpenStock} />
     </div>

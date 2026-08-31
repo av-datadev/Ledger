@@ -20,6 +20,7 @@ import type { VoiceSite } from "../lib/voice";
 import { SiteBalanceCard } from "./SiteBalanceCard";
 import { SiteLinkPanel } from "./SiteLinkPanel";
 import type { ContractorSite, SiteLedgerRow } from "../types";
+import { Icon } from "./Icon";
 
 const KIND_LABEL = Object.fromEntries(
   LEDGER_KINDS.map((k) => [k.value, k.label]),
@@ -328,10 +329,10 @@ function LedgerRowCard({
         </div>
       ) : (
         <div
-          className="w-12 h-12 shrink-0 rounded border border-dashed border-rule grid place-items-center text-[9px] text-crimson text-center leading-tight px-1"
+          className="w-12 h-12 shrink-0 rounded border border-dashed border-rule grid place-items-center gap-0.5 text-[11px] text-crimson text-center leading-tight px-1"
           title="No bill attached to this spend"
         >
-          No bill
+          <Icon name="warn" size={16} />
         </div>
       )}
 
@@ -357,7 +358,7 @@ function LedgerRowCard({
         {linkId && (
           <div className="mt-1">
             {row.sharedId ? (
-              <span className="text-[11px] text-moss">✓ owner can see this</span>
+              <span className="text-[11px] text-moss inline-flex items-center gap-1"><Icon name="check" size={12} /> owner can see this</span>
             ) : (
               <button
                 type="button"
@@ -614,11 +615,19 @@ function RowForm({
             className="btn w-full !py-2 !text-[13px]"
             onClick={() => fileRef.current?.click()}
           >
-            {proof
-              ? `✓ ${proof.name}`
-              : hadProof && keepProof
-                ? "📷 Replace the bill photo"
-                : "📷 Attach the bill"}
+            {proof ? (
+              <>
+                <Icon name="check" size={16} /> {proof.name}
+              </>
+            ) : hadProof && keepProof ? (
+              <>
+                <Icon name="camera" size={18} /> Replace the bill photo
+              </>
+            ) : (
+              <>
+                <Icon name="camera" size={18} /> Attach the bill
+              </>
+            )}
           </button>
           {hadProof && !proof && (
             // Removing the photo has to be possible and has to be deliberate:

@@ -11,6 +11,7 @@ import { VoiceCapture, VoiceHeard } from "./VoiceCapture";
 import type { VoiceEntry } from "../lib/voice";
 import type { ScannedBill } from "../lib/scanParse";
 import type { Entry, Attachment } from "../types";
+import { Icon } from "./Icon";
 
 /**
  * Re-shape a note that turned out to be an itemised bill into the bill reader's
@@ -352,7 +353,13 @@ export function EntryForm({
               noteAi.granted ? noteRef.current?.click() : setAskConsent(true)
             }
           >
-            {reading ? "Reading the note…" : "✍️ Read a handwritten note"}
+            {reading ? (
+              "Reading the note…"
+            ) : (
+              <>
+                <Icon name="camera" size={20} /> Read a handwritten note
+              </>
+            )}
           </button>
           <p className="text-[11px] text-ink-soft mt-1.5">
             For a vendor's kaccha slip, a cheque, or a Hindi diary page — fills
@@ -409,10 +416,10 @@ export function EntryForm({
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium">
                   {read.confidence === "low"
-                    ? "⚠️ Hard to read — check every field"
+                    ? "Hard to read — check every field"
                     : read.confidence === "medium"
                       ? "Read — check the amount"
-                      : "✓ Read clearly — check the amount"}
+                      : "Read clearly — check the amount"}
                 </span>
                 {read.isInformal && <span className="badge">No GST bill</span>}
               </div>
@@ -608,7 +615,7 @@ export function EntryForm({
               disabled={processing}
               onClick={() => cameraRef.current?.click()}
             >
-              📷 Take photo
+              <Icon name="camera" size={20} /> Take photo
             </button>
             <button
               type="button"
@@ -701,7 +708,7 @@ export function EntryForm({
 
         {saved && (
           <div className="text-center text-moss text-sm font-medium">
-            ✓ Entry saved
+            <Icon name="check" size={16} /> Entry saved
           </div>
         )}
       </div>

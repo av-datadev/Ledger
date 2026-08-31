@@ -8,6 +8,9 @@ import { inr, formatDate } from "../lib/format";
 import { toCsv, downloadFile, timestampSlug } from "../lib/csv";
 import { EntryForm } from "./EntryForm";
 import { UnbackedCard } from "./UnbackedCard";
+import { EmptyState } from "./EmptyState";
+import { SkeletonRows } from "./Skeleton";
+import { Icon } from "./Icon";
 import type { Entry } from "../types";
 
 /** Filter hand-off from other tabs (dashboard drill-down, People tab). */
@@ -42,7 +45,15 @@ function summarize(label: string, sel: string[]): string {
   return `${sel[0]} +${sel.length - 1}`;
 }
 
-export function Ledger({ preset }: { preset: LedgerPreset | null }) {
+export function Ledger({
+  preset,
+  onOpenBill,
+}: {
+  preset: LedgerPreset | null;
+  /** Open a payment's bill on the BOQ tab, with that bill highlighted — where
+   * a bill payment is edited, and the reason this row has no edit control. */
+  onOpenBill?: (billId: string) => void;
+}) {
   const entries = useLiveQuery(() => db.entries.toArray(), []);
   // How many photos each entry has — read only the entryId index (not the
   // blobs) so this stays cheap.
@@ -376,7 +387,7 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
                 type="button"
                 disabled={!e.notes}
                 aria-expanded={e.notes ? openNote === e.id : undefined}
-                className="min-w-0 text-left disabled:cursor-default"
+                className="row-main min-w-0 text-left disabled:cursor-default"
                 onClick={() =>
                   setOpenNote((id) => (id === e.id ? null : e.id))
                 }
@@ -393,7 +404,22 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
                   <span>{e.mode}</span>
                   <span>· {e.paidBy}</span>
                   {photoCount.get(e.id) && (
-                    <span className="badge">📎 {photoCount.get(e.id)}</span>
+                    <span className="badge inline-flex items-center gap-1">
+                      <Icon name="clip" size={11} /> {photoCount.get(e.id)}
+                    </span>
+                  )}
+                  {/* Which bill this payment sits on, named. This used to be a
+                      70-character sentence in the figure column, which — being
+                      shrink-0 — took the whole row and left the label ellipsed
+                      to a single character. The badge says the same thing, and
+                      the row itself now opens that bill. */}
+                  {e.billAllocations && e.billAllocations.length > 0 && (
+                    <span className="badge inline-flex items-center gap-1">
+                      <Icon name="link" size={11} />
+                      {e.billAllocations.length === 1
+                        ? "on a bill"
+                        : `on ${e.billAllocations.length} bills`}
+                    </span>
                   )}
                   {e.notes && (
                     <span className="badge">
@@ -402,7 +428,7 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
                   )}
                 </div>
               </button>
-              <div className="text-right shrink-0">
+              <div className="row-fig text-right shrink-0">
                 <div className="money font-semibold">{inr(e.amount)}</div>
                 {confirmId === e.id ? (
                   <div className="flex gap-1 mt-1">
@@ -427,9 +453,22 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
                   // affects is visible. Editing it here would change the ledger
                   // and leave the bill still claiming the old figure, and the
                   // two would quietly disagree from then on.
-                  <div className="text-[11px] text-ink-soft mt-1 text-right">
-                    🔗 payment against a BOQ bill — edit it on the{" "}
-                    <b>BOQ</b> tab, on the bill itself
+                  //
+                  // That rule used to be explained by a sentence sitting in
+                  // this column — which is shrink-0, so the sentence set the
+                  // column's width, took the whole row, and ellipsed the
+                  // payment's own name down to one character. The badge on the
+                  // row names the bill; this takes you to it, which is where
+                  // the editing happens. The affordance does the explaining.
+                  <div className="flex justify-end mt-1">
+                    <button
+                      className="text-[11px] text-ink-soft underline underline-offset-2 whitespace-nowrap"
+                      onClick={() =>
+                        onOpenBill?.(e.billAllocations![0].billId)
+                      }
+                    >
+                      open bill
+                    </button>
                   </div>
                 ) : (
                   <div className="flex gap-2 mt-1 justify-end">
@@ -456,12 +495,38 @@ export function Ledger({ preset }: { preset: LedgerPreset | null }) {
             )}
           </div>
         ))}
-        {entries && visible.length === 0 && (
-          <div className="px-3 py-8 text-center text-sm text-ink-soft">
-            No entries match.
-          </div>
+        {/* "Nothing here yet" and "nothing matched" are different screens: one
+            offers to record the first payment, the other offers to drop the
+            filters that hid the rest. */}
+        {entries && visible.length === 0 && filtered && (
+          <EmptyState
+            icon="search"
+            line="No payments match these filters."
+            hint={`${entries.length} ${entries.length === 1 ? "payment is" : "payments are"} in the book — none of them match what's selected above.`}
+            actionLabel="Clear filters"
+            onAction={() => {
+              setSearch("");
+              setCats([]);
+              setModes([]);
+              setPayers([]);
+              setFrom("");
+              setTo("");
+              setOpenFilter(null);
+            }}
+          />
+        )}
+        {entries && visible.length === 0 && !filtered && (
+          <EmptyState
+            icon="clip"
+            line="Nothing in the book yet."
+            hint="Every rupee that leaves for the house goes here. Record the first one from the Record button."
+          />
         )}
       </div>
+
+      {/* Reserve the rows' real height rather than flashing a blank screen and
+          popping the list in underneath the reader's thumb. */}
+      {!entries && <SkeletonRows rows={6} />}
 
       {editing && (
         <EditOverlay entry={editing} onClose={() => setEditing(null)} />

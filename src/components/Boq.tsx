@@ -29,6 +29,8 @@ import { BoqItemResults } from "./BoqItemResults";
 import { BillPaymentPanel } from "./BillPaymentPanel";
 import { DealerAccounts } from "./DealerAccounts";
 import type { BoqItem } from "../types";
+import { Icon } from "./Icon";
+import { EmptyState } from "./EmptyState";
 
 /** How many photos of one bill are read in a single call. Matches the PDF
  * path's MAX_GEMINI_PAGES: a kaccha bill running past six notebook pages is
@@ -65,6 +67,8 @@ function describeFallback(reason: string): string {
 export function Boq({
   preset = null,
   onPresetUsed,
+  highlightBillId = null,
+  onHighlightUsed,
 }: {
   /** A bill already read on the Entry tab, handed over because the slip turned
    * out to be an itemised bill rather than a plain payment. Opens straight on
@@ -72,6 +76,11 @@ export function Boq({
    * read once and filed once. */
   preset?: ScannedBill | null;
   onPresetUsed?: () => void;
+  /** A bill to open and mark, handed over from a Ledger payment row. Editing a
+   * bill payment happens on the bill, so arriving here should land ON that
+   * bill rather than at the top of a list of forty. */
+  highlightBillId?: string | null;
+  onHighlightUsed?: () => void;
 } = {}) {
   const items = useLiveQuery(() => db.boqItems.toArray(), []);
   const entries = useLiveQuery(() => db.entries.toArray(), []);
@@ -94,6 +103,10 @@ export function Boq({
    * tap away and both should go to the reader together. */
   const [pages, setPages] = useState<File[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
+  /** The bill just arrived at from a payment row — expanded, scrolled to, and
+   * ringed for a moment so the eye lands on it. Cleared on a timer: a marker
+   * that stays is noise on the next visit. */
+  const [flashBill, setFlashBill] = useState<string | null>(null);
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   /** Narrow the bill list to the ones a vendor is still owed money on. */
   const [dueOnly, setDueOnly] = useState(false);
@@ -121,6 +134,31 @@ export function Boq({
     onPresetUsed?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset]);
+
+  // Arriving from a payment row: open that bill, bring it into view, and ring
+  // it briefly. Consumed once, like the preset above.
+  useEffect(() => {
+    if (!highlightBillId) return;
+    setExpanded(highlightBillId);
+    setBillsOpen(true);
+    setDueOnly(false); // the bill may be settled; a filter must not hide it
+    setQuery("");
+    setFlashBill(highlightBillId);
+    onHighlightUsed?.();
+    const el = document.getElementById(`bill-${highlightBillId}`);
+    // Two frames: the list has to re-render with the bill expanded before its
+    // position is worth measuring.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        document
+          .getElementById(`bill-${highlightBillId}`)
+          ?.scrollIntoView({ block: "center", behavior: el ? "smooth" : "auto" }),
+      ),
+    );
+    const t = setTimeout(() => setFlashBill(null), 2400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightBillId]);
 
   const editBill = (rows: BoqItem[]) => {
     const head = rows[0];
@@ -523,7 +561,7 @@ export function Boq({
           disabled={!!busy}
           onClick={() => cameraRef.current?.click()}
         >
-          📷 Take photo
+          <Icon name="camera" size={20} /> Take photo
         </button>
         <button
           className="btn"
@@ -537,7 +575,7 @@ export function Boq({
           disabled={!!busy}
           onClick={() => sizesRef.current?.click()}
         >
-          📐 Size list
+          <Icon name="ruler" size={20} /> Size list
         </button>
         <button
           className="btn"
@@ -693,7 +731,7 @@ export function Boq({
               aria-label="Clear search"
               onClick={() => setQuery("")}
             >
-              ✕
+              <Icon name="x" size={16} />
             </button>
           )}
         </div>
@@ -803,8 +841,27 @@ export function Boq({
             const head = rows[0];
             const open = expanded === key;
             const clubbed = head.clubbed === true;
+            const flashing = flashBill === key;
             return (
-              <div key={key} className="card">
+              <div
+                key={key}
+                id={`bill-${key}`}
+                className={`card transition-colors ${
+                  flashing ? "!border-crimson bg-accent-soft/40" : ""
+                }`}
+                style={{ transitionDuration: "var(--dur-base)" }}
+              >
+                {/* Said, not only shown — the ring is a colour change, and
+                    colour is never the only signal. */}
+                {flashing && (
+                  <div
+                    role="status"
+                    className="px-3 pt-2.5 text-[11px] text-crimson flex items-center gap-1.5"
+                  >
+                    <Icon name="link" size={12} />
+                    The payment you came from is on this bill
+                  </div>
+                )}
                 <button
                   className="w-full px-3 py-2.5 flex items-center justify-between gap-2 text-left"
                   onClick={() => setExpanded(open ? null : key)}
@@ -896,23 +953,28 @@ export function Boq({
             );
           })}
           {items && groups.length === 0 && (
-            <div className="text-sm text-ink-soft text-center py-6">
-              No bills recorded yet.
-            </div>
+            <EmptyState
+              icon="camera"
+              line="No bills on record."
+              hint="Photograph a dealer's slip and the items, rates and what's still owed come off it. Handwritten and Hindi bills are read too."
+            />
           )}
           {/* Which of the two filters emptied the list decides what to say. The
               "nothing outstanding" line is good news; said after a search that
               simply found nothing, it would be an answer to a question nobody
               asked. */}
           {items && groups.length > 0 && shownGroups.length === 0 && searching && billsOpen && (
-            <div className="text-sm text-ink-soft text-center py-6">
-              No bill matches “{query.trim()}”
-              {dueOnly && <> among those still to pay</>}.
-              <br />
-              <button className="underline mt-1" onClick={() => setQuery("")}>
-                Clear the search
-              </button>
-            </div>
+            <EmptyState
+              icon="search"
+              line={`No bill matches “${query.trim()}”`}
+              hint={
+                dueOnly
+                  ? "Nothing among the bills still to pay, at least. Clearing the search shows all of them again."
+                  : "Search runs across every line on every bill, so a part of an item name works too."
+              }
+              actionLabel="Clear the search"
+              onAction={() => setQuery("")}
+            />
           )}
           {items && groups.length > 0 && shownGroups.length === 0 && !searching && (
             <div className="text-sm text-ink-soft text-center py-6">

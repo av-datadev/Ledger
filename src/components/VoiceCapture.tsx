@@ -9,6 +9,7 @@ import {
   type VoiceMode,
   type VoiceResult,
 } from "../lib/voice";
+import { Icon } from "./Icon";
 
 type Phase = "idle" | "consent" | "recording" | "sending";
 
@@ -174,7 +175,7 @@ export function VoiceCapture<M extends VoiceMode>({
         disabled={phase === "sending"}
         onClick={() => void begin()}
       >
-        {phase === "sending" ? "Reading what you said…" : "🎤 Speak it instead"}
+        {phase === "sending" ? ("Reading what you said…") : (<><Icon name="mic" size={20} /> Speak it instead</>)}
       </button>
       {err && <div className="text-[12px] text-crimson mt-1">{err}</div>}
     </>
@@ -213,7 +214,7 @@ export function VoiceHeard({
           aria-label="Dismiss what was heard"
           onClick={onDismiss}
         >
-          ✕
+          <Icon name="x" size={16} />
         </button>
       </div>
       {(unclear || confidence === "low") && (

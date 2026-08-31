@@ -27,8 +27,15 @@
   --color-crimson: #b44c26;
   --color-accent-deep: #a2431f; /* pressed state, badge text */
   --color-accent-soft: #f3e3d8; /* badge fill, progress track */
-  --color-brass: #a98544; /* secondary accent, used sparingly */
+  /* D1: the old #a98544 measured 3.09:1 on paper and 3.43:1 on surface — under
+     AA for the captions it carries. Darkened to 4.91:1 / 5.46:1. The dark value
+     already passed at 7.48:1 and is unchanged. */
+  --color-brass: #856427; /* secondary accent, used sparingly */
   --color-moss: #3e6b52; /* confirm / positive */
+  /* D5: destructive. Deliberately NOT terracotta — the accent already means
+     "act on this", and one colour cannot also mean "this cannot be undone".
+     5.89:1 on paper, 6.54:1 for white on the fill. */
+  --color-danger: #b3261e;
 
   --font-sans:
     system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
@@ -45,6 +52,20 @@
      existing `rounded-md` / `rounded-lg` at once, without touching a component. */
   --radius-md: 0.625rem; /* 10px */
   --radius-lg: 0.875rem; /* 14px */
+  /* D8: bare `rounded` (4px) is used in 38 places beside 14px cards, where it
+     reads as an unfinished corner. Overriding the base scale lifts all of them
+     at once — same trick as the two above, and again no component changes. */
+  --radius: 0.375rem; /* 6px */
+  --radius-sm: 0.375rem; /* 6px */
+
+  /* Motion. The whole vocabulary — there is no animation library and should not
+     be one. Exits are faster than entrances. */
+  --dur-press: 80ms;
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-exit: 160ms;
+  --ease-base: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 
   --shadow-card:
     0 1px 2px rgba(21, 35, 46, 0.04), 0 8px 24px -12px rgba(21, 35, 46, 0.18);
@@ -75,6 +96,9 @@
   --color-accent-soft: rgba(210, 112, 63, 0.18);
   --color-brass: #c4a165;
   --color-moss: #4e9e76;
+  /* Light pink, not red: a saturated red dies against near-black the same way
+     terracotta does. 9.52:1 on surface. */
+  --color-danger: #f2b8b5;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-float: 0 8px 30px -12px rgba(0, 0, 0, 0.7);
@@ -143,24 +167,35 @@ h3 {
   white-space: nowrap;
 }
 
+/* D7: 11px is the floor for anything that carries meaning. 10px survives only
+   for uppercase badge pills, where caps height and tracking carry it. */
 .field-label {
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   color: var(--color-ink-faint);
   display: block;
   margin-bottom: 4px;
 }
 
+/* D3: a white field on a white card had a 1.37:1 boundary — invisible, and
+   under the 3:1 floor for a control edge. Filling with paper-2 gives the field
+   its own surface, which also makes a long form scan faster than a darker
+   border would. */
 .input {
   width: 100%;
   border: 1px solid var(--color-rule-strong);
-  border-radius: 8px;
-  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
   padding: 9px 11px;
   font-size: 16px;
   color: var(--color-ink);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+/* Error: never the border alone. Components pair this with a message wired by
+   aria-describedby and aria-invalid. */
+.input[aria-invalid="true"] {
+  border-color: var(--color-danger);
 }
 .input:focus {
   outline: none;
@@ -201,10 +236,52 @@ h3 {
   opacity: 0.5;
   box-shadow: none;
 }
+/* D2: white on the dark-mode accent (#d2703f) measures 3.43:1. Ink measures
+   5.31:1. One rule, both themes correct. */
+:root[data-theme="dark"] .btn-primary {
+  color: var(--color-ink);
+}
 .btn-green {
   background: var(--color-moss);
   border-color: var(--color-moss);
   color: #fff;
+}
+/* D5: destructive is an OUTLINE, not a solid fill. White on the dark danger
+   token would fail exactly the way D2 does, and a solid red button would
+   outshout the primary action on every screen it appears on. */
+.btn-danger {
+  background: var(--color-surface);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  box-shadow: none;
+}
+.btn-danger:active {
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+  border-color: var(--color-danger);
+}
+
+/* Focus is always visible, and follows the control's own meaning: a delete
+   button ringed in the brand accent would read as the primary action. */
+:where(button, a, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--color-crimson) 18%, transparent);
+  border-radius: var(--radius-md);
+}
+.btn-danger:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 22%, transparent);
+}
+
+/* §5.4 — two structural guards on the money row, after a bill-linked payment
+   in the Ledger put a sentence in the figure column: the column took the whole
+   row, and the label ellipsed away to a single character.
+   The label may ellipse; it may not vanish. The figure column holds the
+   figure. */
+.row-main {
+  min-width: 11ch;
+}
+.row-fig {
+  max-width: 40%;
 }
 
 /* The design leans on hover lifts and eased transitions; honour a user who has

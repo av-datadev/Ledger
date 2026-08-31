@@ -8,6 +8,7 @@ import { SiteBackupPanel } from "./SiteBackupPanel";
 import { ContractorLeadForm } from "./ContractorLeadForm";
 import { FindContractor } from "./FindContractor";
 import type { ContractorSite } from "../types";
+import { EmptyState } from "./EmptyState";
 
 type Tab = "sites" | "directory";
 
@@ -126,9 +127,14 @@ function SitesList({
       {adding && <AddSiteForm onDone={() => setAdding(false)} />}
 
       {sites.length === 0 && !adding && (
-        <div className="text-[13px] text-ink-soft">
-          No sites yet. Add the first house you're working on to start keeping
-          its money separate.
+        <div className="card">
+          <EmptyState
+            icon="house"
+            line="No sites yet."
+            hint="Add the first house you're working on. Each site keeps its own money, and none of them is visible to any homeowner."
+            actionLabel="Add a site"
+            onAction={() => setAdding(true)}
+          />
         </div>
       )}
 

@@ -646,7 +646,7 @@ export function BillReview({
                   ? "Enter the dealer's own total above to check it against the sizes."
                   : qtyDisagrees
                     ? `Off by ${Math.abs(qtyDiff)} ${measuredUnit} — check every size against the photo.`
-                    : "✓ the sizes agree with the slip"}
+                    : "The sizes agree with the slip"}
               </div>
             </div>
             {qtyDisagrees && (
@@ -755,7 +755,7 @@ export function BillReview({
         >
           Invoice total on bill: {inr(total)}
           {overCounted && ` — items alone exceed it by ${inr(diff)}`}
-          {!overCounted && computedAgrees && " ✓ matches the calculation"}
+          {!overCounted && computedAgrees && " — matches the calculation"}
           {!overCounted && !computedAgrees && total > 0 &&
             ` — calculation says ${inr(computedTotal)}`}
           {!overCounted && total <= 0 && " — not read; use the calculated total"}
