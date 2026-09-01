@@ -9,6 +9,7 @@ import { ContractorLeadForm } from "./ContractorLeadForm";
 import { FindContractor } from "./FindContractor";
 import type { ContractorSite } from "../types";
 import { EmptyState } from "./EmptyState";
+import { Icon } from "./Icon";
 
 type Tab = "sites" | "directory";
 
@@ -37,12 +38,16 @@ export function ContractorHome({
 
   return (
     <div className="min-h-dvh flex flex-col bg-paper text-ink">
-      <header className="sticky top-0 z-30 bg-header text-onhead px-4 h-12 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-header text-onhead px-4 h-12 flex items-center justify-between chrome-edge-b">
         <div className="font-bold tracking-[0.14em] text-sm">BRICK BOOK</div>
+        {/* Was a bare underlined link while the owner header used a bordered
+            pill — one product, two skins. Same control on both sides now. */}
         <button
-          className="text-[11px] underline opacity-80"
+          className="text-onhead/90 active:text-onhead text-[11px] border border-onhead/30 rounded px-2 py-1 inline-flex items-center gap-1.5"
           onClick={onSwitchToBuilder}
+          title="Switch to the owner side"
         >
+          <Icon name="house" size={16} />
           I'm building a home
         </button>
       </header>

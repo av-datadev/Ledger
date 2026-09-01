@@ -10,7 +10,6 @@ import { useTextScale, TEXT_SCALES } from "../hooks/useTextScale";
 import { useNoteAiConsent, useVoiceAiConsent } from "../hooks/useNoteAiConsent";
 import { PushToggle } from "./PushToggle";
 import { ImportWizard } from "./ImportWizard";
-import { Faq } from "./Faq";
 import { useConfirm } from "./ConfirmSheet";
 
 export function SettingsScreen() {
@@ -394,7 +393,6 @@ export function SettingsScreen() {
         </div>
       </section>
 
-      <Faq />
 
       <section className="space-y-2">
         <h2 className="eyebrow">

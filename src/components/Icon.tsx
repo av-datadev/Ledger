@@ -26,6 +26,7 @@ export type IconName =
   | "warn"
   | "ruler"
   | "house"
+  | "hardhat"
   | "card"
   | "check"
   | "x"
@@ -44,6 +45,14 @@ const PATHS: Record<IconName, string> = {
   ruler:
     "M3 8h18v8H3zm2 2v4h1.5v-2H8v2h1.5v-3H11v3h1.5v-2H14v2h1.5v-3H17v3h2v-4z",
   house: "M12 3 2 11h3v9h5v-6h4v6h5v-9h3z",
+  /* The contractor side, in one shape: a hard hat with its brim. Drawn solid at
+     the same weight as `house`, which marks the owner side, so the pair reads
+     as two of a kind in the two mode-switch buttons.
+
+     The raised centre crown is the whole icon. A plain dome on a brim reads as
+     a bell at 16px; the step up in the middle is what makes it a hard hat. */
+  hardhat:
+    "M12 3.4a2.7 2.7 0 0 0-2.7 2.7v2.1A5.7 5.7 0 0 0 5.8 13.5v2h12.4v-2a5.7 5.7 0 0 0-3.5-5.3V6.1A2.7 2.7 0 0 0 12 3.4zM2 16.6h20a1 1 0 0 1 1 1v1.1a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-1.1a1 1 0 0 1 1-1z",
   card: "M3 5h18v14H3zm2 2v10h14V7zm2 2h4v4H7zm6 0h4v1.5h-4zm0 3h4v1.5h-4zM7 14h4v1.5H7z",
   check: "M9.6 16.3 5.4 12.1 4 13.5l5.6 5.6L20.2 8.5l-1.4-1.4z",
   x: "M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z",

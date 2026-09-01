@@ -27,6 +27,12 @@
   --color-crimson: #b44c26;
   --color-accent-deep: #a2431f; /* pressed state, badge text */
   --color-accent-soft: #f3e3d8; /* badge fill, progress track */
+  /* The fill under `.btn-primary` ONLY. Split from --color-crimson because
+     the two jobs have different contrast duties: crimson carries text and is
+     measured against the page ground, while this is measured against the
+     white label sitting ON it. In light mode they coincide. See D2. */
+  --color-accent-fill: #b44c26;
+  --color-accent-fill-deep: #a2431f; /* .btn-primary pressed */
   /* D1: the old #a98544 measured 3.09:1 on paper and 3.43:1 on surface — under
      AA for the captions it carries. Darkened to 4.91:1 / 5.46:1. The dark value
      already passed at 7.48:1 and is unchanged. */
@@ -80,28 +86,75 @@
    Hand-authored, not derived: the source design is light-only, so nothing here
    falls out of it for free. The accent is lifted and desaturated so terracotta
    still reads against a near-black ground, and the shadows are dropped to
-   near-nothing because a dark surface separates by lightness, not by shade. */
+   near-nothing because a dark surface separates by lightness, not by shade.
+
+   AMOLED. The ground is true #000000, not a near-black: on the OLED panels
+   these phones ship with, a black pixel is an unlit pixel, so this is the one
+   design choice in the app that costs battery to get wrong. The greys above it
+   are neutral — the old palette was navy-tinted (#10161c, #18212b, #a0aeb8),
+   which reads as a colour cast rather than a choice once the ground beside it
+   is a true black.
+
+   Every value below was measured, not chosen by eye. Against the three grounds
+   (#000000 / #121212 / #1a1a1a): ink 17.94 / 16.00 / 14.87 · ink-soft 8.83 /
+   7.88 / 7.32 · ink-faint 6.49 / 5.79 / 5.38 · crimson 6.13 / 5.47 / 5.08 ·
+   moss 6.48 / 5.78 / 5.37 · brass 8.63 / 7.70 / 7.15 · danger 12.30 / 10.97 /
+   10.19. All pass AA, and all are higher than the navy palette they replace. */
 :root[data-theme="dark"] {
-  --color-ink: #e8e6e1;
-  --color-ink-soft: #a0aeb8;
-  --color-ink-faint: #7d8b95;
-  --color-paper: #10161c;
-  --color-paper-2: #141c24;
-  --color-rule: rgba(255, 255, 255, 0.1);
-  --color-rule-strong: rgba(255, 255, 255, 0.18);
-  --color-surface: #18212b;
-  --color-header: #0b1015;
+  --color-ink: #ededed;
+  --color-ink-soft: #a8a8a8;
+  --color-ink-faint: #8f8f8f;
+  --color-paper: #000000;
+  /* Cards separate from the ground by lightness. #121212 against #000000 is a
+     small step, but it is the same step Material uses for dark surfaces and it
+     survives sunlight better than a hairline alone — which is why the card
+     keeps its border as well. */
+  --color-surface: #121212;
+  --color-paper-2: #1a1a1a;
+  --color-rule: rgba(255, 255, 255, 0.12);
+  /* Input and button outlines are control boundaries, and §2.2 sets a 3:1
+     floor for those. On a true-black ground white at 18% measures 1.55:1; 35%
+     is the first step that reaches 3.00:1. Row dividers stay at 12% above —
+     those are decorative, and the book feel depends on them staying faint. */
+  --color-rule-strong: rgba(255, 255, 255, 0.35);
+  /* Chrome is the same black as the page; its edge is carried by a light
+     hairline instead of by a shade (see .chrome-edge-* below). A black/40
+     border on a black ground is not a border. */
+  --color-header: #000000;
   --color-crimson: #d2703f;
   --color-accent-deep: #e0895c;
   --color-accent-soft: rgba(210, 112, 63, 0.18);
+  /* D2: the fill parts company with --color-crimson in dark mode. White on
+     #d2703f measures 3.43:1; on this it measures 4.15:1. Crimson itself stays
+     lifted for its 103 text call sites, where it measures 6.13:1 on black. */
+  --color-accent-fill: #c4602f;
+  /* Pressed goes DOWN from the resting fill, as it does in light mode.
+     White measures 5.15:1 here. */
+  --color-accent-fill-deep: #ad5429;
   --color-brass: #c4a165;
   --color-moss: #4e9e76;
   /* Light pink, not red: a saturated red dies against near-black the same way
-     terracotta does. 9.52:1 on surface. */
+     terracotta does. 10.97:1 on surface. */
   --color-danger: #f2b8b5;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-float: 0 8px 30px -12px rgba(0, 0, 0, 0.7);
+}
+
+/* The header and tab bar sit on the same black as the page in dark mode, so
+   their edge has to be drawn rather than implied. One class each, used by the
+   two chrome elements, so neither carries a raw colour. */
+.chrome-edge-b {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+}
+.chrome-edge-t {
+  border-top: 1px solid rgba(0, 0, 0, 0.4);
+}
+:root[data-theme="dark"] .chrome-edge-b {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+:root[data-theme="dark"] .chrome-edge-t {
+  border-top-color: rgba(255, 255, 255, 0.12);
 }
 
 html,
@@ -208,6 +261,15 @@ h3 {
 }
 
 .btn {
+  /* Buttons carry an icon beside their label in ten places. Without an explicit
+     layout the icon and the text are two separate inline boxes, and the icon
+     drops onto its own line the moment the label is long enough to wrap — which
+     is what "Take photo" and "Size list" were doing on the BOQ screen. Centred
+     flex with a gap is the layout every one of these buttons assumed it had. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: 1px solid var(--color-rule-strong);
   border-radius: var(--radius-md);
   background: var(--color-surface);
@@ -221,25 +283,32 @@ h3 {
   background: color-mix(in srgb, var(--color-ink) 6%, var(--color-surface));
   border-color: var(--color-ink);
 }
+/* D2, corrected. The old note here read "white on the dark-mode accent
+   (#d2703f) measures 3.43:1, ink measures 5.31:1" and set the label to ink in
+   dark mode. 5.31 was crimson-on-paper — a different pair. Measured against the
+   fill the label actually sits on, ink scored 2.75:1, WORSE than the white it
+   replaced, on every primary button in the app.
+
+   The fix is the fill, not the label: white stays, and the fill gets its own
+   token so it can be dark enough to carry white (4.15:1) while --color-crimson
+   stays lifted for the text it carries elsewhere (6.13:1 on black). */
 .btn-primary {
-  background: var(--color-crimson);
-  border-color: var(--color-crimson);
+  background: var(--color-accent-fill);
+  border-color: var(--color-accent-fill);
   color: #fff;
   /* The design's signature: a coloured lift under the primary action only. */
-  box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--color-crimson) 70%, transparent);
+  box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--color-accent-fill) 70%, transparent);
 }
+/* Pressed darkens in both themes. It used to reach for --color-accent-deep,
+   which in dark mode is LIGHTER than the resting fill (#e0895c) and put white
+   at 2.66:1 — pressing the button made its label harder to read. */
 .btn-primary:active {
-  background: var(--color-accent-deep);
-  border-color: var(--color-accent-deep);
+  background: var(--color-accent-fill-deep);
+  border-color: var(--color-accent-fill-deep);
 }
 .btn-primary:disabled {
   opacity: 0.5;
   box-shadow: none;
-}
-/* D2: white on the dark-mode accent (#d2703f) measures 3.43:1. Ink measures
-   5.31:1. One rule, both themes correct. */
-:root[data-theme="dark"] .btn-primary {
-  color: var(--color-ink);
 }
 .btn-green {
   background: var(--color-moss);

@@ -478,7 +478,10 @@ export function BillReview({
           {degraded}
           {onRetryScan && (
             <button
-              className="btn !py-1.5 !px-3 !text-[13px] mt-2 block"
+              /* !flex, not `block`: this button sits inside a paragraph of
+                 warning text and has to start its own line. `.btn` now sets its
+                 own display, so the override has to outrank it. */
+              className="btn !py-1.5 !px-3 !text-[13px] mt-2 !flex"
               disabled={!!busy}
               onClick={onRetryScan}
             >

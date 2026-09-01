@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { Dashboard } from "./components/Dashboard";
 import { EntryForm } from "./components/EntryForm";
@@ -8,7 +8,7 @@ import { Boq } from "./components/Boq";
 import { Stock } from "./components/Stock";
 import { People } from "./components/People";
 import { SettingsScreen } from "./components/SettingsScreen";
-import { TabBar, type Tab } from "./components/TabBar";
+import { TabBar, TAB_ORDER, type Tab } from "./components/TabBar";
 import type { ScannedBill } from "./lib/scanParse";
 import { useTheme } from "./hooks/useTheme";
 import { useAuth } from "./hooks/useAuth";
@@ -27,6 +27,9 @@ import { LinkedContractors } from "./components/LinkedContractors";
 import { FindContractor } from "./components/FindContractor";
 import { AddContractorAdmin } from "./components/AddContractorAdmin";
 import { DIRECTORY_ADMIN_EMAIL } from "./lib/contractors";
+import { Faq } from "./components/Faq";
+import { Icon } from "./components/Icon";
+import { useTabSwipe } from "./hooks/useTabSwipe";
 
 /**
  * No auth gate: the app runs on the on-device ledger the moment it opens, so a
@@ -170,6 +173,23 @@ function LedgerApp({
     navigate(t);
   };
 
+  // Swiping the screen walks TAB_ORDER, which is the same left-to-right order
+  // the bar lays the tabs out in. It stops at both ends rather than wrapping:
+  // wrapping from Help back to Dash would make a flick at the edge feel like a
+  // mis-tap. Record is not in TAB_ORDER, so a half-typed entry can never be
+  // swiped away — indexOf returns -1 there and both directions are no-ops.
+  const mainRef = useRef<HTMLElement>(null);
+  const stepTab = (delta: number) => {
+    const i = TAB_ORDER.indexOf(tab);
+    if (i === -1) return;
+    const next = TAB_ORDER[i + delta];
+    if (next) navigateFromTabBar(next);
+  };
+  useTabSwipe(mainRef, {
+    onNext: () => stepTab(1),
+    onPrev: () => stepTab(-1),
+  });
+
   /** Move a bill read on the Entry tab over to the BOQ review screen. */
   const openBoqBill = (bill: ScannedBill) => {
     navigate("boq");
@@ -194,18 +214,21 @@ function LedgerApp({
 
   return (
     <div className="min-h-dvh flex flex-col bg-paper">
-      <header className="bg-header text-onhead sticky top-0 z-30 px-4 h-12 flex items-center justify-between border-b border-black/30">
+      <header className="bg-header text-onhead sticky top-0 z-30 px-4 h-12 flex items-center justify-between chrome-edge-b">
         <h1 className="text-sm font-semibold tracking-[0.18em]">
           BRICK BOOK
         </h1>
         <div className="flex items-center gap-1">
         {/* One-tap hop to the contractor side and back, so a listing can be
             added and checked without clearing app state. */}
+        {/* Paired with the button in ContractorHome's header: same pill, same
+            size, an icon each naming the side it takes you to. */}
         <button
           onClick={onSwitchToContractor}
-          className="text-onhead/90 active:text-onhead text-[11px] border border-onhead/30 rounded px-2 py-1"
+          className="text-onhead/90 active:text-onhead text-[11px] border border-onhead/30 rounded px-2 py-1 inline-flex items-center gap-1.5"
           title="Switch to the contractor side"
         >
+          <Icon name="hardhat" size={16} />
           Contractor view
         </button>
         <button
@@ -237,7 +260,9 @@ function LedgerApp({
         </div>
       </header>
 
-      <main className="flex-1 pb-20">
+      {/* pb-24: the bar grew a page-dot row, and design.md asks every scrolling
+          screen to clear the bar, the safe area and 16px besides. */}
+      <main ref={mainRef} className="flex-1 pb-24">
         {tab === "dashboard" && (
           <Dashboard
             onOpenCategory={(cat) => openLedger({ category: cat })}
@@ -297,6 +322,14 @@ function LedgerApp({
               </div>
             )}
           </>
+        )}
+        {/* Faq is a bare <section>; it used to inherit its gutters from the
+            Data screen's container. As a tab of its own it needs them itself —
+            the same px-4 py-4 max-w-lg every other screen uses. */}
+        {tab === "help" && (
+          <div className="px-4 py-4 max-w-lg mx-auto">
+            <Faq />
+          </div>
         )}
       </main>
 
