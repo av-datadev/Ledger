@@ -7,12 +7,7 @@ import {
 } from "../lib/contractors";
 import { inr } from "../lib/format";
 import { EngageTeamSheet } from "./EngageTeamSheet";
-
-const AVAILABILITY_LABEL: Record<FirmMember["availability"], string> = {
-  available: "Available now",
-  partial: "Partly booked",
-  booked: "Fully booked",
-};
+import { DirectoryHeader, AvailabilityBadge } from "./DirectoryChrome";
 
 /**
  * One person in the directory.
@@ -54,20 +49,20 @@ export function MemberDetail({
 
   return (
     <div className="px-4 py-4 max-w-lg mx-auto space-y-3">
-      <button className="btn !py-1.5 !px-2.5 text-[12px]" onClick={onBack}>
-        ‹ Back
-      </button>
+      <DirectoryHeader
+        eyebrow={viaFirm ? viaFirm.name : "Directory"}
+        title={member.name}
+        onBack={onBack}
+        backLabel={viaFirm ? "Team" : "Contractors"}
+      />
 
-      <div>
-        <h2 className="text-[17px] font-semibold">{member.name}</h2>
-        <div className="flex flex-wrap items-center gap-2 mt-1.5">
-          <span className="badge">{member.trade}</span>
-          <span className="text-[12px] text-ink-soft">
-            {AVAILABILITY_LABEL[member.availability]}
-            {member.yearsExperience ? ` · ${member.yearsExperience} yrs` : ""}
-            {member.isLead ? " · team lead" : ""}
-          </span>
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="badge">{member.trade}</span>
+        <AvailabilityBadge value={member.availability} />
+        <span className="text-[12px] text-ink-soft">
+          {member.yearsExperience ? `${member.yearsExperience} yrs` : ""}
+          {member.isLead ? " · team lead" : ""}
+        </span>
       </div>
 
       {viaFirm && (

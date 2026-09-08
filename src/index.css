@@ -220,6 +220,30 @@ h3 {
   white-space: nowrap;
 }
 
+/* §5.5 names three semantic variants beside the accent badge above. They were
+   specified but never built, so every state so far has been carried by coloured
+   TEXT — which puts the whole weight of the state on hue. These give the word a
+   ground of its own, and the word still says it: "Available now", not a colour.
+
+   Measured on the card surface, light / dark:
+     neutral   ink-soft on ink@10%    6.66 / 6.20
+     positive  moss     on moss@12%   5.17 / 4.98
+     warn      brass    on brass@12%  4.63 / 6.43
+   The spec's own neutral (ink-faint on rule) measures 4.44 and fails at 10px —
+   ink-soft is the first step that clears AA, so that is what is used. */
+.badge-neutral {
+  color: var(--color-ink-soft);
+  background: color-mix(in srgb, var(--color-ink) 10%, var(--color-surface));
+}
+.badge-positive {
+  color: var(--color-moss);
+  background: color-mix(in srgb, var(--color-moss) 12%, var(--color-surface));
+}
+.badge-warn {
+  color: var(--color-brass);
+  background: color-mix(in srgb, var(--color-brass) 12%, var(--color-surface));
+}
+
 /* D7: 11px is the floor for anything that carries meaning. 10px survives only
    for uppercase badge pills, where caps height and tracking carry it. */
 .field-label {

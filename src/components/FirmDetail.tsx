@@ -6,18 +6,7 @@ import {
 } from "../lib/contractors";
 import { inr, formatDate } from "../lib/format";
 import { EngageTeamSheet } from "./EngageTeamSheet";
-
-const AVAILABILITY_LABEL: Record<Contractor["availability"], string> = {
-  available: "Available now",
-  partial: "Partly booked",
-  booked: "Fully booked",
-};
-
-const AVAILABILITY_CLASS: Record<Contractor["availability"], string> = {
-  available: "text-moss",
-  partial: "text-brass",
-  booked: "text-crimson",
-};
+import { DirectoryHeader, AvailabilityBadge } from "./DirectoryChrome";
 
 /** Group the roster by trade, keeping the seniority order within each. */
 function byTrade(members: FirmMember[]): [string, FirmMember[]][] {
@@ -51,21 +40,19 @@ export function FirmDetail({
 
   return (
     <div className="px-4 py-4 max-w-lg mx-auto space-y-3">
-      <button className="btn !py-1.5 !px-2.5 text-[12px]" onClick={onBack}>
-        ‹ Back
-      </button>
+      <DirectoryHeader
+        eyebrow="Directory"
+        title={firm.name}
+        onBack={onBack}
+        backLabel="Contractors"
+      />
 
       <div>
-        <h2 className="text-[17px] font-semibold">{firm.name}</h2>
-        <div className="flex flex-wrap items-center gap-2 mt-1.5">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="badge">
             {firm.contractorType === "general" ? "General contractor" : "Specialist"}
           </span>
-          <span
-            className={`text-[12px] font-medium ${AVAILABILITY_CLASS[firm.availability]}`}
-          >
-            {AVAILABILITY_LABEL[firm.availability]}
-          </span>
+          <AvailabilityBadge value={firm.availability} />
           <span className="text-[12px] text-ink-soft">
             {firm.area ? `${firm.area}` : firm.city}
             {firm.yearsExperience ? ` · ${firm.yearsExperience} yrs` : ""}

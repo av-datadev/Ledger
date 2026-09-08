@@ -202,21 +202,9 @@ export function People({
   // sync — the one place nobody looking to hire someone would think to open.
   // "Who is working on my house" is this screen's question, so finding someone
   // new belongs next to the people already on it.
-  if (findOpen) {
-    return (
-      <div>
-        <div className="px-4 pt-4 max-w-lg mx-auto">
-          <button
-            className="btn !py-1.5 !px-2.5 text-[12px]"
-            onClick={() => setFindOpen(false)}
-          >
-            ‹ People
-          </button>
-        </div>
-        <FindContractor />
-      </div>
-    );
-  }
+  // The directory owns its own back control at every depth, so this hands the
+  // exit down rather than stacking a second one above it.
+  if (findOpen) return <FindContractor onExit={() => setFindOpen(false)} />;
 
   return (
     <div className="px-4 py-4 max-w-lg mx-auto">

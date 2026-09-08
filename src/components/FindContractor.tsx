@@ -6,25 +6,22 @@ import {
 } from "../lib/contractors";
 import { FirmDetail } from "./FirmDetail";
 import { MemberDetail } from "./MemberDetail";
-
-const AVAILABILITY_LABEL: Record<Contractor["availability"], string> = {
-  available: "Available now",
-  partial: "Partly booked",
-  booked: "Fully booked",
-};
-
-const AVAILABILITY_CLASS: Record<Contractor["availability"], string> = {
-  available: "text-moss",
-  partial: "text-brass",
-  booked: "text-crimson",
-};
+import { DirectoryHeader, AvailabilityBadge } from "./DirectoryChrome";
+import { Icon } from "./Icon";
 
 type View =
   | { kind: "list" }
   | { kind: "firm"; firm: Contractor }
   | { kind: "member"; member: FirmMember; viaFirm: Contractor | null };
 
-/** How many trades a firm supplies, as "2 painters · 1 electrician". */
+/**
+ * What a firm supplies, with how many of each: "Painting ×2", "Carpentry".
+ *
+ * Not "2 painters" — a trade here is the name of the WORK ("Painting",
+ * "Aluminium/Windows", "AC"), and turning those into words for people needs a
+ * lookup that would be wrong for half the list. The count carries it instead,
+ * and it stays right for any trade name the directory ever holds.
+ */
 function tradeCounts(firm: Contractor): string[] {
   const counts = new Map<string, number>();
   for (const m of firm.members) {
@@ -32,7 +29,38 @@ function tradeCounts(firm: Contractor): string[] {
   }
   if (counts.size === 0) return firm.trades;
   return [...counts.entries()].map(([trade, n]) =>
-    n === 1 ? `1 ${trade.toLowerCase()}` : `${n} ${trade.toLowerCase()}s`,
+    n === 1 ? trade : `${trade} ×${n}`,
+  );
+}
+
+/**
+ * Three faces of the roster, before you have opened it: who is on it. Initials
+ * rather than blank circles — a photo is optional in the directory, but the
+ * name never is, so the placeholder can carry real information instead of
+ * standing in for some.
+ */
+function RosterPeek({ members }: { members: FirmMember[] }) {
+  const shown = members.slice(0, 3);
+  const rest = members.length - shown.length;
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="flex -space-x-1.5">
+        {shown.map((m) => (
+          <span
+            key={m.id}
+            className="w-6 h-6 rounded-full bg-paper-2 border border-rule
+                       flex items-center justify-center text-[10px] font-semibold
+                       text-ink-soft"
+            aria-hidden
+          >
+            {m.name.trim().charAt(0).toUpperCase()}
+          </span>
+        ))}
+      </div>
+      <span className="text-[12px] text-ink-soft">
+        {rest > 0 ? `+${rest} · ` : ""}team of {members.length}
+      </span>
+    </div>
   );
 }
 
@@ -43,7 +71,7 @@ function tradeCounts(firm: Contractor): string[] {
  * "electrician" finds a firm because someone on its roster is one, not because
  * somebody remembered to tag the firm.
  */
-export function FindContractor() {
+export function FindContractor({ onExit }: { onExit?: () => void }) {
   const [firms, setFirms] = useState<Contractor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ kind: "list" });
@@ -99,6 +127,8 @@ export function FindContractor() {
     [firms],
   );
 
+  // One back control on screen at any depth: the sub-views own it, and the
+  // list hands it back to whoever opened the directory.
   if (view.kind === "firm") {
     return (
       <FirmDetail
@@ -130,20 +160,28 @@ export function FindContractor() {
 
   return (
     <div className="px-4 py-4 max-w-lg mx-auto space-y-3">
-      <div>
-        <h2 className="eyebrow">Contractors in Moradabad</h2>
-        <p className="text-[12px] text-ink-soft mt-0.5">
-          More added as they're onboarded.
-        </p>
-      </div>
-
-      <input
-        className="input"
-        placeholder="Search a trade, firm or area"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        aria-label="Search contractors"
+      {/* The eyebrow names where you ARE, the back control where you would
+          return — so it says the city rather than repeating "People". */}
+      <DirectoryHeader
+        eyebrow="Moradabad"
+        title="Find a contractor"
+        sub="More added as they're onboarded."
+        onBack={onExit}
+        backLabel="People"
       />
+
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none">
+          <Icon name="search" size={16} />
+        </span>
+        <input
+          className="input !pl-9"
+          placeholder="Search a trade, firm or area"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search contractors"
+        />
+      </div>
 
       {(trades.length > 0 || firms) && (
         <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-0.5">
@@ -225,8 +263,10 @@ export function FindContractor() {
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <div className="text-[15px] font-semibold truncate">{f.name}</div>
-                <div className="text-[12px] text-ink-soft">
+                <div className="font-serif text-[17px] font-semibold tracking-[-0.01em] truncate">
+                  {f.name}
+                </div>
+                <div className="text-[12px] text-ink-soft mt-0.5">
                   {f.contractorType === "general"
                     ? "General contractor"
                     : "Specialist"}
@@ -234,33 +274,20 @@ export function FindContractor() {
                   {f.yearsExperience ? ` · ${f.yearsExperience} yrs` : ""}
                 </div>
               </div>
-              <span
-                className={`text-[11px] font-medium shrink-0 ${AVAILABILITY_CLASS[f.availability]}`}
-              >
-                {AVAILABILITY_LABEL[f.availability]}
-              </span>
+              <AvailabilityBadge value={f.availability} />
             </div>
 
             {tradeCounts(f).length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {tradeCounts(f).map((t) => (
-                  <span key={t} className="badge">
+                  <span key={t} className="badge badge-neutral">
                     {t}
                   </span>
                 ))}
               </div>
             )}
 
-            {f.members.length > 0 && (
-              <div className="text-[12px] text-ink-soft">
-                Team of {f.members.length} ·{" "}
-                {f.members
-                  .slice(0, 2)
-                  .map((m) => m.name)
-                  .join(", ")}
-                {f.members.length > 2 ? ` +${f.members.length - 2}` : ""}
-              </div>
-            )}
+            {f.members.length > 0 && <RosterPeek members={f.members} />}
           </button>
         ))}
       </div>
