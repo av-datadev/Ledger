@@ -1,221 +1,269 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   listContractors,
-  contractorPhotoUrl,
   type Contractor,
+  type FirmMember,
 } from "../lib/contractors";
-import { inr, formatDate } from "../lib/format";
+import { FirmDetail } from "./FirmDetail";
+import { MemberDetail } from "./MemberDetail";
 
 const AVAILABILITY_LABEL: Record<Contractor["availability"], string> = {
   available: "Available now",
-  partial: "Partially booked",
+  partial: "Partly booked",
   booked: "Fully booked",
 };
 
 const AVAILABILITY_CLASS: Record<Contractor["availability"], string> = {
   available: "text-moss",
-  partial: "text-ink-soft",
+  partial: "text-brass",
   booked: "text-crimson",
 };
 
-/** Public directory browse — no sign-in required. Moradabad only, for now. */
+type View =
+  | { kind: "list" }
+  | { kind: "firm"; firm: Contractor }
+  | { kind: "member"; member: FirmMember; viaFirm: Contractor | null };
+
+/** How many trades a firm supplies, as "2 painters · 1 electrician". */
+function tradeCounts(firm: Contractor): string[] {
+  const counts = new Map<string, number>();
+  for (const m of firm.members) {
+    counts.set(m.trade, (counts.get(m.trade) ?? 0) + 1);
+  }
+  if (counts.size === 0) return firm.trades;
+  return [...counts.entries()].map(([trade, n]) =>
+    n === 1 ? `1 ${trade.toLowerCase()}` : `${n} ${trade.toLowerCase()}s`,
+  );
+}
+
+/**
+ * Public directory browse — no sign-in required. Moradabad only, for now.
+ *
+ * Search matches a firm's name and area, and also its people: typing
+ * "electrician" finds a firm because someone on its roster is one, not because
+ * somebody remembered to tag the firm.
+ */
 export function FindContractor() {
-  const [contractors, setContractors] = useState<Contractor[] | null>(null);
+  const [firms, setFirms] = useState<Contractor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<View>({ kind: "list" });
+  const [query, setQuery] = useState("");
+  const [trade, setTrade] = useState<string | null>(null);
+  const [freeOnly, setFreeOnly] = useState(false);
 
   useEffect(() => {
     let alive = true;
     listContractors("Moradabad")
-      .then((rows) => alive && setContractors(rows))
-      .catch((err) => alive && setError(err instanceof Error ? err.message : "Could not load contractors."));
+      .then((rows) => alive && setFirms(rows))
+      .catch(
+        (err) =>
+          alive &&
+          setError(
+            err instanceof Error ? err.message : "Could not load contractors.",
+          ),
+      );
     return () => {
       alive = false;
     };
   }, []);
 
+  // Every trade anyone in the directory actually holds — the filter strip can
+  // only offer work that somebody is there to do.
+  const trades = useMemo(() => {
+    const all = new Set<string>();
+    for (const f of firms ?? []) for (const t of f.trades) all.add(t);
+    return [...all].sort();
+  }, [firms]);
+
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (firms ?? []).filter((f) => {
+      if (trade && !f.trades.includes(trade)) return false;
+      if (freeOnly && f.availability === "booked") return false;
+      if (!q) return true;
+      return (
+        f.name.toLowerCase().includes(q) ||
+        (f.area ?? "").toLowerCase().includes(q) ||
+        f.trades.some((t) => t.toLowerCase().includes(q)) ||
+        f.members.some(
+          (m) =>
+            m.name.toLowerCase().includes(q) ||
+            m.trade.toLowerCase().includes(q),
+        )
+      );
+    });
+  }, [firms, query, trade, freeOnly]);
+
+  const peopleCount = useMemo(
+    () => new Set((firms ?? []).flatMap((f) => f.members.map((m) => m.id))).size,
+    [firms],
+  );
+
+  if (view.kind === "firm") {
+    return (
+      <FirmDetail
+        firm={view.firm}
+        onBack={() => setView({ kind: "list" })}
+        onOpenMember={(m) =>
+          setView({ kind: "member", member: m, viaFirm: view.firm })
+        }
+      />
+    );
+  }
+
+  if (view.kind === "member") {
+    return (
+      <MemberDetail
+        member={view.member}
+        viaFirm={view.viaFirm}
+        onBack={() =>
+          setView(
+            view.viaFirm
+              ? { kind: "firm", firm: view.viaFirm }
+              : { kind: "list" },
+          )
+        }
+        onOpenFirm={(f) => setView({ kind: "firm", firm: f })}
+      />
+    );
+  }
+
   return (
     <div className="px-4 py-4 max-w-lg mx-auto space-y-3">
       <div>
-        <h2 className="eyebrow">
-          Contractors in Moradabad
-        </h2>
+        <h2 className="eyebrow">Contractors in Moradabad</h2>
         <p className="text-[12px] text-ink-soft mt-0.5">
           More added as they're onboarded.
         </p>
       </div>
 
-      {error && <div className="text-[13px] text-crimson">{error}</div>}
-      {contractors === null && !error && (
+      <input
+        className="input"
+        placeholder="Search a trade, firm or area"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        aria-label="Search contractors"
+      />
+
+      {(trades.length > 0 || firms) && (
+        <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-0.5">
+          <button
+            className={`btn !py-1.5 !px-3 text-[13px] shrink-0 ${
+              trade === null ? "!bg-accent-soft !text-accent-deep !border-accent-soft" : ""
+            }`}
+            aria-pressed={trade === null}
+            onClick={() => setTrade(null)}
+          >
+            All trades
+          </button>
+          {trades.map((t) => (
+            <button
+              key={t}
+              className={`btn !py-1.5 !px-3 text-[13px] shrink-0 ${
+                trade === t ? "!bg-accent-soft !text-accent-deep !border-accent-soft" : ""
+              }`}
+              aria-pressed={trade === t}
+              onClick={() => setTrade(trade === t ? null : t)}
+            >
+              {t}
+            </button>
+          ))}
+          <button
+            className={`btn !py-1.5 !px-3 text-[13px] shrink-0 ${
+              freeOnly ? "!bg-accent-soft !text-accent-deep !border-accent-soft" : ""
+            }`}
+            aria-pressed={freeOnly}
+            onClick={() => setFreeOnly((v) => !v)}
+          >
+            Available
+          </button>
+        </div>
+      )}
+
+      {error && <div className="text-[13px] text-danger">{error}</div>}
+      {firms === null && !error && (
         <div className="text-[13px] text-ink-soft">Loading…</div>
       )}
-      {contractors?.length === 0 && (
+
+      {firms && firms.length > 0 && (
+        <div className="text-[12px] text-ink-soft" role="status">
+          <b className="text-ink">
+            {shown.length} {shown.length === 1 ? "firm" : "firms"}
+          </b>
+          {peopleCount > 0 ? ` · ${peopleCount} people listed` : ""}
+        </div>
+      )}
+
+      {firms?.length === 0 && (
         <div className="text-[13px] text-ink-soft">
           No contractors listed yet — check back soon.
         </div>
       )}
-
-      <div className="space-y-3">
-        {contractors?.map((c) => (
-          <ContractorCard key={c.id} contractor={c} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
- * One directory listing. Collapsed it shows only the name and number — the two
- * things you need to make contact — so a long list stays scannable. Tapping it
- * opens the full record: every rate, references, terms and photos, which had no
- * way to be seen before (the rate card was cut off at three lines and the
- * references, advance % and payment terms were never rendered at all).
- */
-function ContractorCard({ contractor: c }: { contractor: Contractor }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="card overflow-hidden">
-      <button
-        type="button"
-        className="w-full text-left p-3 flex items-start justify-between gap-2"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-      >
-        <div className="min-w-0">
-          <div className="font-semibold text-sm truncate">{c.name}</div>
-          <div className="text-[12px] text-ink-soft money">{c.phone}</div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span
-            className={`text-[11px] font-medium ${AVAILABILITY_CLASS[c.availability]}`}
+      {firms && firms.length > 0 && shown.length === 0 && (
+        <div className="text-[13px] text-ink-soft">
+          Nothing matches that.{" "}
+          <button
+            className="text-crimson font-medium"
+            onClick={() => {
+              setQuery("");
+              setTrade(null);
+              setFreeOnly(false);
+            }}
           >
-            {AVAILABILITY_LABEL[c.availability]}
-          </span>
-          <span
-            className={`text-ink-soft transition-transform ${open ? "rotate-90" : ""}`}
-            aria-hidden
-          >
-            ›
-          </span>
-        </div>
-      </button>
-
-      {open && (
-        <div className="px-3 pb-3 space-y-2 border-t border-rule pt-2.5">
-          <div className="text-[12px] text-ink-soft">
-            {c.contractorType === "general" ? "General Contractor" : "Specialist"}
-            {c.area ? ` · ${c.area}` : ""}
-            {c.city ? ` · ${c.city}` : ""}
-          </div>
-
-          {c.trades.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {c.trades.map((t) => (
-                <span key={t} className="badge">
-                  {t}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {c.photos.length > 0 && (
-            <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1">
-              {c.photos.map((p) => (
-                <img
-                  key={p}
-                  src={contractorPhotoUrl(p)}
-                  alt=""
-                  className="w-20 h-20 object-cover rounded shrink-0 border border-rule"
-                />
-              ))}
-            </div>
-          )}
-
-          {(c.yearsExperience || c.teamSize) && (
-            <div className="text-[12px] text-ink-soft">
-              {c.yearsExperience ? `${c.yearsExperience} yrs experience` : ""}
-              {c.yearsExperience && c.teamSize ? " · " : ""}
-              {c.teamSize ? `team of ${c.teamSize}` : ""}
-            </div>
-          )}
-
-          {c.rateCard.length > 0 && (
-            <div>
-              <div className="text-[11px] uppercase tracking-wider text-ink-soft mb-1">
-                Rates
-              </div>
-              <div className="text-[12px] space-y-0.5">
-                {c.rateCard.map((r, i) => (
-                  <div key={i} className="flex justify-between gap-2">
-                    <span className="text-ink-soft">
-                      {r.item}
-                      {r.materialIncluded ? " (with material)" : " (labour only)"}
-                    </span>
-                    <span className="money shrink-0">
-                      {inr(r.rate)}/{r.unit}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {(c.advancePct != null || c.paymentTerms) && (
-            <div>
-              <div className="text-[11px] uppercase tracking-wider text-ink-soft mb-1">
-                Payment
-              </div>
-              {c.advancePct != null && (
-                <div className="text-[12px] text-ink-soft">
-                  Advance: {c.advancePct}%
-                </div>
-              )}
-              {c.paymentTerms && (
-                <div className="text-[12px] text-ink-soft">{c.paymentTerms}</div>
-              )}
-            </div>
-          )}
-
-          {c.references.length > 0 && (
-            <div>
-              <div className="text-[11px] uppercase tracking-wider text-ink-soft mb-1">
-                References
-              </div>
-              <div className="space-y-0.5">
-                {c.references.map((r, i) => (
-                  <a
-                    key={i}
-                    href={`tel:${r.phone}`}
-                    className="flex justify-between gap-2 text-[12px]"
-                  >
-                    <span>{r.name}</span>
-                    <span className="money text-ink-soft">{r.phone}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {c.freeFrom && (
-            <div className="text-[12px] text-ink-soft">
-              Free from {formatDate(c.freeFrom)}
-            </div>
-          )}
-
-          {c.vouchedBy && (
-            <div className="text-[11px] text-moss">
-              Vouched for by {c.vouchedBy}
-            </div>
-          )}
-
-          <a
-            href={`tel:${c.phone}`}
-            className="btn btn-primary w-full !py-2 block text-center"
-          >
-            Call {c.phone}
-          </a>
+            Clear the filters
+          </button>
+          .
         </div>
       )}
+
+      <div className="space-y-2.5">
+        {shown.map((f) => (
+          <button
+            key={f.id}
+            className="card w-full text-left p-3 space-y-2"
+            onClick={() => setView({ kind: "firm", firm: f })}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-[15px] font-semibold truncate">{f.name}</div>
+                <div className="text-[12px] text-ink-soft">
+                  {f.contractorType === "general"
+                    ? "General contractor"
+                    : "Specialist"}
+                  {f.area ? ` · ${f.area}` : ""}
+                  {f.yearsExperience ? ` · ${f.yearsExperience} yrs` : ""}
+                </div>
+              </div>
+              <span
+                className={`text-[11px] font-medium shrink-0 ${AVAILABILITY_CLASS[f.availability]}`}
+              >
+                {AVAILABILITY_LABEL[f.availability]}
+              </span>
+            </div>
+
+            {tradeCounts(f).length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {tradeCounts(f).map((t) => (
+                  <span key={t} className="badge">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {f.members.length > 0 && (
+              <div className="text-[12px] text-ink-soft">
+                Team of {f.members.length} ·{" "}
+                {f.members
+                  .slice(0, 2)
+                  .map((m) => m.name)
+                  .join(", ")}
+                {f.members.length > 2 ? ` +${f.members.length - 2}` : ""}
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

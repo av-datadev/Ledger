@@ -24,8 +24,8 @@ import { AccountSection } from "./components/Auth";
 import { RoleGate } from "./components/RoleGate";
 import { ContractorHome } from "./components/ContractorHome";
 import { LinkedContractors } from "./components/LinkedContractors";
-import { FindContractor } from "./components/FindContractor";
 import { AddContractorAdmin } from "./components/AddContractorAdmin";
+import { ManageRoster } from "./components/ManageRoster";
 import { DIRECTORY_ADMIN_EMAIL } from "./lib/contractors";
 import { Faq } from "./components/Faq";
 import { Icon } from "./components/Icon";
@@ -311,14 +311,15 @@ function LedgerApp({
             <div className="border-t border-rule mt-2">
               <LinkedContractors />
             </div>
-            <div className="border-t border-rule mt-2">
-              <FindContractor />
-            </div>
+            {/* The directory used to sit here too. It has moved to People,
+                where someone actually looking to hire would go — see the note
+                in People.tsx. Only the admin onboarding form stays on Data. */}
             {session?.user?.email === DIRECTORY_ADMIN_EMAIL && (
-              <div className="border-t border-rule px-4 py-4 max-w-lg mx-auto">
+              <div className="border-t border-rule px-4 py-4 max-w-lg mx-auto space-y-6">
                 <AddContractorAdmin
                   adminName={session.user.email ?? "Admin"}
                 />
+                <ManageRoster />
               </div>
             )}
           </>

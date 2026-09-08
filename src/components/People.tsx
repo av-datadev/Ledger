@@ -7,6 +7,7 @@ import { contractTotal } from "../lib/measure";
 import { outstandingByCategory } from "../lib/billBalance";
 import { tradeCosts, personByTrade, type TradeCost } from "../lib/trades";
 import { PersonDetailsForm } from "./PersonDetailsForm";
+import { FindContractor } from "./FindContractor";
 import type { PersonDetails } from "../types";
 import { Icon } from "./Icon";
 
@@ -133,6 +134,7 @@ export function People({
   );
   // Name whose editor overlay is open.
   const [openDetails, setOpenDetails] = useState<string | null>(null);
+  const [findOpen, setFindOpen] = useState(false);
 
   const detailsFor = (cat: string): PersonDetails | undefined =>
     people?.find((p) => p.name === cat);
@@ -196,6 +198,26 @@ export function People({
     outstanding: owed.get(cat) ?? 0,
   }));
 
+  // The directory used to sit at the bottom of the Data tab, below backup and
+  // sync — the one place nobody looking to hire someone would think to open.
+  // "Who is working on my house" is this screen's question, so finding someone
+  // new belongs next to the people already on it.
+  if (findOpen) {
+    return (
+      <div>
+        <div className="px-4 pt-4 max-w-lg mx-auto">
+          <button
+            className="btn !py-1.5 !px-2.5 text-[12px]"
+            onClick={() => setFindOpen(false)}
+          >
+            ‹ People
+          </button>
+        </div>
+        <FindContractor />
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 py-4 max-w-lg mx-auto">
       <h2 className="text-base font-semibold mb-1">People &amp; categories</h2>
@@ -204,6 +226,16 @@ export function People({
         <b> Painter</b> apart from Paint. Each becomes its own section
         everywhere.
       </p>
+
+      <button
+        className="btn w-full !py-2.5 mb-3 justify-between"
+        onClick={() => setFindOpen(true)}
+      >
+        <span>Find a contractor</span>
+        <span className="text-ink-faint" aria-hidden>
+          ›
+        </span>
+      </button>
 
       <div className="flex gap-1.5 mb-2">
         <input
