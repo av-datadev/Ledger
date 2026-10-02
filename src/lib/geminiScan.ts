@@ -87,7 +87,16 @@ interface GeminiBillResponse {
   paidAmount: number;
   balanceDue: number;
   paymentDate: string;
-  items: { item: string; qty: number; unit: string; rate: number; amount: number }[];
+  items: {
+    item: string;
+    qty: number;
+    unit: string;
+    rate: number;
+    amount: number;
+    // Optional: an older deploy of scan-bill doesn't return them.
+    discPct?: number;
+    lengthPerUnit?: number;
+  }[];
   error?: string;
 }
 
@@ -154,6 +163,8 @@ export async function scanImagesWithGemini(
       unit: it.unit ?? "",
       rate: it.rate != null ? String(it.rate) : "",
       amount: it.amount != null ? String(it.amount) : "",
+      discPct: it.discPct ? String(it.discPct) : "",
+      lengthPerUnit: it.lengthPerUnit ? String(it.lengthPerUnit) : "",
     })),
   };
 }

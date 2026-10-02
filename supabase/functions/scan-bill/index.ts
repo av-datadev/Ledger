@@ -47,11 +47,13 @@ const RESPONSE_SCHEMA = {
         properties: {
           item: { type: "string", description: "Product name only, in ENGLISH — no serial number, HSN code, or GST %." },
           qty: { type: "number" },
-          unit: { type: "string", description: "As printed: pcs, Mtr, kg, bag, cft, ft, etc." },
-          rate: { type: "number" },
-          amount: { type: "number" },
+          unit: { type: "string", description: "As printed: pcs, Mtr, kg, bag, cft, ft, cl (coil), roll, etc." },
+          rate: { type: "number", description: "The rate column exactly as printed — on a bill with a discount column this is the LIST rate before the discount." },
+          discPct: { type: "number", description: "The row's trade discount percentage from a 'Disc. %' / 'Disc' column (e.g. 40 for '40 %'). 0 when the bill has no discount column or the row's cell is blank. Never the GST rate." },
+          lengthPerUnit: { type: "number", description: "Metres in ONE unit when the row is sold by the coil, roll, bundle or drum and the name states the length (e.g. 'WIRE 1MM 180MTR' sold per coil → 180). 0 otherwise, and 0 when the unit is already a length (Mtr, ft)." },
+          amount: { type: "number", description: "The row's amount column exactly as printed (after any discount)." },
         },
-        required: ["item", "qty", "unit", "rate", "amount"],
+        required: ["item", "qty", "unit", "rate", "discPct", "lengthPerUnit", "amount"],
       },
     },
   },
@@ -68,6 +70,8 @@ Rules:
 - "items" is ONLY the goods/materials/service rows from the main tables. Never include CGST, SGST, IGST, tax-summary rows, "Rounding Off", "Taxable Value", section subtotals (e.g. "SUB GROUP", "Basic Price For ..."), or the printed grand total as an item.
 - Freight, packing, cartage, transport, or loading charges are real charges but are NOT goods — put their amount in "otherCharges", not in "items".
 - Bills treat freight two different ways, so read this one carefully and set "otherChargesTaxed" accordingly. If the freight row has its own HSN/SAC code and GST rate (e.g. "Freight (GST) 996511 18 %"), or the tax summary's total taxable value equals the goods subtotal PLUS the freight, then GST is charged on the freight — set it true. If freight is just a plain line with no HSN and no rate, and the taxable value equals the goods subtotal alone, set it false.
+- Wholesale invoices (wire, cable, switchgear, sanitaryware) often print a maker's list rate and a per-row "Disc. %" column, so qty × rate is far more than the amount. Report rate and amount exactly as printed and the percentage in "discPct" — never fold the discount into the rate, and never mistake the GST % column for the discount.
+- Keep the product's specification in the item name — gauge, length, colour, make ("Wire 1mm 180m FR Red"). Two rows that differ only by colour are two items.
 - If a row's quantity is split across two lines (e.g. "150.00 Mtr" on one line, "2 Bundal" as a note below), use the actual quantity/unit columns, not the note.
 - invoiceTotal is the final amount actually payable across the WHOLE document — if there are several sections each with their own subtotal, use the single combined bottom-line total (e.g. "TOTAL A + B", "Grand Total"), not any one section's subtotal.
 - vendor is the company issuing the document (the letterhead at the top), never the "Buyer" / "Bill to" / "Project" name. On a handwritten notebook bill the name written at the top is usually the CUSTOMER whose account is being kept, not the seller — when the seller is not named anywhere, return an EMPTY vendor. Never invent a plausible shop name like "Hardware Store", and never fall back to the customer's name.

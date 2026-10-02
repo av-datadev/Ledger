@@ -10,6 +10,12 @@ export interface ScannedItem {
   unit: string;
   rate: string;
   amount: string;
+  /** The row's "Disc. %" when the reader saw one. Optional: the on-device
+   * reader can't tell it apart from the GST % beside it, so it never sets it
+   * and the review screen works it out from rate and amount instead. */
+  discPct?: string;
+  /** Metres in one unit of a coil/roll row, when the reader saw one. */
+  lengthPerUnit?: string;
 }
 
 export interface ScannedBill {
