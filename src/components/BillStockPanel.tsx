@@ -126,7 +126,13 @@ export function BillStockPanel({
                   </div>
                   <div className="text-[11px] text-ink-soft money">
                     {line.qty != null &&
-                      `${num(line.qty)} ${line.unit ?? ""}${line.rate != null ? ` × ${num(line.rate)}` : ""}`}
+                      `${num(line.qty)} ${line.unit ?? ""}${line.rate != null ? ` × ${num(line.rate)}` : ""}` +
+                        `${line.discPct ? ` less ${line.discPct}%` : ""}`}
+                    {/* A coil's length per unit: what the bill bought, in the
+                        metres it will actually be used by. */}
+                    {line.basis === "qty" && line.length != null && line.qty != null && (
+                      <> · {num(Math.round(line.qty * line.length * 1000) / 1000)} m</>
+                    )}
                     {received > 0 && (
                       <span className="text-moss">
                         {line.qty != null ? " · " : ""}in stock {num(received)}

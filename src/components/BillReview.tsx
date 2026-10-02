@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { db } from "../db";
 import { useCategories } from "../hooks/useCategories";
 import { usePayers, useModes } from "../hooks/useFacets";
-import { inr, todayStr, formatDate } from "../lib/format";
+import { inr, num, todayStr, formatDate } from "../lib/format";
 import { addBillRowsToStock } from "../lib/stock";
 import {
   BASIS,
@@ -11,6 +11,7 @@ import {
   amountFrom,
   parseDimension,
   blankDims,
+  isLengthPack,
 } from "../lib/measure";
 import { useBackClose } from "../hooks/useBackClose";
 import type { MeasureBasis } from "../types";
@@ -20,6 +21,9 @@ export interface DraftItem {
   hsn: string;
   gstPct: string;
   basis: MeasureBasis;
+  /** On a measured basis, the length input. On a plain `qty` row, the metres
+   * in ONE unit of a coil or roll ("180" for a 180 m coil of wire) — a spec
+   * recorded beside the count, never part of the price. */
   length: string;
   width: string;
   /** cft only: thickness in inches. */
@@ -141,9 +145,10 @@ const AUTO_UNITS = new Set(MEASURE_BASES.filter((b) => b !== "qty").map((b) => B
  */
 export function recalcItem(it: DraftItem): DraftItem {
   const next = { ...it };
+  const disc = toNum(next.discPct);
   if (next.basis === "qty") {
     if (AUTO_UNITS.has(next.unit)) next.unit = "";
-    const amt = amountFrom(toNum(next.qty), toNum(next.rate));
+    const amt = amountFrom(toNum(next.qty), toNum(next.rate), disc);
     if (amt != null) next.amount = String(amt);
     return next;
   }
@@ -159,7 +164,7 @@ export function recalcItem(it: DraftItem): DraftItem {
     pieces: toNum(next.pieces),
   });
   next.qty = measure != null ? String(measure) : "";
-  const amt = amountFrom(measure, toNum(next.rate));
+  const amt = amountFrom(measure, toNum(next.rate), disc);
   if (amt != null) next.amount = String(amt);
   return next;
 }
@@ -232,6 +237,14 @@ export function BillReview({
   const setItem = (i: number, patch: Partial<DraftItem>) => {
     const items = draft.items.slice();
     const it: DraftItem = { ...items[i], ...patch };
+    // A plain row's length is metres per coil; a measured row's is the length
+    // being priced. Carried across a switch between the two, a 180 m coil
+    // would silently become 180 running feet of something.
+    if (
+      patch.basis &&
+      (patch.basis === "qty") !== (items[i].basis === "qty")
+    )
+      it.length = "";
     // Editing the amount by hand is the override — never recompute over it.
     items[i] = "amount" in patch ? it : recalcItem(it);
     set({ items });
@@ -365,7 +378,11 @@ export function BillReview({
       hsn: it.hsn.trim() || null,
       gstPct: toNum(it.gstPct),
       basis: it.basis,
-      length: it.basis === "qty" ? null : parseDimension(it.length),
+      // On a plain row this is metres per coil — kept only where it was given.
+      length:
+        it.basis === "qty"
+          ? (toNum(it.length) ?? 0) > 0 ? toNum(it.length) : null
+          : parseDimension(it.length),
       width: BASIS[it.basis].area ? parseDimension(it.width) : null,
       // Thickness and pieces only mean anything on a volume basis; on every
       // other row they stay null so the columns read honestly in the CSV.
@@ -1019,10 +1036,57 @@ function LineItem({
   // cft carries a width too, but it needs its own four-input layout rather
   // than the two-sided area one.
   const area = meta.area && !meta.volume;
+  const disc = toNum(it.discPct);
+  const lessDisc = disc != null && disc > 0 ? ` less ${disc}%` : "";
   const measureHint =
     it.basis !== "qty" && it.qty
-      ? `${it.qty} ${meta.unit}${it.rate ? ` × ₹${it.rate}` : ""}`
+      ? `${it.qty} ${meta.unit}${it.rate ? ` × ₹${it.rate}` : ""}${lessDisc}`
       : "";
+  // A coil or roll is bought by the piece but used by the metre, so the
+  // per-unit length is asked for wherever the unit is one — and kept visible
+  // once filled, even if the unit is later retyped.
+  const showLength = isLengthPack(it.unit) || it.length !== "";
+  const perUnit = toNum(it.length);
+  const count = toNum(it.qty);
+  const totalMetres =
+    perUnit != null && perUnit > 0 && count != null && count > 0
+      ? Math.round(perUnit * count * 1000) / 1000
+      : null;
+  const unitWord = it.unit.trim() || "unit";
+  const qtyHint = [
+    count != null && it.rate && lessDisc
+      ? `${it.qty} ${unitWord} × ${inr(toNum(it.rate) ?? 0)}${lessDisc}`
+      : "",
+    totalMetres != null ? `${it.qty} × ${it.length} m = ${num(totalMetres)} m` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  // Once typed into, a box loses its placeholder, and "50" beside "180" beside
+  // "5000" no longer says which is the discount — so these two carry their
+  // unit inside the box for good.
+  const suffixed = (input: ReactElement, suffix: string) => (
+    <div className="relative min-w-0">
+      {input}
+      <span
+        aria-hidden="true"
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-ink-faint pointer-events-none"
+      >
+        {suffix}
+      </span>
+    </div>
+  );
+  const discInput = suffixed(
+    <input
+      className="input !py-1.5 !text-[13px] money !pr-7"
+      placeholder="Disc"
+      aria-label="Discount percent"
+      inputMode="decimal"
+      value={it.discPct}
+      onChange={(e) => onField({ discPct: e.target.value })}
+    />,
+    "%",
+  );
 
   return (
     <div className="card p-2 space-y-1.5">
@@ -1068,35 +1132,59 @@ function LineItem({
       </div>
 
       {it.basis === "qty" ? (
-        <div className="grid grid-cols-4 gap-1.5">
-          <input
-            className="input !py-1.5 !text-[13px] money"
-            placeholder="Qty"
-            inputMode="decimal"
-            value={it.qty}
-            onChange={(e) => onField({ qty: e.target.value })}
-          />
-          <input
-            className="input !py-1.5 !text-[13px]"
-            placeholder="Unit"
-            value={it.unit}
-            onChange={(e) => onField({ unit: e.target.value })}
-          />
-          <input
-            className="input !py-1.5 !text-[13px] money"
-            placeholder="Rate"
-            inputMode="decimal"
-            value={it.rate}
-            onChange={(e) => onField({ rate: e.target.value })}
-          />
-          <input
-            className="input !py-1.5 !text-[13px] money !font-semibold"
-            placeholder="Amount"
-            inputMode="decimal"
-            value={it.amount}
-            onChange={(e) => onField({ amount: e.target.value })}
-          />
-        </div>
+        <>
+          <div className="grid grid-cols-3 gap-1.5">
+            <input
+              className="input !py-1.5 !text-[13px] money"
+              placeholder="Qty"
+              aria-label="Quantity"
+              inputMode="decimal"
+              value={it.qty}
+              onChange={(e) => onField({ qty: e.target.value })}
+            />
+            <input
+              className="input !py-1.5 !text-[13px]"
+              placeholder="Unit"
+              aria-label="Unit"
+              value={it.unit}
+              onChange={(e) => onField({ unit: e.target.value })}
+            />
+            <input
+              className="input !py-1.5 !text-[13px] money"
+              placeholder="Rate"
+              aria-label="Rate per unit, before discount"
+              inputMode="decimal"
+              value={it.rate}
+              onChange={(e) => onField({ rate: e.target.value })}
+            />
+          </div>
+          <div className={`grid ${showLength ? "grid-cols-3" : "grid-cols-2"} gap-1.5`}>
+            {discInput}
+            {showLength &&
+              suffixed(
+                <input
+                  className="input !py-1.5 !text-[13px] money !pr-7"
+                  placeholder="Length"
+                  aria-label={`Metres in one ${unitWord}`}
+                  inputMode="decimal"
+                  value={it.length}
+                  onChange={(e) => onField({ length: e.target.value })}
+                />,
+                "m",
+              )}
+            <input
+              className="input !py-1.5 !text-[13px] money !font-semibold"
+              placeholder="Amount"
+              aria-label="Amount"
+              inputMode="decimal"
+              value={it.amount}
+              onChange={(e) => onField({ amount: e.target.value })}
+            />
+          </div>
+          {qtyHint && (
+            <div className="text-[11px] text-ink-soft money">= {qtyHint}</div>
+          )}
+        </>
       ) : meta.volume ? (
         <>
           {/* Timber is quoted length-in-feet × width-in-inches × thickness-in-
@@ -1136,7 +1224,7 @@ function LineItem({
               onChange={(e) => onField({ pieces: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             <input
               className="input !py-1.5 !text-[13px] money"
               placeholder={`Rate / ${meta.unit}`}
@@ -1144,6 +1232,7 @@ function LineItem({
               value={it.rate}
               onChange={(e) => onField({ rate: e.target.value })}
             />
+            {discInput}
             <input
               className="input !py-1.5 !text-[13px] money !font-semibold"
               placeholder="Amount"
@@ -1156,7 +1245,7 @@ function LineItem({
             {it.qty
               ? `${it.length || "?"}ft × ${it.width || "?"}in × ${it.thickness || "?"}in` +
                 `${toNum(it.pieces) && toNum(it.pieces)! > 1 ? ` × ${it.pieces} pc` : ""}` +
-                ` ÷ 144 = ${it.qty} ${meta.unit}`
+                ` ÷ 144 = ${it.qty} ${meta.unit}${lessDisc}`
               : "Fill length, width and thickness to get the cubic feet."}
           </div>
         </>
@@ -1187,20 +1276,19 @@ function LineItem({
               onChange={(e) => onField({ rate: e.target.value })}
             />
           </div>
-          <div className="flex items-center gap-2">
-            {measureHint && (
-              <span className="text-[11px] text-ink-soft money">
-                = {measureHint}
-              </span>
-            )}
+          <div className="flex items-center justify-end gap-2">
+            <div className="shrink-0 !w-20">{discInput}</div>
             <input
-              className="input !py-1.5 !text-[13px] money !font-semibold ml-auto !w-32"
+              className="input !py-1.5 !text-[13px] money !font-semibold !w-32 shrink-0"
               placeholder="Amount"
               inputMode="decimal"
               value={it.amount}
               onChange={(e) => onField({ amount: e.target.value })}
             />
           </div>
+          {measureHint && (
+            <div className="text-[11px] text-ink-soft money">= {measureHint}</div>
+          )}
         </>
       )}
     </div>

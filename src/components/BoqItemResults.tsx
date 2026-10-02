@@ -125,6 +125,11 @@ export function BoqItemResults({ query }: { query: string }) {
                 <span className="money text-[12px] shrink-0">
                   {num(bought)}
                   {line.unit && <span className="text-ink-soft"> {line.unit}</span>}
+                  {line.basis === "qty" && line.length != null && bought > 0 && (
+                    <span className="text-ink-soft">
+                      {" "}· {num(Math.round(bought * line.length * 1000) / 1000)} m
+                    </span>
+                  )}
                 </span>
               </div>
 

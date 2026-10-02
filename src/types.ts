@@ -58,6 +58,12 @@ export interface BoqItem {
   // `pieces` for `cft`, where one row is a timber size bought N times over
   // ("8¼ ft × 9 in × 8 in — 3 pieces").
   basis: MeasureBasis;
+  /**
+   * On a measured basis, the length input above. On a plain `qty` row, the
+   * metres in ONE unit of a coil or roll ("180" for a 180 m coil of wire), so
+   * 10 coils reads as 1,800 m — a specification only, never in the price.
+   * null on a qty row that isn't sold by the coil.
+   */
   length: number | null;
   width: number | null;
   /** cft only: thickness in inches. null on every other basis. */

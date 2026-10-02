@@ -7,6 +7,7 @@ import { fileToOcrImage } from "../lib/scanImage";
 import { recognizeText } from "../lib/ocr";
 import { pdfToText, pdfPagesToImages } from "../lib/pdf";
 import { parseScannedBill, type ScannedBill } from "../lib/scanParse";
+import { impliedDiscPct, lengthPerUnitFromName } from "../lib/measure";
 import {
   fileToGeminiImage,
   scanImagesWithGemini,
@@ -384,14 +385,29 @@ export function Boq({
             hsn: "",
             gstPct: "",
             basis: "qty" as const,
-            length: "",
+            // Metres per coil, from the reader or else from the name itself
+            // ("WIRE 1MM 180MTR") — the name is on every scan, old deploy or new.
+            length:
+              it.lengthPerUnit ||
+              String(lengthPerUnitFromName(it.item, it.unit) ?? ""),
             width: "",
             thickness: "",
             pieces: "",
             qty: it.qty,
             unit: it.unit,
             rate: it.rate,
-            discPct: "",
+            // The printed discount, or the one the printed rate and amount
+            // imply. Without it the row's next edit reprices it at list rate
+            // and the bill stops saving.
+            discPct:
+              it.discPct ||
+              String(
+                impliedDiscPct(
+                  parseFloat(it.qty) || null,
+                  parseFloat(it.rate) || null,
+                  parseFloat(it.amount) || null,
+                ) ?? "",
+              ),
             amount: it.amount,
           }))
         : [blankItem()],

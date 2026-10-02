@@ -147,13 +147,78 @@ const VULGAR: Record<string, string> = {
   "⅛": "1/8", "⅜": "3/8", "⅝": "5/8", "⅞": "7/8",
 };
 
-/** measure × rate, rounded to paise; null when either side is missing. */
+/**
+ * measure × rate, less any trade discount, rounded to paise; null when either
+ * side is missing.
+ *
+ * The discount is the bill's own "Disc. %" column. Wholesale electrical and
+ * sanitary invoices print the maker's LIST rate and then knock 40–70% off it
+ * per row ("10 cl @ 5,000.00, 50 %, 25,000.00"), so a row priced as plain
+ * qty × rate comes out more than double the printed amount — and the bill then
+ * refuses to save, because its rows exceed its own total.
+ */
 export function amountFrom(
   measure: number | null,
   rate: number | null,
+  discPct: number | null = null,
 ): number | null {
   if (measure == null || rate == null) return null;
-  return Math.round(measure * rate * 100) / 100;
+  const keep = discPct != null && discPct > 0 && discPct < 100 ? 1 - discPct / 100 : 1;
+  return Math.round(measure * rate * keep * 100) / 100;
+}
+
+/**
+ * The discount a row must carry for its printed figures to agree, when the
+ * reader returned the list rate and the discounted amount but not the
+ * percentage between them. Returns null unless the gap is a clean percentage
+ * (to the half-percent, at most 80%) that reproduces the amount to within a
+ * rupee — a gap that isn't is far more likely a misread quantity than a
+ * discount, and inventing one would hide that.
+ */
+export function impliedDiscPct(
+  qty: number | null,
+  rate: number | null,
+  amount: number | null,
+): number | null {
+  if (!qty || !rate || !amount || qty <= 0 || rate <= 0 || amount <= 0) return null;
+  const gross = qty * rate;
+  if (gross - amount < 1) return null;
+  const pct = Math.round((1 - amount / gross) * 200) / 2;
+  // Trade discounts run to about 70%. Past 80 the likelier story is a quantity
+  // read too high: a ticked "10" read as "40" quarters the implied price, which
+  // can land on a clean-looking 85–90% "discount".
+  if (pct <= 0 || pct > 80) return null;
+  const back = amountFrom(qty, rate, pct);
+  return back != null && Math.abs(back - amount) <= 1 ? pct : null;
+}
+
+/** Units a thing is sold by that are a fixed length of something longer — a
+ * coil of wire, a roll of pipe — so "how many metres" is worth recording
+ * alongside "how many coils". */
+const LENGTH_PACKS = /^(cl|coil|coils|roll|rolls|rl|bndl|bundle|bundles|drum|drums|reel|reels)$/i;
+/** Units that are already a length, where a per-unit length means nothing. */
+const LENGTH_UNITS = /^(m|mtr|mtrs|meter|metre|meters|metres|rmt|rm|ft|feet|rft)$/i;
+
+/** True when a row's unit is a coil/roll/bundle, so its length per unit applies. */
+export function isLengthPack(unit: string): boolean {
+  return LENGTH_PACKS.test(unit.trim().replace(/\.$/, ""));
+}
+
+/**
+ * Metres in ONE unit of a coil/roll row, read from the product name the way
+ * every wire and pipe maker prints it: "WIRE 1MM 180MTR FR …" → 180,
+ * "Conduit 90 m roll" → 90. Null when the name gives no length, or when the
+ * unit is already a length (a row bought in metres needs no per-unit figure).
+ *
+ * The wire's gauge ("1MM", "2.5 mm") is a millimetre figure and must not read
+ * as metres — the trailing \b after a lone "m" is what rejects "1MM".
+ */
+export function lengthPerUnitFromName(name: string, unit: string): number | null {
+  if (LENGTH_UNITS.test(unit.trim().replace(/\.$/, ""))) return null;
+  const m = name.match(/(\d+(?:\.\d+)?)\s*(?:mtrs?|meters?|metres?|m)\b/i);
+  if (!m) return null;
+  const v = parseFloat(m[1]);
+  return Number.isFinite(v) && v > 0 ? v : null;
 }
 
 function round3(n: number): number {
