@@ -176,6 +176,21 @@ signing key before touching anything there.
   items are goods only; GST, freight and rounding are computed, not itemised.
   Rows summing to *more* than the printed total blocks saving, since that means
   a duplicated or misread row.
+- **Trade discounts** — wholesale electrical and sanitary invoices print the
+  maker's list rate and take 40–70% off per row in a *Disc. %* column. Every
+  row carries a discount, and its amount is qty × rate less that percentage,
+  so editing a row no longer reprices it at list and pushes the bill over its
+  own total. `scan-bill` reads the column; when it doesn't (an older deploy, or
+  the on-device reader), the review screen recovers it from the printed rate
+  and amount — only as a clean percentage of at most 80% that reproduces the
+  amount to the rupee, since anything else is likelier a misread quantity.
+- **Coil and roll lengths** — wire and pipe are bought by the coil but used by
+  the metre. A row whose unit is a coil, roll, bundle or drum takes **metres
+  per unit**, filled from the name where the maker prints it (`1MM 180MTR` →
+  180; the gauge is never read as metres), and shows the total — 10 coils of
+  180 m reads *1,800 m* — on the review screen, the bill's rows and BOQ search.
+  Stored in the row's `length` column, which a plain-quantity row never used,
+  so it needed no sync migration. Stock still counts coils.
 - **A bill spread over several photos** — a kaccha bill is a notebook page, and
   a running account routinely covers two or three. Photos accumulate in a tray
   (one shot at a time from the camera, or several at once from the gallery) and
@@ -505,6 +520,9 @@ Offline (airplane mode, after one full load):
       range**), note expand-on-tap, edit, delete, CSV
 - [ ] BOQ: "Type manually" saves; a printed English bill still scans via
       on-device OCR; the lines-vs-total check holds
+- [ ] BOQ: a row of 10 @ 5,000 with **Disc 50** comes to 25,000, and editing its
+      qty keeps the discount; a `cl` row shows a metres box, and 180 there reads
+      "= 1,800 m" on the review screen and on the saved bill
 - [ ] People → Edit → **Work this person handles**: linking *Plumbing* to
       *Vijay Plumber* makes the trade row read "done by Vijay Plumber" and adds
       a joined total (material + paid to him) with the material/labour split
@@ -562,6 +580,8 @@ Offline (airplane mode, after one full load):
 Online only:
 
 - [ ] BOQ scan of a photo/PDF via Gemini
+- [ ] A wholesale wire bill with a *Disc. %* column scans with each row's
+      discount filled, metres per coil read off the name, and saves in one go
 - [ ] Several photos of one bill: the tray holds them, they read as **one**
       bill in **one** call, and the rows from every page arrive together
 - [ ] BOQ → Size list on a timber slip; measured total matches the written one

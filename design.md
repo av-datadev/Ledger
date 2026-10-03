@@ -650,6 +650,14 @@ equal-weight buttons, the first in primary.
   **By dealer** (a running account per dealer with what each is still owed).
 - Each line shows: item, dealer, date, badge, rate/qty, amount, and a **+ Stock**
   action taking that line straight into stock.
+- The review screen's row editor reads Qty · Unit · Rate on one line, then
+  Disc · (metres per unit) · **Amount** on the next. Disc and metres carry their
+  unit (`%`, `m`) *inside* the box, because once typed into a box loses its
+  placeholder and "50" beside "180" no longer says which is which. A hint line
+  under the row spells out the arithmetic — `10 cl × ₹5,000 less 50% · 10 × 180 m
+  = 1,800 m` — in `text-ink-soft`, on its own line so it never squeezes the
+  inputs at text scale 1.25. The metres box appears only for coil, roll, bundle
+  or drum units, or once it holds a value.
 - The size-list mode explains its own arithmetic ("8¼ × 9 × 8 — 3 pc") and always
   shows the computed cubic feet next to what the dealer wrote, so the two can be
   compared.
