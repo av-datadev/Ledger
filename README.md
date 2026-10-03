@@ -216,15 +216,34 @@ signing key before touching anything there.
   group into one running account per vendor (case- and space-insensitively, so
   three spellings of one shop still group; bills naming no seller group per
   category rather than collapsing into one fictional dealer). **Record a
-  payment to this dealer** takes one payment and lets you place it across the
-  bills yourself — **Full** on one, a part amount on another — with a running
-  *placed X of Y* tally. Oldest-first is offered as the opening suggestion and
-  follows the amount as you type it, but stops the moment you touch a bill,
-  since which bill a payment settles is the payer's knowledge, not the app's.
-  One payment writes **one** ledger entry, because money moved once. Anything
-  left unplaced is held as an **advance** with that dealer — derived from the
-  ledger against what the bills record, not stored as a balance, so editing
-  those entries moves it.
+  payment to this dealer** settles as many of that dealer's bills as you tick,
+  by as many methods as you actually used. Bills with money owing are ticked on
+  open. One payment writes **one** ledger entry, because money moved once, and
+  you place it across the bills yourself — **Full** on one, a part amount on
+  another — with a running *placed X of Y* tally. Oldest-first is offered as
+  the opening suggestion and follows the amount as you type it, but stops the
+  moment you touch a bill, since which bill a payment settles is the payer's
+  knowledge, not the app's. Anything left unplaced is held as an **advance**
+  with that dealer — derived from the ledger against what the bills record, not
+  stored as a balance, so editing those entries moves it.
+- **A settlement paid by more than one method** — two bills on the counter, a
+  fifth of each in cash and the rest transferred. Tap **+ another mode** and the
+  new line opens holding the remainder, because *"the rest by transfer"* is how
+  people say it. Each tender is divided across the ticked bills **pro-rata to
+  what each still owes**, so a cash figure that happens to be a fifth of the
+  total lands a fifth on every bill — which is what happened at the counter.
+  Oldest-first would instead put the cash entirely on the first bill and the
+  transfer entirely on the second: a claim about which bill was paid how that
+  nobody made. The form shows the result per bill before writing anything
+  (*"Cash ₹24,000 + UPI 1 ₹96,000 = ₹1,20,000 · settles it"*).
+
+  It writes **one ledger entry per method**, because cash out of a drawer and a
+  bank transfer are two movements of money and a row carries exactly one mode —
+  folding them together would either lose the mode or claim money moved once
+  when it moved twice. Each row names the other half in its note, carries its
+  own share of each bill, and stays editable on its own. Each bill's paid figure
+  moves **once**, by the combined amount. A single-method payment is unchanged:
+  one row, and the per-bill boxes stay editable as they always were.
 - **Payments are records, not a running total** — a bill lists each payment
   with **edit** and **remove**, and editing one rewrites its ledger entry and
   the bill together. This is what `Entry.billAllocations` is for: a list of

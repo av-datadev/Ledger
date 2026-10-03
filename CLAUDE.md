@@ -191,6 +191,19 @@ was computed, not estimated, and that is the only reason it is worth anything.
   glyph at 16px, not at 96px — shapes that read fine large turn to mush small.
 - **Money** is always `.money` (mono, tabular figures) and formatted with `inr()`
   from `src/lib/format.ts`. Indian grouping — ₹48,62,400, lakhs, never millions.
+- **`usePayers()` and `useModes()` return a NEW ARRAY on every render.** They
+  derive from a `useLiveQuery`, so an effect listing them in its deps runs on
+  every render. Every updater inside such an effect must return the *same*
+  value when nothing needs changing — `setX((v) => cond ? v : next)`, never
+  `.map()`, which always builds a new array and so always counts as a change.
+  Get this wrong and you get an infinite render loop that looks completely fine
+  on screen and only shows up in the console.
+- **Bill payment arithmetic lives in `src/lib/billBalance.ts`** and is kept
+  pure so it can be checked without the UI: `allocatePayment` (oldest-first,
+  for one payment against a running account) and `spreadProRata` (by what each
+  bill still owes, for one settlement divided across bills or tenders).
+  `recordVendorSettlement` writes **one ledger entry per tender** and bumps each
+  bill's `amountPaid` **once** by the combined figure.
 - **Touch targets are ≥44×44 CSS px**, at every text scale.
 
 ## Privacy

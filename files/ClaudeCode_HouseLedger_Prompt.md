@@ -328,9 +328,35 @@ a customer routinely agree that a particular bill is being cleared, and guessing
 that wrong makes every bill's balance a fiction even when the dealer total comes
 out right.
 
-**One payment writes one ledger entry**, not one per bill it touches. Three
-entries for a single ₹50,000 would overstate how many times money moved, and the
-ledger is what the dashboard totals and paid-vs-billed are computed from.
+**One ledger entry per movement of money** — not per bill, and not per
+settlement. One payment clearing three bills is one movement and one entry;
+three entries for a single ₹50,000 would overstate how many times money moved,
+and the ledger is what the dashboard totals and paid-vs-billed are computed
+from.
+
+**Several bills, settled at once, by more than one method.** Two bills on the
+counter, a fifth of each in cash and the rest transferred, is ordinary. The
+bills to settle are ticked (everything owing is ticked on open) and the payment
+is entered as one line per method, each new line opening with the remainder
+already in it, because *"the rest by transfer"* is how people say it.
+
+Each method is divided across the ticked bills **pro-rata to what each still
+owes**, so a cash figure that is a fifth of the total lands a fifth on every
+bill. Oldest-first is deliberately NOT used here: it would put the cash entirely
+on the first bill and the transfer entirely on the second, a claim about which
+bill was paid how that nobody made. Oldest-first remains the opening suggestion
+for a single payment against the account, where it is how a running account
+actually settles. The division is shown per bill before anything is written.
+
+A split settlement writes **one entry per method**, which is the rule above and
+not an exception to it: cash from a drawer and a bank transfer are two movements
+of money, and an entry carries exactly one mode, so folding them together would
+either lose the mode or claim money moved once when it moved twice. Each entry
+names the other half in its note, holds its own share of each bill, and remains
+editable alone. Each bill's paid figure moves **once**, by the combined amount.
+A figure per bill *per method* is a grid, and a grid on a 375px phone costs more
+than the arithmetic it saves — so with one method the per-bill amounts stay
+editable, and with several they are derived and shown read-only.
 
 Money may be placed short of the payment; the remainder is an **advance** with
 that dealer, which is ordinary when paying ahead of the paperwork. It is

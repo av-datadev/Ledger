@@ -662,6 +662,37 @@ equal-weight buttons, the first in primary.
   shows the computed cubic feet next to what the dealer wrote, so the two can be
   compared.
 
+#### 6.4.1 Dealer settlement form — *specified*
+
+Opens inside an expanded dealer account, in place of that account's bill list —
+the same bills twice on a 375px screen is scrolling, not information. It answers
+three questions in the order they are asked.
+
+**Settle which bills.** Every bill with money owing is ticked on open, so the
+common case needs no taps. Each row is a full-width ≥44px target: a 20px check
+box in `accent-fill`, the date in `ink-faint`, the label truncating, and the
+amount due in `crimson` (or "paid" in `moss`). A running count sits below —
+"2 of 2 bills · ₹2,00,000 due between them".
+
+**How it was paid.** One tender line to start — a mode `select` and an amount —
+holding the whole amount due. **+ another mode** adds a line pre-filled with the
+remainder, because "the rest by transfer" is how people say it. A second line
+gives each line a remove control. The row is `flex-wrap`: at the XL text scale
+the page zooms to an effective 300px, and a mode name, an amount and a remove
+button stop fitting on one line, so the **amount** takes a line of its own. The
+amount is what the row is for; clipping ₹1,60,000 to "16" is the one failure
+this row may not have.
+
+**Where it lands.** A single tender keeps the editable per-bill boxes (Full +
+part), seeded oldest-first. Two or more divide **pro-rata to what each bill
+still owes** and are shown read-only, line per bill: "Cash ₹24,000 + UPI 1
+₹96,000 = ₹1,20,000 · settles it". A figure per bill *per mode* is a grid, and a
+grid at 375px costs more than the arithmetic it saves. The footer states placed
+vs tendered, with any excess called out as an advance.
+
+The form says how many ledger rows it will write, because that is the part a
+person cannot see: one per mode, since that is how many times money moved.
+
 ### 6.5 The rest — *sketched*
 
 | Screen | Job | Notes for design |
@@ -710,6 +741,13 @@ equal-weight buttons, the first in primary.
   as a mis-tap. It routes through the same navigation a tap does, so history and the
   back button are unaffected, and it never calls `preventDefault`, so scrolling stays
   on the compositor.
+- **One ledger row per movement of money.** Not per bill, and not per
+  settlement. One payment clearing three bills is one movement and one row —
+  the bills it cleared are recorded as allocations on it. Cash and a transfer
+  handed over the same afternoon are two movements and two rows, even when they
+  settle the same paperwork, because a row carries exactly one mode and the
+  app's mode totals have to stay true. A form that is about to write more than
+  one row says so before it does.
 - **One product, two modes.** The owner and contractor headers carry the same
   mode-switch control: the same pill, the same size, an `icon-sm` naming the side it
   leads to (hard hat → contractor, house → owner). They were a bordered pill on one
