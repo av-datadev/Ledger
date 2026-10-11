@@ -6,7 +6,7 @@ and shaped by what actually goes wrong there — vendors who hand over a
 handwritten slip instead of an invoice, and a contractor whose figures don't
 match yours.
 
-**Live:** https://ledger-nu-ashen.vercel.app
+**Live:** https://ledger-nu-ashen.vercel.app · **Site:** https://brickbook-site.vercel.app
 
 Data lives on-device in IndexedDB (Dexie) and works offline. Sign in and it
 also syncs across a household via Supabase, so several people share one live
@@ -155,8 +155,11 @@ Other scripts: `npm run build` · `npm run preview` · `npm run typecheck` ·
 
 ## Deploy
 
-Pushing to `main` triggers a Vercel production deploy. Edge Functions deploy
-separately (`supabase functions deploy <name>`) and are **not** part of the
+Pushing to `main` triggers a Vercel production deploy — of **two** projects:
+`ledger` (the app, repo root) and `brickbook-site` (the marketing site, root
+directory `site/`, no build step; see `site/README.md`). Each builds only its
+own directory, so a site change redeploys the app unchanged and vice versa.
+Edge Functions deploy separately (`supabase functions deploy <name>`) and are **not** part of the
 Vercel build.
 
 The service worker precaches aggressively, so an installed app keeps serving

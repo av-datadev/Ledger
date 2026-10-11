@@ -94,11 +94,15 @@ app keeps its own URL. Nothing here shares code, state, or a deploy with the app
 
 ## Deploying
 
-New Vercel project → import this repo → set **Root Directory** to `site` →
-Framework preset **Other**, no build command, output directory `.`. Then attach
-the domain. Pushes to `main` deploy it, independently of the app's project.
+**Live at <https://brickbook-site.vercel.app>** since 2026-10-11 — Vercel
+project `brickbook-site`, linked to this repo with **Root Directory** `site`,
+framework **Other**, no build or install command. Pushes to `main` deploy it,
+independently of the app's `ledger` project (the same push redeploys both).
 
-## Before it goes live
+No custom domain yet. When one is attached, do the `og:image` / canonical item
+below in the same change.
+
+## Still open now that it is live
 
 - [ ] Point the `ledger-nu-ashen.vercel.app` CTA at the **Play Store listing**
       once the app is published (marked with a `TODO` in the HTML).
