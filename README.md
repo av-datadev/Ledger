@@ -202,6 +202,12 @@ signing key before touching anything there.
   180 m reads *1,800 m* — on the review screen, the bill's rows and BOQ search.
   Stored in the row's `length` column, which a plain-quantity row never used,
   so it needed no sync migration. Stock still counts coils.
+  **BOQ search totals them:** search `wire` and a *Bought in all* line sums the
+  lines on screen — `16 coils · 2,160 m` — counting rows bought by the metre as
+  metres. Narrow the search (`wire 1mm`) and the total narrows with it. A coil
+  row with no metres per unit is counted in the coils but named as left out of
+  the metres, never guessed. The arithmetic is `lengthTotals` in
+  `src/lib/measure.ts`.
 - **A bill spread over several photos** — a kaccha bill is a notebook page, and
   a running account routinely covers two or three. Photos accumulate in a tray
   (one shot at a time from the camera, or several at once from the gallery) and

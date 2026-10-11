@@ -650,6 +650,12 @@ equal-weight buttons, the first in primary.
   **By dealer** (a running account per dealer with what each is still owed).
 - Each line shows: item, dealer, date, badge, rate/qty, amount, and a **+ Stock**
   action taking that line straight into stock.
+- When any matched line is sold by the coil, roll, bundle or drum, or by the
+  metre, a **Bought in all** card heads the results: the packs per kind and the
+  metres (`16 coils · 2,160 m`) in `.money` at 15px semibold, caption in
+  `text-ink-soft`. Lines with no metres per unit get a
+  `text-ink-soft` note saying they are left out of the metres — the state shown,
+  not a figure that quietly reads as the whole purchase.
 - The review screen's row editor reads Qty · Unit · Rate on one line, then
   Disc · (metres per unit) · **Amount** on the next. Disc and metres carry their
   unit (`%`, `m`) *inside* the box, because once typed into a box loses its

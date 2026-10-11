@@ -221,6 +221,70 @@ export function lengthPerUnitFromName(name: string, unit: string): number | null
   return Number.isFinite(v) && v > 0 ? v : null;
 }
 
+/** One name per kind of pack, however the bill abbreviated it. */
+const PACK_NAME: [RegExp, string, string][] = [
+  [/^(cl|coil|coils)$/i, "coil", "coils"],
+  [/^(roll|rolls|rl)$/i, "roll", "rolls"],
+  [/^(bndl|bundle|bundles)$/i, "bundle", "bundles"],
+  [/^(drum|drums)$/i, "drum", "drums"],
+  [/^(reel|reels)$/i, "reel", "reels"],
+];
+/** Units that are already metres — a row bought by the metre counts as is. */
+const METRE_UNITS = /^(m|mtr|mtrs|meter|metre|meters|metres|rmt|rm)$/i;
+
+export interface LengthTotals {
+  /** Coils, rolls… summed per kind, in the order first met. */
+  packs: { unit: string; qty: number }[];
+  /** Metres across every row that states them: coils × metres per coil,
+   * plus rows bought by the metre. */
+  metres: number;
+  /** Coil/roll rows whose bill gives no metres per unit, so `metres` leaves
+   * them out. Shown, never guessed — a total that silently skips them would
+   * read as the whole purchase. */
+  unmeasured: number;
+}
+
+/**
+ * How much was bought in all, across a set of bill rows: "how many coils of
+ * wire, and how many metres is that". Null when none of the rows is sold by
+ * the coil/roll or by the metre, so a search for cement shows no such line.
+ */
+export function lengthTotals(
+  rows: { basis: MeasureBasis; qty: number | null; unit: string | null; length: number | null }[],
+): LengthTotals | null {
+  const packs = new Map<string, { unit: string; qty: number }>();
+  let metres = 0;
+  let unmeasured = 0;
+  let any = false;
+  for (const r of rows) {
+    if (r.basis !== "qty" || r.qty == null || !(r.qty > 0)) continue;
+    const unit = (r.unit ?? "").trim().replace(/\.$/, "");
+    if (METRE_UNITS.test(unit)) {
+      metres += r.qty;
+      any = true;
+      continue;
+    }
+    if (!isLengthPack(unit)) continue;
+    any = true;
+    const kind = PACK_NAME.find(([re]) => re.test(unit));
+    const key = kind ? kind[1] : unit.toLowerCase();
+    const p = packs.get(key) ?? { unit: key, qty: 0 };
+    p.qty += r.qty;
+    packs.set(key, p);
+    if (r.length != null && r.length > 0) metres += r.qty * r.length;
+    else unmeasured += 1;
+  }
+  if (!any) return null;
+  return {
+    packs: [...packs.values()].map((p) => {
+      const kind = PACK_NAME.find(([, one]) => one === p.unit);
+      return { unit: kind && p.qty !== 1 ? kind[2] : p.unit, qty: round3(p.qty) };
+    }),
+    metres: round3(metres),
+    unmeasured,
+  };
+}
+
 function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
 }

@@ -3,6 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
 import { inr, num, formatDate } from "../lib/format";
 import { matchesQuery } from "../lib/search";
+import { lengthTotals } from "../lib/measure";
 import { findOrCreateStockItem, isMaterialRow } from "../lib/stock";
 import type { BoqItem } from "../types";
 import { Icon } from "./Icon";
@@ -62,6 +63,11 @@ export function BoqItemResults({ query }: { query: string }) {
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }, [boqItems, query]);
 
+  // "How many coils of wire did we buy, and how many metres is that" — summed
+  // over exactly the lines on screen, so narrowing the search ("wire 1mm")
+  // narrows the total with it.
+  const totals = useMemo(() => lengthTotals(rows), [rows]);
+
   if (!boqItems) return null;
 
   const add = async (line: BoqItem) => {
@@ -108,6 +114,23 @@ export function BoqItemResults({ query }: { query: string }) {
       <div className="text-[10px] uppercase tracking-wider text-ink-soft px-1">
         Items · {rows.length} line{rows.length === 1 ? "" : "s"}
       </div>
+      {totals && (
+        <div className="card px-3 py-2">
+          <div className="text-[11px] text-ink-soft">Bought in all</div>
+          <div className="money text-[15px] font-semibold">
+            {totals.packs.map((p) => `${num(p.qty)} ${p.unit}`).join(" · ")}
+            {totals.packs.length > 0 && totals.metres > 0 && " · "}
+            {totals.metres > 0 && `${num(totals.metres)} m`}
+          </div>
+          {totals.unmeasured > 0 && (
+            <div className="text-[11px] text-ink-soft mt-0.5">
+              {totals.unmeasured} line{totals.unmeasured === 1 ? " gives" : "s give"} no
+              metres per unit, so the metres leave {totals.unmeasured === 1 ? "it" : "them"} out.
+              Edit the bill to add it.
+            </div>
+          )}
+        </div>
+      )}
       <div className="card overflow-hidden divide-y divide-rule">
         {rows.map((line) => {
           const bought = line.qty ?? 0;
