@@ -1,0 +1,16 @@
+@import "../02_FOUNDATIONS/01_COLOR_TOKENS.css";
+:root{
+--bb-font-sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+--bb-font-mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+--bb-font-display:Georgia,"Times New Roman",serif;
+--bb-text-display:48px;--bb-text-h1:30px;--bb-text-h2:23px;--bb-text-h3:19px;
+--bb-text-body:15px;--bb-text-dense:14px;--bb-text-meta:13px;--bb-text-label:12px;
+--bb-space-1:4px;--bb-space-2:8px;--bb-space-3:12px;--bb-space-4:16px;--bb-space-5:20px;
+--bb-space-6:24px;--bb-space-8:32px;--bb-space-10:40px;--bb-space-12:48px;--bb-space-16:64px;
+--bb-radius-sm:6px;--bb-radius-md:10px;--bb-radius-lg:14px;--bb-touch-target:44px;
+}
+.bb-money{font-family:var(--bb-font-mono);font-variant-numeric:tabular-nums;letter-spacing:-.025em}
+.bb-button-primary{min-height:44px;padding:0 16px;border:0;border-radius:10px;background:var(--bb-brand);color:#fff;font-weight:600}
+.bb-button-secondary{min-height:44px;padding:0 16px;border-radius:10px;background:transparent;color:var(--bb-text-primary);border:1px solid var(--bb-border-default);font-weight:500}
+.bb-input{min-height:48px;width:100%;padding:0 16px;border-radius:10px;background:var(--bb-bg-surface-2);color:var(--bb-text-primary);border:1px solid var(--bb-border-default)}
+.bb-money-display{font-family:var(--bb-font-mono);font-variant-numeric:tabular-nums;font-size:var(--bb-text-display);line-height:1.1;font-weight:600;letter-spacing:-.035em;color:var(--bb-text-primary)}

@@ -1,0 +1,25 @@
+{
+  "name": "Brick Book Design System",
+  "version": "1.0",
+  "principle": "Make complexity feel physically organized.",
+  "modes": [
+    "Owner",
+    "Contractor"
+  ],
+  "stack": [
+    "React 19",
+    "TypeScript strict",
+    "Vite",
+    "Tailwind v4",
+    "PWA"
+  ],
+  "binding_files": [
+    "01_BRICK_BOOK_DESIGN_CONSTITUTION.md",
+    "02_BRICK_BOOK_TOKENS.css",
+    "03_BRICK_BOOK_COMPONENTS.md",
+    "04_BRICK_BOOK_PATTERNS.md",
+    "05_BRICK_BOOK_CLAUDE_DESIGN_INSTRUCTIONS.md",
+    "06_BRICK_BOOK_REFERENCE_SCREEN_SPECS.md",
+    "07_BRICK_BOOK_QUALITY_GATE.md"
+  ]
+}

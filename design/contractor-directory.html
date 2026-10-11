@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Brick Book — contractor directory</title>
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Brick Book v1.1 foundations · type scale C (locked)
+   Corrections carried over: border-strong, text-tertiary, and the
+   brand/brand-fill split. Accent tints are pre-blended solids.
+   Brand pairing is still provisional: shipped terracotta in light,
+   v1.1's lifted orange in dark.
+   ───────────────────────────────────────────────────────────── */
+:root{
+  --font-sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  --font-display:Georgia,"Times New Roman",serif;
+  /* scale C */
+  --text-display:28px; --text-h2:20px; --text-h3:17px; --text-body:13px;
+  --text-dense:13px; --text-meta:12px; --text-label:11px;
+  --gap-sec:14px; --pad-t:14px;
+  --r-sm:6px; --r-md:10px; --r-lg:14px;
+}
+.t-light{
+  --canvas:#F4F2ED; --surface-1:#FFFFFF; --surface-2:#EEECE6; --surface-3:#E3E0D9;
+  --border-subtle:#D7D4CC; --border-default:#BDB9B0; --border-strong:#8C8C8C;
+  --text-primary:#182027; --text-secondary:#535D65; --text-tertiary:#5D646A;
+  --positive:#28724E; --negative:#A43D35; --warning:#875C17;
+  --positive-soft:#E3EDE8; --negative-soft:#F3E6E5; --warning-soft:#EFEAE1;
+  --chrome:#182027; --on-chrome:#F4F2ED; --on-chrome-dim:#919494;
+  --on-chrome-faint:#4F5458; --chrome-inset:#2E353B;
+  --brand:#B44C26; --brand-fill:#B44C26; --brand-soft:#F5E8E3;
+}
+.t-dark{
+  --canvas:#000000; --surface-1:#0B0B0B; --surface-2:#141414; --surface-3:#1D1D1D;
+  --border-subtle:#242424; --border-default:#363636; --border-strong:#5A5A5A;
+  --text-primary:#F2F0EA; --text-secondary:#B7B4AE; --text-tertiary:#908D87;
+  --positive:#65C697; --negative:#F08A80; --warning:#E8B260;
+  --positive-soft:#17231D; --negative-soft:#291C1A; --warning-soft:#282116;
+  --chrome:#000000; --on-chrome:#F2F0EA; --on-chrome-dim:#858481;
+  --on-chrome-faint:#3C3C3A; --chrome-inset:#181817;
+  --brand:#E58A52; --brand-fill:#A9663C; --brand-soft:#271C14;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#8a8a8a;font-family:var(--font-sans);padding:28px;
+     display:flex;flex-direction:column;gap:26px;align-items:center}
+.cap{font:600 12px/1.3 var(--font-sans);letter-spacing:.1em;text-transform:uppercase;
+     color:#fff;text-align:center}
+.cap small{display:block;font-weight:500;letter-spacing:0;text-transform:none;
+           opacity:.82;margin-top:4px;font-size:12px}
+.col{display:flex;flex-direction:column;gap:9px;align-items:center}
+
+.phone{width:375px;min-height:812px;position:relative;background:var(--canvas);
+       color:var(--text-primary);display:flex;flex-direction:column;
+       border-radius:20px;box-shadow:0 18px 50px -18px rgba(0,0,0,.7);overflow:hidden}
+
+/* chrome */
+.hdr{background:var(--chrome);padding:12px 16px;display:flex;align-items:center;
+     justify-content:space-between;gap:12px}
+.hdr .l{display:flex;align-items:center;gap:11px;min-width:0}
+.back{width:17px;height:17px;border-radius:3px;background:var(--on-chrome);flex:none}
+.hdr h1{font:600 var(--text-h2)/1.22 var(--font-display);color:var(--on-chrome);
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr .sub{font:500 var(--text-label)/1.2 var(--font-sans);color:var(--on-chrome-dim);
+          letter-spacing:.1em;text-transform:uppercase}
+.gear{width:20px;height:20px;border-radius:50%;background:var(--on-chrome-dim);flex:none}
+
+.body{padding:var(--pad-t) 16px 16px;display:flex;flex-direction:column;
+      gap:var(--gap-sec);flex:1;overflow:hidden}
+
+/* type roles */
+.label{font:600 var(--text-label)/1.2 var(--font-sans);letter-spacing:.12em;
+       text-transform:uppercase;color:var(--text-tertiary)}
+.meta{font:400 var(--text-meta)/1.38 var(--font-sans);color:var(--text-secondary)}
+.faint{color:var(--text-tertiary)}
+.dense{font:500 var(--text-dense)/1.42 var(--font-sans);color:var(--text-primary)}
+.body-t{font:400 var(--text-body)/1.45 var(--font-sans);color:var(--text-primary)}
+.h3{font:600 var(--text-h3)/1.25 var(--font-display);color:var(--text-primary)}
+.money{font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+       font-weight:600;letter-spacing:-.025em;font-size:var(--text-dense)}
+.link{font:600 var(--text-meta)/1.38 var(--font-sans);color:var(--brand)}
+
+/* controls */
+.input{display:flex;align-items:center;gap:10px;background:var(--surface-1);
+       border:1px solid var(--border-strong);border-radius:var(--r-md);padding:11px 12px}
+.input i{width:15px;height:15px;border-radius:50%;background:var(--text-tertiary);flex:none}
+.input span{font:400 15px/1.3 var(--font-sans);color:var(--text-tertiary)}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border-radius:var(--r-md);padding:6px 10px;font:500 var(--text-dense)/1.3 var(--font-sans);
+      background:var(--surface-1);border:1px solid var(--border-default);color:var(--text-secondary)}
+.chip.on{background:var(--brand-soft);border-color:var(--brand-soft);color:var(--brand);font-weight:600}
+.pill{border-radius:999px;padding:2px 8px;font:600 10px/1.5 var(--font-sans);
+      letter-spacing:.07em;text-transform:uppercase;white-space:nowrap}
+.pill.ok{background:var(--positive-soft);color:var(--positive)}
+.pill.part{background:var(--warning-soft);color:var(--warning)}
+.pill.no{background:var(--negative-soft);color:var(--negative)}
+.pill.neutral{background:var(--surface-2);color:var(--text-tertiary)}
+.pill.brand{background:var(--brand-soft);color:var(--brand)}
+.btn{min-height:44px;border-radius:var(--r-md);display:flex;align-items:center;
+     justify-content:center;gap:8px;font:600 15px/1 var(--font-sans);padding:0 16px}
+.btn.primary{background:var(--brand-fill);color:#fff}
+.btn.sec{background:transparent;color:var(--text-primary);border:1px solid var(--border-strong)}
+.btn.sm{min-height:34px;font-size:var(--text-meta);padding:0 12px;border-radius:var(--r-sm)}
+
+.card{background:var(--surface-1);border:1px solid var(--border-subtle);
+      border-radius:var(--r-lg);overflow:hidden}
+.rowdiv{border-top:1px solid var(--border-subtle)}
+
+/* firm card */
+.firm{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.firm .top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.firm .name{font:600 var(--text-h3)/1.25 var(--font-display)}
+.roster-peek{display:flex;align-items:center;gap:6px}
+.av{width:24px;height:24px;border-radius:50%;background:var(--surface-3);
+    border:1px solid var(--border-subtle);flex:none}
+.more{font:600 var(--text-meta)/1 var(--font-sans);color:var(--text-tertiary)}
+
+/* member row */
+.mrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px}
+.mrow .who{display:flex;align-items:center;gap:10px;min-width:0}
+.chev{width:7px;height:7px;background:var(--text-tertiary);flex:none}
+
+/* rate table */
+.rate{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px}
+
+/* sheet */
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface-1);
+       border-radius:var(--r-lg) var(--r-lg) 0 0;padding:14px 16px 18px;
+       display:flex;flex-direction:column;gap:12px;
+       box-shadow:0 -8px 40px rgba(0,0,0,.35)}
+.grab{width:36px;height:4px;border-radius:2px;background:var(--border-strong);
+      margin:0 auto 2px}
+.check{width:18px;height:18px;border-radius:4px;border:1.5px solid var(--brand);
+       background:var(--brand-fill);flex:none}
+.srow{display:flex;align-items:center;gap:10px;padding:7px 0}
+.note{background:var(--surface-2);border-radius:var(--r-md);padding:10px 12px}
+
+/* tab bar */
+.tabs{background:var(--chrome);padding:8px 0 10px;display:flex;flex-direction:column;
+      align-items:center;margin-top:auto}
+.slots{display:flex;width:100%}
+.slot{flex:1;height:48px;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;gap:4px}
+.slot .ind{width:28px;height:2px;background:transparent;border-radius:1px}
+.slot.on .ind{background:var(--brand)}
+.slot .ico{width:20px;height:20px;border-radius:4px;background:var(--on-chrome-dim)}
+.slot.on .ico{background:var(--on-chrome)}
+.slot .lb{font:600 10px/1.3 var(--font-sans);color:var(--on-chrome-dim)}
+.slot.on .lb{color:var(--on-chrome)}
+.slot .rec{width:38px;height:38px;border-radius:50%;background:var(--brand-fill)}
+.dots{display:flex;gap:5px;padding-top:4px}
+.dots i{width:5px;height:5px;border-radius:50%;background:var(--on-chrome-faint);display:block}
+.dots i.on{background:var(--brand)}
+</style>
+</head>
+<body>
+
+<!-- ═══ 1 · FIND A CONTRACTOR ═══════════════════════════════ -->
+<div class="col">
+  <div class="cap">1 · Find a contractor<small>reached from the People tab</small></div>
+  <div class="phone t-light">
+    <div class="hdr">
+      <div class="l"><div class="back"></div>
+        <div><div class="sub">People</div><h1>Find a contractor</h1></div>
+      </div>
+    </div>
+    <div class="body">
+      <div class="input"><i></i><span>Search a trade, firm or area</span></div>
+      <div class="chips">
+        <div class="chip on">All trades</div>
+        <div class="chip">Painter</div>
+        <div class="chip">Carpenter</div>
+        <div class="chip">Electrician</div>
+        <div class="chip">Available now</div>
+      </div>
+      <div class="meta"><b>3 firms · 14 people</b> in Moradabad</div>
+
+      <div class="card firm">
+        <div class="top">
+          <div>
+            <div class="name">AS Construction</div>
+            <div class="meta faint" style="margin-top:2px">General contractor · Civil Lines · 12 yrs</div>
+          </div>
+          <span class="pill ok">Available</span>
+        </div>
+        <div class="chips">
+          <span class="pill neutral">2 painters</span>
+          <span class="pill neutral">2 carpenters</span>
+          <span class="pill neutral">1 electrician</span>
+          <span class="pill neutral">1 mason</span>
+        </div>
+        <div class="top" style="align-items:center">
+          <div class="roster-peek">
+            <div class="av"></div><div class="av"></div><div class="av"></div>
+            <span class="more">+3 · team of 6</span>
+          </div>
+          <div class="btn sec sm">Call</div>
+        </div>
+      </div>
+
+      <div class="card firm">
+        <div class="top">
+          <div>
+            <div class="name">MK Interiors</div>
+            <div class="meta faint" style="margin-top:2px">Specialist · Buddhi Vihar · 7 yrs</div>
+          </div>
+          <span class="pill part">Partly booked</span>
+        </div>
+        <div class="chips">
+          <span class="pill neutral">3 carpenters</span>
+          <span class="pill neutral">1 painter</span>
+        </div>
+        <div class="top" style="align-items:center">
+          <div class="roster-peek">
+            <div class="av"></div><div class="av"></div><div class="av"></div>
+            <span class="more">+1 · team of 4</span>
+          </div>
+          <div class="btn sec sm">Call</div>
+        </div>
+      </div>
+
+      <div class="card firm">
+        <div class="top">
+          <div>
+            <div class="name">Royal Fabrication</div>
+            <div class="meta faint" style="margin-top:2px">Specialist · Delhi Road · 5 yrs</div>
+          </div>
+          <span class="pill no">Booked</span>
+        </div>
+        <div class="chips"><span class="pill neutral">4 fabricators</span></div>
+      </div>
+    </div>
+    <div class="tabs"><div class="slots">
+      <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">Stock</div></div>
+      <div class="slot on"><div class="ind"></div><div class="ico"></div><div class="lb">People</div></div>
+      <div class="slot"><div class="ind"></div><div class="rec"></div></div>
+      <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">Data</div></div>
+      <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">Help</div></div>
+    </div><div class="dots"><i></i><i class="on"></i></div></div>
+  </div>
+</div>
+
+<!-- ═══ 2 · FIRM DETAIL ═════════════════════════════════════ -->
+<div class="col">
+  <div class="cap">2 · Firm detail — the roster is the screen<small>trades and team size are derived from members, not typed</small></div>
+  <div class="phone t-light">
+    <div class="hdr">
+      <div class="l"><div class="back"></div>
+        <div><div class="sub">Directory</div><h1>AS Construction</h1></div>
+      </div>
+    </div>
+    <div class="body">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="pill brand">General contractor</span>
+        <span class="pill ok">Available now</span>
+        <span class="meta faint">Civil Lines · 12 yrs</span>
+      </div>
+      <div class="meta">Vouched by a Brick Book household · 4 jobs completed</div>
+      <div style="display:flex;gap:9px">
+        <div class="btn primary" style="flex:1">Call</div>
+        <div class="btn sec" style="flex:1">WhatsApp</div>
+      </div>
+
+      <div>
+        <div class="label" style="margin-bottom:7px">Team · 6 people</div>
+        <div class="card">
+          <div style="padding:8px 14px 2px"><span class="label">Painter</span></div>
+          <div class="mrow">
+            <div class="who"><div class="av"></div>
+              <div><div class="dense">Painter 1</div><div class="meta faint">8 yrs · lead</div></div>
+            </div><div class="chev"></div>
+          </div>
+          <div class="mrow rowdiv">
+            <div class="who"><div class="av"></div>
+              <div><div class="dense">Painter 2</div><div class="meta faint">4 yrs</div></div>
+            </div><div class="chev"></div>
+          </div>
+          <div class="rowdiv" style="padding:8px 14px 2px"><span class="label">Carpenter</span></div>
+          <div class="mrow">
+            <div class="who"><div class="av"></div>
+              <div><div class="dense">Carpenter 1</div><div class="meta faint">10 yrs</div></div>
+            </div><div class="chev"></div>
+          </div>
+          <div class="mrow rowdiv">
+            <div class="who"><div class="av"></div>
+              <div><div class="dense">Carpenter 2</div><div class="meta faint">3 yrs</div></div>
+            </div><div class="chev"></div>
+          </div>
+          <div class="rowdiv" style="padding:8px 14px 2px"><span class="label">Electrician</span></div>
+          <div class="mrow">
+            <div class="who"><div class="av"></div>
+              <div><div class="dense">Electrician 1</div><div class="meta faint">6 yrs</div></div>
+            </div><div class="chev"></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="label" style="margin-bottom:7px">Rate card</div>
+        <div class="card">
+          <div class="rate"><div><div class="dense">Interior painting</div>
+            <div class="meta faint">per sq ft · material included</div></div>
+            <span class="money">₹28</span></div>
+          <div class="rate rowdiv"><div><div class="dense">Wardrobe carpentry</div>
+            <div class="meta faint">per sq ft · labour only</div></div>
+            <span class="money">₹340</span></div>
+        </div>
+      </div>
+
+      <div class="btn primary">I've hired them</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 3 · MEMBER DETAIL ═══════════════════════════════════ -->
+<div class="col">
+  <div class="cap">3 · Member — hireable on their own<small>always says which firm they belong to</small></div>
+  <div class="phone t-light">
+    <div class="hdr">
+      <div class="l"><div class="back"></div>
+        <div><div class="sub">AS Construction</div><h1>Painter 1</h1></div>
+      </div>
+    </div>
+    <div class="body">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="pill brand">Painter</span>
+        <span class="pill ok">Available now</span>
+        <span class="meta faint">8 yrs · team lead</span>
+      </div>
+      <div class="note">
+        <div class="meta">Part of <b>AS Construction</b>. You can hire the firm for the
+        whole job, or this person directly for painting alone.</div>
+      </div>
+      <div style="display:flex;gap:9px">
+        <div class="btn primary" style="flex:1">Call</div>
+        <div class="btn sec" style="flex:1">WhatsApp</div>
+      </div>
+
+      <div>
+        <div class="label" style="margin-bottom:7px">Own rates</div>
+        <div class="card">
+          <div class="rate"><div><div class="dense">Interior painting</div>
+            <div class="meta faint">per sq ft · material included</div></div>
+            <span class="money">₹28</span></div>
+          <div class="rate rowdiv"><div><div class="dense">Putty &amp; primer</div>
+            <div class="meta faint">per sq ft · labour only</div></div>
+            <span class="money">₹9</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="label" style="margin-bottom:7px">Work photos</div>
+        <div style="display:flex;gap:8px">
+          <div style="flex:1;aspect-ratio:1;border-radius:var(--r-sm);background:var(--surface-3);border:1px solid var(--border-subtle)"></div>
+          <div style="flex:1;aspect-ratio:1;border-radius:var(--r-sm);background:var(--surface-3);border:1px solid var(--border-subtle)"></div>
+          <div style="flex:1;aspect-ratio:1;border-radius:var(--r-sm);background:var(--surface-3);border:1px solid var(--border-subtle)"></div>
+        </div>
+      </div>
+
+      <div class="btn sec">Add to my people</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 4 · ENGAGE SHEET ════════════════════════════════════ -->
+<div class="col">
+  <div class="cap">4 · "I've hired them" — the bridge into the private ledger<small>public directory data flows in; nothing private goes back out</small></div>
+  <div class="phone t-light">
+    <div class="hdr">
+      <div class="l"><div class="back"></div>
+        <div><div class="sub">Directory</div><h1>AS Construction</h1></div>
+      </div>
+    </div>
+    <div class="body" style="opacity:.45">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="pill brand">General contractor</span><span class="pill ok">Available now</span>
+      </div>
+      <div class="label">Team · 6 people</div>
+      <div class="card" style="height:150px"></div>
+    </div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="h3">Add this team to your people?</div>
+      <div class="meta">Each one is added with their trade already linked, so payments
+        you record against them count towards that trade from the first entry.</div>
+      <div>
+        <div class="srow"><div class="check"></div>
+          <div style="flex:1"><span class="dense">Painter 1</span>
+          <span class="meta faint"> · Painter</span></div></div>
+        <div class="srow"><div class="check"></div>
+          <div style="flex:1"><span class="dense">Painter 2</span>
+          <span class="meta faint"> · Painter</span></div></div>
+        <div class="srow"><div class="check"></div>
+          <div style="flex:1"><span class="dense">Carpenter 1</span>
+          <span class="meta faint"> · Carpenter</span></div></div>
+        <div class="srow"><div class="check"></div>
+          <div style="flex:1"><span class="dense">Electrician 1</span>
+          <span class="meta faint"> · Electrician</span></div></div>
+        <div class="meta faint" style="padding-top:4px">+ 2 more</div>
+      </div>
+      <div class="note"><div class="meta">Saved on this device only. Adding someone
+        here does not tell them anything, and sends nothing to the directory.</div></div>
+      <div style="display:flex;gap:9px">
+        <div class="btn sec" style="flex:1">Cancel</div>
+        <div class="btn primary" style="flex:1.4">Add 6 people</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 5 · FIRM DETAIL, DARK ═══════════════════════════════ -->
+<div class="col">
+  <div class="cap">5 · Firm detail — dark<small>same screen on the AMOLED ground</small></div>
+  <div class="phone t-dark">
+    <div class="hdr">
+      <div class="l"><div class="back"></div>
+        <div><div class="sub">Directory</div><h1>AS Construction</h1></div>
+      </div>
+    </div>
+    <div class="body">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="pill brand">General contractor</span>
+        <span class="pill ok">Available now</span>
+        <span class="meta faint">Civil Lines · 12 yrs</span>
+      </div>
+      <div class="meta">Vouched by a Brick Book household · 4 jobs completed</div>
+      <div style="display:flex;gap:9px">
+        <div class="btn primary" style="flex:1">Call</div>
+        <div class="btn sec" style="flex:1">WhatsApp</div>
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:7px">Team · 6 people</div>
+        <div class="card">
+          <div style="padding:8px 14px 2px"><span class="label">Painter</span></div>
+          <div class="mrow">
+            <div class="who"><div class="av"></div>
+              <div><div class="dense">Painter 1</div><div class="meta faint">8 yrs · lead</div></div>
+            </div><div class="chev"></div>
+          </div>
+          <div class="mrow rowdiv">
+            <div class="who"><div class="av"></div>
+              <div><div class="dense">Painter 2</div><div class="meta faint">4 yrs</div></div>
+            </div><div class="chev"></div>
+          </div>
+          <div class="rowdiv" style="padding:8px 14px 2px"><span class="label">Carpenter</span></div>
+          <div class="mrow">
+            <div class="who"><div class="av"></div>
+              <div><div class="dense">Carpenter 1</div><div class="meta faint">10 yrs</div></div>
+            </div><div class="chev"></div>
+          </div>
+          <div class="mrow rowdiv">
+            <div class="who"><div class="av"></div>
+              <div><div class="dense">Carpenter 2</div><div class="meta faint">3 yrs</div></div>
+            </div><div class="chev"></div>
+          </div>
+          <div class="rowdiv" style="padding:8px 14px 2px"><span class="label">Electrician</span></div>
+          <div class="mrow">
+            <div class="who"><div class="av"></div>
+              <div><div class="dense">Electrician 1</div><div class="meta faint">6 yrs</div></div>
+            </div><div class="chev"></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:7px">Rate card</div>
+        <div class="card">
+          <div class="rate"><div><div class="dense">Interior painting</div>
+            <div class="meta faint">per sq ft · material included</div></div>
+            <span class="money">₹28</span></div>
+          <div class="rate rowdiv"><div><div class="dense">Wardrobe carpentry</div>
+            <div class="meta faint">per sq ft · labour only</div></div>
+            <span class="money">₹340</span></div>
+        </div>
+      </div>
+      <div class="btn primary">I've hired them</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

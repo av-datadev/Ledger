@@ -1,0 +1,11 @@
+/* Brick Book UI starter — React/Tailwind v4 compatible */
+.bb-surface{background:var(--bb-bg-surface-1);border:1px solid var(--bb-border-subtle);border-radius:var(--bb-radius-lg)}
+.bb-surface-raised{background:var(--bb-bg-surface-2);border:1px solid var(--bb-border-default);border-radius:var(--bb-radius-lg)}
+.bb-button-primary{min-height:var(--bb-touch-target);padding:0 var(--bb-space-4);border-radius:var(--bb-radius-md);background:var(--bb-brand);color:#fff;font-weight:600}
+.bb-button-secondary{min-height:var(--bb-touch-target);padding:0 var(--bb-space-4);border-radius:var(--bb-radius-md);background:transparent;color:var(--bb-text-primary);border:1px solid var(--bb-border-default);font-weight:500}
+.bb-input{min-height:48px;width:100%;padding:0 var(--bb-space-4);border-radius:var(--bb-radius-md);background:var(--bb-bg-surface-2);color:var(--bb-text-primary);border:1px solid var(--bb-border-default)}
+.bb-money-display{font-family:var(--bb-font-sans);font-variant-numeric:tabular-nums;letter-spacing:-.03em;font-size:var(--bb-text-display);line-height:1.12;font-weight:600;color:var(--bb-text-primary)}
+.bb-section-label{font-size:var(--bb-text-label);line-height:1.2;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--bb-text-tertiary)}
+.bb-financial-positive{color:var(--bb-positive)}
+.bb-financial-negative{color:var(--bb-negative)}
+.bb-financial-warning{color:var(--bb-warning)}

@@ -1,0 +1,14 @@
+{
+  "name": "Brick Book Design System",
+  "version": "1.1",
+  "status": "implementation-grade foundation + visual-reference blueprint",
+  "dark_canvas": "#000000",
+  "default_body": "15px",
+  "dense_body": "14px",
+  "metadata": "13px",
+  "money": "mono + tabular numerals",
+  "font_policy": "system stacks",
+  "radius": "6/10/14",
+  "navigation": "shipped paged 8-tab navigation locked",
+  "next": "actual visual reference screens / Figma library"
+}

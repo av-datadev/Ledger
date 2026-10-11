@@ -1,0 +1,69 @@
+:root {
+  /* TRUE AMOLED CANVAS */
+  --bb-dark-canvas:#000000;
+  --bb-dark-surface-1:#0B0B0B;
+  --bb-dark-surface-2:#141414;
+  --bb-dark-surface-3:#1D1D1D;
+  --bb-dark-border-subtle:#242424;
+  --bb-dark-border-default:#363636;
+  --bb-dark-border-strong:#4A4A4A;
+  --bb-dark-text-primary:#F2F0EA;
+  --bb-dark-text-secondary:#B7B4AE;
+  --bb-dark-text-tertiary:#85827D;
+  --bb-dark-text-disabled:#5F5D59;
+
+  /* BRAND */
+  --bb-brand-dark:#E58A52;
+  --bb-brand-dark-hover:#F19A60;
+  --bb-brand-dark-pressed:#C97440;
+  --bb-brand-dark-soft:rgba(229,138,82,.16);
+
+  /* LIGHT */
+  --bb-light-canvas:#F4F2ED;
+  --bb-light-surface-1:#FFFFFF;
+  --bb-light-surface-2:#EEECE6;
+  --bb-light-surface-3:#E3E0D9;
+  --bb-light-border-subtle:#D7D4CC;
+  --bb-light-border-default:#BDB9B0;
+  --bb-light-border-strong:#97938A;
+  --bb-light-text-primary:#182027;
+  --bb-light-text-secondary:#535D65;
+  --bb-light-text-tertiary:#6F787F;
+  --bb-light-text-disabled:#92989D;
+
+  /* LIGHT SEMANTIC ACCENTS ARE DARKER FOR CONTRAST */
+  --bb-brand-light:#9B4D20;
+  --bb-brand-light-hover:#853F18;
+  --bb-brand-light-pressed:#713514;
+  --bb-brand-light-soft:rgba(155,77,32,.10);
+
+  --bb-positive-dark:#65C697;
+  --bb-negative-dark:#F08A80;
+  --bb-warning-dark:#E8B260;
+  --bb-positive-light:#28724E;
+  --bb-negative-light:#A43D35;
+  --bb-warning-light:#875C17;
+}
+
+[data-theme="dark"]{
+  --bb-bg-canvas:var(--bb-dark-canvas);--bb-bg-surface-1:var(--bb-dark-surface-1);
+  --bb-bg-surface-2:var(--bb-dark-surface-2);--bb-bg-surface-3:var(--bb-dark-surface-3);
+  --bb-border-subtle:var(--bb-dark-border-subtle);--bb-border-default:var(--bb-dark-border-default);
+  --bb-border-strong:var(--bb-dark-border-strong);--bb-text-primary:var(--bb-dark-text-primary);
+  --bb-text-secondary:var(--bb-dark-text-secondary);--bb-text-tertiary:var(--bb-dark-text-tertiary);
+  --bb-text-disabled:var(--bb-dark-text-disabled);--bb-brand:var(--bb-brand-dark);
+  --bb-brand-hover:var(--bb-brand-dark-hover);--bb-brand-pressed:var(--bb-brand-dark-pressed);
+  --bb-brand-soft:var(--bb-brand-dark-soft);--bb-positive:var(--bb-positive-dark);
+  --bb-negative:var(--bb-negative-dark);--bb-warning:var(--bb-warning-dark);
+}
+[data-theme="light"]{
+  --bb-bg-canvas:var(--bb-light-canvas);--bb-bg-surface-1:var(--bb-light-surface-1);
+  --bb-bg-surface-2:var(--bb-light-surface-2);--bb-bg-surface-3:var(--bb-light-surface-3);
+  --bb-border-subtle:var(--bb-light-border-subtle);--bb-border-default:var(--bb-light-border-default);
+  --bb-border-strong:var(--bb-light-border-strong);--bb-text-primary:var(--bb-light-text-primary);
+  --bb-text-secondary:var(--bb-light-text-secondary);--bb-text-tertiary:var(--bb-light-text-tertiary);
+  --bb-text-disabled:var(--bb-light-text-disabled);--bb-brand:var(--bb-brand-light);
+  --bb-brand-hover:var(--bb-brand-light-hover);--bb-brand-pressed:var(--bb-brand-light-pressed);
+  --bb-brand-soft:var(--bb-brand-light-soft);--bb-positive:var(--bb-positive-light);
+  --bb-negative:var(--bb-negative-light);--bb-warning:var(--bb-warning-light);
+}

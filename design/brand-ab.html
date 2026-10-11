@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brick Book — brand A/B</title>
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Brick Book v1.1 foundations, with three corrections measured
+   against the package's own AA targets:
+     border-strong  dark  #4A4A4A → #5A5A5A   (2.37 → 3.04 on #000)
+                    light #97938A → #8C8C8C   (2.74 → 3.01 on canvas)
+     text-tertiary  light #6F787F → #5D646A   (4.02 → 5.37 on canvas)
+                    dark  #85827D → #908D87   (4.40 → 5.09 on surface-3)
+     brand-fill     new token split from brand — white on the dark
+                    brand measured 2.60, which cannot carry a label
+   Accent tints are pre-blended solids, not alpha.
+   ───────────────────────────────────────────────────────────── */
+:root{
+  --font-sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  --font-display:Georgia,"Times New Roman",serif;
+
+  --text-display:40px; --text-h2:21px; --text-body:15px;
+  --text-dense:14px; --text-meta:13px; --text-label:12px;
+
+  --r-sm:6px; --r-md:10px; --r-lg:14px;
+}
+
+/* ── theme: light ─────────────────────────────────────────── */
+.t-light{
+  --canvas:#F4F2ED; --surface-1:#FFFFFF; --surface-2:#EEECE6; --surface-3:#E3E0D9;
+  --border-subtle:#D7D4CC; --border-default:#BDB9B0; --border-strong:#8C8C8C;
+  --text-primary:#182027; --text-secondary:#535D65; --text-tertiary:#5D646A;
+  --positive:#28724E; --negative:#A43D35; --warning:#875C17;
+  --positive-soft:#E3EDE8; --negative-soft:#F3E6E5; --warning-soft:#EFEAE1;
+  --chrome:#182027; --on-chrome:#F4F2ED; --on-chrome-dim:#919494;
+  --on-chrome-faint:#4F5458; --chrome-inset:#2E353B;
+}
+.t-dark{
+  --canvas:#000000; --surface-1:#0B0B0B; --surface-2:#141414; --surface-3:#1D1D1D;
+  --border-subtle:#242424; --border-default:#363636; --border-strong:#5A5A5A;
+  --text-primary:#F2F0EA; --text-secondary:#B7B4AE; --text-tertiary:#908D87;
+  --positive:#65C697; --negative:#F08A80; --warning:#E8B260;
+  --positive-soft:#17231D; --negative-soft:#291C1A; --warning-soft:#282116;
+  --chrome:#000000; --on-chrome:#F2F0EA; --on-chrome-dim:#858481;
+  --on-chrome-faint:#3C3C3A; --chrome-inset:#181817;
+}
+
+/* ── brand A — v1.1 as specified ──────────────────────────── */
+.b-a.t-light{ --brand:#9B4D20; --brand-fill:#9B4D20; --brand-soft:#F2E8E2; }
+.b-a.t-dark { --brand:#E58A52; --brand-fill:#A9663C; --brand-soft:#271C14; }
+/* ── brand B — the shipped terracotta ─────────────────────── */
+.b-b.t-light{ --brand:#B44C26; --brand-fill:#B44C26; --brand-soft:#F5E8E3; }
+.b-b.t-dark { --brand:#D2703F; --brand-fill:#C4602F; --brand-soft:#251812; }
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#8a8a8a; font-family:var(--font-sans);
+  padding:28px; display:flex; gap:26px; align-items:flex-start;
+  flex-wrap:wrap; justify-content:center;
+}
+.col{display:flex;flex-direction:column;gap:9px;align-items:center}
+.cap{font:600 12px/1.3 var(--font-sans);letter-spacing:.1em;text-transform:uppercase;color:#fff}
+.cap b{color:#fff}
+.swatch{display:flex;gap:5px;align-items:center;font:500 11px/1 var(--font-mono);color:#f0f0f0}
+.swatch i{width:11px;height:11px;border-radius:3px;display:block}
+
+/* ── the phone ────────────────────────────────────────────── */
+.phone{
+  width:375px; min-height:812px; position:relative;
+  background:var(--canvas); color:var(--text-primary);
+  display:flex; flex-direction:column;
+  border-radius:20px; box-shadow:0 18px 50px -18px rgba(0,0,0,.7);
+}
+
+/* header — locked chrome, dark in both themes */
+.hdr{
+  background:var(--chrome); padding:12px 16px;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.hdr .eyebrow{
+  font:600 var(--text-label)/1.2 var(--font-sans);
+  letter-spacing:.12em; text-transform:uppercase; color:var(--on-chrome-dim);
+}
+.hdr h1{font:600 var(--text-h2)/1.24 var(--font-display);color:var(--on-chrome);margin-top:2px}
+.hdr .right{display:flex;align-items:center;gap:10px}
+.sync{
+  display:flex;align-items:center;gap:6px;background:var(--chrome-inset);
+  border-radius:999px;padding:4px 9px;
+  font:500 12px/1.2 var(--font-sans);color:var(--on-chrome);
+}
+.sync i{width:6px;height:6px;border-radius:50%;background:var(--positive);display:block}
+.gear{width:20px;height:20px;border-radius:50%;background:var(--on-chrome-dim)}
+
+.body{padding:18px 16px 16px;display:flex;flex-direction:column;gap:20px;flex:1}
+/* where the 375x812 fold lands — everything below it needs a scroll */
+.phone::after{
+  content:"812px fold";position:absolute;left:0;right:0;top:812px;
+  border-top:1px dashed rgba(255,0,0,.55);
+  font:600 9px/1 var(--font-mono);color:rgba(255,0,0,.75);
+  padding-top:2px;text-align:right;pointer-events:none;
+}
+
+.label{
+  font:600 var(--text-label)/1.2 var(--font-sans);
+  letter-spacing:.12em;text-transform:uppercase;color:var(--text-tertiary);
+}
+.meta{font:400 var(--text-meta)/1.38 var(--font-sans);color:var(--text-secondary)}
+.dense{font:500 var(--text-dense)/1.42 var(--font-sans);color:var(--text-primary)}
+.money{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-weight:600;letter-spacing:-.025em}
+.link{font:600 var(--text-meta)/1.38 var(--font-sans);color:var(--brand)}
+
+/* hero — deliberately not a card */
+.hero .amt{
+  font-size:var(--text-display);line-height:1.1;letter-spacing:-.035em;
+  display:block;margin-top:6px;color:var(--text-primary);
+}
+.meter{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.track{height:8px;border-radius:4px;background:var(--surface-3);overflow:hidden}
+.track span{display:block;height:100%;width:81%;background:var(--positive);border-radius:4px}
+.mrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.mrow b{font:600 var(--text-meta)/1.38 var(--font-sans);color:var(--positive)}
+
+/* needs attention — the v1.1 signature module */
+.att{background:var(--surface-1);border:1px solid var(--border-subtle);border-radius:var(--r-lg);overflow:hidden}
+.att .head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px}
+.count{
+  background:var(--brand-soft);color:var(--brand);border-radius:999px;
+  padding:1px 7px;font:600 12px/1.35 var(--font-sans);
+}
+.arow{display:flex;border-top:1px solid var(--border-subtle)}
+.arow:first-of-type{border-top:0}
+.arow .marker{width:3px;flex:none}
+.arow.warn  .marker{background:var(--warning)}
+.arow.neg   .marker{background:var(--negative)}
+.arow .in{
+  flex:1;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:11px 14px 11px 11px;
+}
+.arow .tags{display:flex;align-items:center;gap:7px;margin-top:4px}
+.chip{
+  border-radius:999px;padding:2px 7px;
+  font:600 11px/1.3 var(--font-sans);letter-spacing:.06em;text-transform:uppercase;
+}
+.chip.warn{background:var(--warning-soft);color:var(--warning)}
+.chip.neg {background:var(--negative-soft);color:var(--negative)}
+.arow .amt{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.arow .amt .money{font-size:var(--text-dense)}
+.arow.warn .amt .money{color:var(--warning)}
+.arow.neg  .amt .money{color:var(--negative)}
+.chev{width:7px;height:7px;background:var(--text-tertiary);flex:none}
+
+/* breakdown */
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cat{display:flex;flex-direction:column;gap:6px}
+.cat .r{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cat .l{display:flex;align-items:center;gap:7px}
+.cat .n{font:400 var(--text-meta)/1.38 var(--font-sans);color:var(--text-tertiary)}
+.cat .bar{height:5px;border-radius:3px;background:var(--brand)}
+.cat .money{font-size:var(--text-dense)}
+
+/* activity */
+.trow{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:6px 0;border-top:1px solid var(--border-subtle);
+}
+.trow:first-of-type{border-top:0}
+.trow .money{font-size:var(--text-body)}
+
+/* tab bar — locked navigation primitive */
+.tabs{background:var(--chrome);padding:8px 0 10px;display:flex;flex-direction:column;align-items:center}
+.slots{display:flex;width:100%}
+.slot{flex:1;height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.slot .ind{width:28px;height:2px;background:transparent;border-radius:1px}
+.slot.on .ind{background:var(--brand)}
+.slot .ico{width:20px;height:20px;border-radius:4px;background:var(--on-chrome-dim)}
+.slot.on .ico{background:var(--on-chrome)}
+.slot .lb{font:600 10px/1.3 var(--font-sans);color:var(--on-chrome-dim)}
+.slot.on .lb{color:var(--on-chrome)}
+.slot .rec{width:38px;height:38px;border-radius:50%;background:var(--brand-fill)}
+.dots{display:flex;gap:5px;padding-top:4px}
+.dots i{width:5px;height:5px;border-radius:50%;background:var(--on-chrome-faint);display:block}
+.dots i.on{background:var(--brand)}
+</style>
+</head>
+<body>
+
+<!-- the four variants are identical markup; only the brand class differs -->
+
+<div class="col">
+  <div class="cap">A · v1.1 &nbsp;·&nbsp; light</div>
+  <div class="swatch"><i style="background:#9B4D20"></i>#9B4D20</div>
+  <div class="phone t-light b-a" >
+<div class="hdr">
+  <div>
+    <div class="eyebrow">Brick Book · Owner</div>
+    <h1>Green Valley Phase 2</h1>
+  </div>
+  <div class="right">
+    <div class="sync"><i></i>Synced</div>
+    <div class="gear"></div>
+  </div>
+</div>
+
+<div class="body">
+
+  <div class="hero">
+    <div class="label">Total spent · 182 payments</div>
+    <span class="money amt">₹48,62,400</span>
+    <div class="meter">
+      <div class="track"><span></span></div>
+      <div class="mrow">
+        <span class="meta">81% of ₹60,00,000 budget</span>
+        <b>₹11,37,600 left</b>
+      </div>
+    </div>
+  </div>
+
+  <div class="att">
+    <div class="head"><span class="label">Needs attention</span><span class="count">3</span></div>
+
+    <div class="arow warn">
+      <div class="marker"></div>
+      <div class="in">
+        <div>
+          <div class="dense">12 payments with no bill</div>
+          <div class="tags"><span class="chip warn">Unbilled</span><span class="meta">Oldest 04 Aug</span></div>
+        </div>
+        <div class="amt"><span class="money">₹6,72,400</span><span class="chev"></span></div>
+      </div>
+    </div>
+
+    <div class="arow neg">
+      <div class="marker"></div>
+      <div class="in">
+        <div>
+          <div class="dense">Marble is over its budget</div>
+          <div class="tags"><span class="chip neg">Over budget</span><span class="meta">of ₹5,75,000</span></div>
+        </div>
+        <div class="amt"><span class="money">+₹40,000</span><span class="chev"></span></div>
+      </div>
+    </div>
+
+    <div class="arow neg">
+      <div class="marker"></div>
+      <div class="in">
+        <div>
+          <div class="dense">Cement stock has gone negative</div>
+          <div class="tags"><span class="chip neg">Check stock</span><span class="meta">11 Aug issue</span></div>
+        </div>
+        <div class="amt"><span class="money">−12 bags</span><span class="chev"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="sec-head"><span class="label">Spending breakdown</span><span class="link">See all 14</span></div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Contractor</span><span class="n">46</span></div><span class="money">₹10,40,000</span></div>
+      <div class="bar" style="width:100%"></div>
+    </div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Marble</span><span class="n">9</span></div><span class="money">₹6,15,000</span></div>
+      <div class="bar" style="width:59%"></div>
+    </div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Steel</span><span class="n">22</span></div><span class="money">₹4,52,000</span></div>
+      <div class="bar" style="width:43%"></div>
+    </div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Plumbing</span><span class="n">17</span></div><span class="money">₹2,88,000</span></div>
+      <div class="bar" style="width:28%"></div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div class="sec-head"><span class="label">Recent activity</span><span class="link">See all</span></div>
+    <div class="trow"><div><div class="dense">Cement — 40 bags</div><div class="meta">Today · Vendor 1 · UPI</div></div><span class="money">₹17,200</span></div>
+    <div class="trow"><div><div class="dense">Contractor 1 — week 12</div><div class="meta">Today · Cash · Payer 2</div></div><span class="money">₹68,000</span></div>
+  </div>
+
+</div>
+
+<div class="tabs">
+  <div class="slots">
+    <div class="slot on"><div class="ind"></div><div class="ico"></div><div class="lb">Dash</div></div>
+    <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">Ledger</div></div>
+    <div class="slot"><div class="ind"></div><div class="rec"></div></div>
+    <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">BOQ</div></div>
+    <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">Recent</div></div>
+  </div>
+  <div class="dots"><i class="on"></i><i></i></div>
+</div>
+</div>
+</div>
+<div class="col">
+  <div class="cap">B · shipped &nbsp;·&nbsp; light</div>
+  <div class="swatch"><i style="background:#B44C26"></i>#B44C26</div>
+  <div class="phone t-light b-b" >
+<div class="hdr">
+  <div>
+    <div class="eyebrow">Brick Book · Owner</div>
+    <h1>Green Valley Phase 2</h1>
+  </div>
+  <div class="right">
+    <div class="sync"><i></i>Synced</div>
+    <div class="gear"></div>
+  </div>
+</div>
+
+<div class="body">
+
+  <div class="hero">
+    <div class="label">Total spent · 182 payments</div>
+    <span class="money amt">₹48,62,400</span>
+    <div class="meter">
+      <div class="track"><span></span></div>
+      <div class="mrow">
+        <span class="meta">81% of ₹60,00,000 budget</span>
+        <b>₹11,37,600 left</b>
+      </div>
+    </div>
+  </div>
+
+  <div class="att">
+    <div class="head"><span class="label">Needs attention</span><span class="count">3</span></div>
+
+    <div class="arow warn">
+      <div class="marker"></div>
+      <div class="in">
+        <div>
+          <div class="dense">12 payments with no bill</div>
+          <div class="tags"><span class="chip warn">Unbilled</span><span class="meta">Oldest 04 Aug</span></div>
+        </div>
+        <div class="amt"><span class="money">₹6,72,400</span><span class="chev"></span></div>
+      </div>
+    </div>
+
+    <div class="arow neg">
+      <div class="marker"></div>
+      <div class="in">
+        <div>
+          <div class="dense">Marble is over its budget</div>
+          <div class="tags"><span class="chip neg">Over budget</span><span class="meta">of ₹5,75,000</span></div>
+        </div>
+        <div class="amt"><span class="money">+₹40,000</span><span class="chev"></span></div>
+      </div>
+    </div>
+
+    <div class="arow neg">
+      <div class="marker"></div>
+      <div class="in">
+        <div>
+          <div class="dense">Cement stock has gone negative</div>
+          <div class="tags"><span class="chip neg">Check stock</span><span class="meta">11 Aug issue</span></div>
+        </div>
+        <div class="amt"><span class="money">−12 bags</span><span class="chev"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="sec-head"><span class="label">Spending breakdown</span><span class="link">See all 14</span></div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Contractor</span><span class="n">46</span></div><span class="money">₹10,40,000</span></div>
+      <div class="bar" style="width:100%"></div>
+    </div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Marble</span><span class="n">9</span></div><span class="money">₹6,15,000</span></div>
+      <div class="bar" style="width:59%"></div>
+    </div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Steel</span><span class="n">22</span></div><span class="money">₹4,52,000</span></div>
+      <div class="bar" style="width:43%"></div>
+    </div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Plumbing</span><span class="n">17</span></div><span class="money">₹2,88,000</span></div>
+      <div class="bar" style="width:28%"></div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div class="sec-head"><span class="label">Recent activity</span><span class="link">See all</span></div>
+    <div class="trow"><div><div class="dense">Cement — 40 bags</div><div class="meta">Today · Vendor 1 · UPI</div></div><span class="money">₹17,200</span></div>
+    <div class="trow"><div><div class="dense">Contractor 1 — week 12</div><div class="meta">Today · Cash · Payer 2</div></div><span class="money">₹68,000</span></div>
+  </div>
+
+</div>
+
+<div class="tabs">
+  <div class="slots">
+    <div class="slot on"><div class="ind"></div><div class="ico"></div><div class="lb">Dash</div></div>
+    <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">Ledger</div></div>
+    <div class="slot"><div class="ind"></div><div class="rec"></div></div>
+    <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">BOQ</div></div>
+    <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">Recent</div></div>
+  </div>
+  <div class="dots"><i class="on"></i><i></i></div>
+</div>
+</div>
+</div>
+<div class="col">
+  <div class="cap">A · v1.1 &nbsp;·&nbsp; dark</div>
+  <div class="swatch"><i style="background:#E58A52"></i>#E58A52</div>
+  <div class="phone t-dark b-a" >
+<div class="hdr">
+  <div>
+    <div class="eyebrow">Brick Book · Owner</div>
+    <h1>Green Valley Phase 2</h1>
+  </div>
+  <div class="right">
+    <div class="sync"><i></i>Synced</div>
+    <div class="gear"></div>
+  </div>
+</div>
+
+<div class="body">
+
+  <div class="hero">
+    <div class="label">Total spent · 182 payments</div>
+    <span class="money amt">₹48,62,400</span>
+    <div class="meter">
+      <div class="track"><span></span></div>
+      <div class="mrow">
+        <span class="meta">81% of ₹60,00,000 budget</span>
+        <b>₹11,37,600 left</b>
+      </div>
+    </div>
+  </div>
+
+  <div class="att">
+    <div class="head"><span class="label">Needs attention</span><span class="count">3</span></div>
+
+    <div class="arow warn">
+      <div class="marker"></div>
+      <div class="in">
+        <div>
+          <div class="dense">12 payments with no bill</div>
+          <div class="tags"><span class="chip warn">Unbilled</span><span class="meta">Oldest 04 Aug</span></div>
+        </div>
+        <div class="amt"><span class="money">₹6,72,400</span><span class="chev"></span></div>
+      </div>
+    </div>
+
+    <div class="arow neg">
+      <div class="marker"></div>
+      <div class="in">
+        <div>
+          <div class="dense">Marble is over its budget</div>
+          <div class="tags"><span class="chip neg">Over budget</span><span class="meta">of ₹5,75,000</span></div>
+        </div>
+        <div class="amt"><span class="money">+₹40,000</span><span class="chev"></span></div>
+      </div>
+    </div>
+
+    <div class="arow neg">
+      <div class="marker"></div>
+      <div class="in">
+        <div>
+          <div class="dense">Cement stock has gone negative</div>
+          <div class="tags"><span class="chip neg">Check stock</span><span class="meta">11 Aug issue</span></div>
+        </div>
+        <div class="amt"><span class="money">−12 bags</span><span class="chev"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="sec-head"><span class="label">Spending breakdown</span><span class="link">See all 14</span></div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Contractor</span><span class="n">46</span></div><span class="money">₹10,40,000</span></div>
+      <div class="bar" style="width:100%"></div>
+    </div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Marble</span><span class="n">9</span></div><span class="money">₹6,15,000</span></div>
+      <div class="bar" style="width:59%"></div>
+    </div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Steel</span><span class="n">22</span></div><span class="money">₹4,52,000</span></div>
+      <div class="bar" style="width:43%"></div>
+    </div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Plumbing</span><span class="n">17</span></div><span class="money">₹2,88,000</span></div>
+      <div class="bar" style="width:28%"></div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div class="sec-head"><span class="label">Recent activity</span><span class="link">See all</span></div>
+    <div class="trow"><div><div class="dense">Cement — 40 bags</div><div class="meta">Today · Vendor 1 · UPI</div></div><span class="money">₹17,200</span></div>
+    <div class="trow"><div><div class="dense">Contractor 1 — week 12</div><div class="meta">Today · Cash · Payer 2</div></div><span class="money">₹68,000</span></div>
+  </div>
+
+</div>
+
+<div class="tabs">
+  <div class="slots">
+    <div class="slot on"><div class="ind"></div><div class="ico"></div><div class="lb">Dash</div></div>
+    <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">Ledger</div></div>
+    <div class="slot"><div class="ind"></div><div class="rec"></div></div>
+    <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">BOQ</div></div>
+    <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">Recent</div></div>
+  </div>
+  <div class="dots"><i class="on"></i><i></i></div>
+</div>
+</div>
+</div>
+<div class="col">
+  <div class="cap">B · shipped &nbsp;·&nbsp; dark</div>
+  <div class="swatch"><i style="background:#D2703F"></i>#D2703F</div>
+  <div class="phone t-dark b-b" >
+<div class="hdr">
+  <div>
+    <div class="eyebrow">Brick Book · Owner</div>
+    <h1>Green Valley Phase 2</h1>
+  </div>
+  <div class="right">
+    <div class="sync"><i></i>Synced</div>
+    <div class="gear"></div>
+  </div>
+</div>
+
+<div class="body">
+
+  <div class="hero">
+    <div class="label">Total spent · 182 payments</div>
+    <span class="money amt">₹48,62,400</span>
+    <div class="meter">
+      <div class="track"><span></span></div>
+      <div class="mrow">
+        <span class="meta">81% of ₹60,00,000 budget</span>
+        <b>₹11,37,600 left</b>
+      </div>
+    </div>
+  </div>
+
+  <div class="att">
+    <div class="head"><span class="label">Needs attention</span><span class="count">3</span></div>
+
+    <div class="arow warn">
+      <div class="marker"></div>
+      <div class="in">
+        <div>
+          <div class="dense">12 payments with no bill</div>
+          <div class="tags"><span class="chip warn">Unbilled</span><span class="meta">Oldest 04 Aug</span></div>
+        </div>
+        <div class="amt"><span class="money">₹6,72,400</span><span class="chev"></span></div>
+      </div>
+    </div>
+
+    <div class="arow neg">
+      <div class="marker"></div>
+      <div class="in">
+        <div>
+          <div class="dense">Marble is over its budget</div>
+          <div class="tags"><span class="chip neg">Over budget</span><span class="meta">of ₹5,75,000</span></div>
+        </div>
+        <div class="amt"><span class="money">+₹40,000</span><span class="chev"></span></div>
+      </div>
+    </div>
+
+    <div class="arow neg">
+      <div class="marker"></div>
+      <div class="in">
+        <div>
+          <div class="dense">Cement stock has gone negative</div>
+          <div class="tags"><span class="chip neg">Check stock</span><span class="meta">11 Aug issue</span></div>
+        </div>
+        <div class="amt"><span class="money">−12 bags</span><span class="chev"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="sec-head"><span class="label">Spending breakdown</span><span class="link">See all 14</span></div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Contractor</span><span class="n">46</span></div><span class="money">₹10,40,000</span></div>
+      <div class="bar" style="width:100%"></div>
+    </div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Marble</span><span class="n">9</span></div><span class="money">₹6,15,000</span></div>
+      <div class="bar" style="width:59%"></div>
+    </div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Steel</span><span class="n">22</span></div><span class="money">₹4,52,000</span></div>
+      <div class="bar" style="width:43%"></div>
+    </div>
+    <div class="cat">
+      <div class="r"><div class="l"><span class="dense">Plumbing</span><span class="n">17</span></div><span class="money">₹2,88,000</span></div>
+      <div class="bar" style="width:28%"></div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div class="sec-head"><span class="label">Recent activity</span><span class="link">See all</span></div>
+    <div class="trow"><div><div class="dense">Cement — 40 bags</div><div class="meta">Today · Vendor 1 · UPI</div></div><span class="money">₹17,200</span></div>
+    <div class="trow"><div><div class="dense">Contractor 1 — week 12</div><div class="meta">Today · Cash · Payer 2</div></div><span class="money">₹68,000</span></div>
+  </div>
+
+</div>
+
+<div class="tabs">
+  <div class="slots">
+    <div class="slot on"><div class="ind"></div><div class="ico"></div><div class="lb">Dash</div></div>
+    <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">Ledger</div></div>
+    <div class="slot"><div class="ind"></div><div class="rec"></div></div>
+    <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">BOQ</div></div>
+    <div class="slot"><div class="ind"></div><div class="ico"></div><div class="lb">Recent</div></div>
+  </div>
+  <div class="dots"><i class="on"></i><i></i></div>
+</div>
+</div>
+</div>
+
+</body>
+</html>
