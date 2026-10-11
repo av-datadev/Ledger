@@ -250,7 +250,13 @@ export interface LengthTotals {
  * the coil/roll or by the metre, so a search for cement shows no such line.
  */
 export function lengthTotals(
-  rows: { basis: MeasureBasis; qty: number | null; unit: string | null; length: number | null }[],
+  rows: {
+    item: string;
+    basis: MeasureBasis;
+    qty: number | null;
+    unit: string | null;
+    length: number | null;
+  }[],
 ): LengthTotals | null {
   const packs = new Map<string, { unit: string; qty: number }>();
   let metres = 0;
@@ -264,14 +270,21 @@ export function lengthTotals(
       any = true;
       continue;
     }
-    if (!isLengthPack(unit)) continue;
+    // The row's own metres per unit, else the maker's figure in the name —
+    // the same rule the review screen fills the box with. A bill that printed
+    // no unit at all ("Copper Wire-90m Red", qty 2) is still two 90 m coils:
+    // the name says so, and leaving them out would understate the wire bought.
+    const perUnit =
+      r.length != null && r.length > 0 ? r.length : lengthPerUnitFromName(r.item, unit);
+    const unitless = unit === "" && perUnit != null;
+    if (!isLengthPack(unit) && !unitless) continue;
     any = true;
-    const kind = PACK_NAME.find(([re]) => re.test(unit));
+    const kind = unitless ? PACK_NAME[0] : PACK_NAME.find(([re]) => re.test(unit));
     const key = kind ? kind[1] : unit.toLowerCase();
     const p = packs.get(key) ?? { unit: key, qty: 0 };
     p.qty += r.qty;
     packs.set(key, p);
-    if (r.length != null && r.length > 0) metres += r.qty * r.length;
+    if (perUnit != null) metres += r.qty * perUnit;
     else unmeasured += 1;
   }
   if (!any) return null;

@@ -204,9 +204,13 @@ signing key before touching anything there.
   so it needed no sync migration. Stock still counts coils.
   **BOQ search totals them:** search `wire` and a *Bought in all* line sums the
   lines on screen — `16 coils · 2,160 m` — counting rows bought by the metre as
-  metres. Narrow the search (`wire 1mm`) and the total narrows with it. A coil
-  row with no metres per unit is counted in the coils but named as left out of
-  the metres, never guessed. The arithmetic is `lengthTotals` in
+  metres. Narrow the search (`wire 1mm`) and the total narrows with it. Where a
+  row has no metres stored, the maker's figure in the name is used (the same
+  rule the review screen fills the box with), and a row with **no unit** whose
+  name states one (`Copper Wire-90m Red`, qty 2) counts as that many coils —
+  some bills print no unit, and skipping them understated real purchases. A
+  coil row with no length anywhere is counted in the coils but named as left
+  out of the metres, never guessed. The arithmetic is `lengthTotals` in
   `src/lib/measure.ts`.
 - **A bill spread over several photos** — a kaccha bill is a notebook page, and
   a running account routinely covers two or three. Photos accumulate in a tray
