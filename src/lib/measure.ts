@@ -232,6 +232,40 @@ const PACK_NAME: [RegExp, string, string][] = [
 /** Units that are already metres — a row bought by the metre counts as is. */
 const METRE_UNITS = /^(m|mtr|mtrs|meter|metre|meters|metres|rmt|rm)$/i;
 
+type LengthRow = {
+  item: string;
+  basis: MeasureBasis;
+  qty: number | null;
+  unit: string | null;
+  length: number | null;
+};
+
+/**
+ * How one bill row reads as a length, or null when it isn't one.
+ * `pack` is the kind it was bought by ("coil", "roll"…), or null for a row
+ * bought by the metre; `metres` is null when a pack's length is nowhere on
+ * the bill.
+ */
+function asLength(r: LengthRow): { pack: string | null; qty: number; metres: number | null } | null {
+  if (r.basis !== "qty" || r.qty == null || !(r.qty > 0)) return null;
+  const unit = (r.unit ?? "").trim().replace(/\.$/, "");
+  if (METRE_UNITS.test(unit)) return { pack: null, qty: r.qty, metres: r.qty };
+  // The row's own metres per unit, else the maker's figure in the name —
+  // the same rule the review screen fills the box with. A bill that printed
+  // no unit at all ("Copper Wire-90m Red", qty 2) is still two 90 m coils:
+  // the name says so, and leaving them out would understate the wire bought.
+  const perUnit =
+    r.length != null && r.length > 0 ? r.length : lengthPerUnitFromName(r.item, unit);
+  const unitless = unit === "" && perUnit != null;
+  if (!isLengthPack(unit) && !unitless) return null;
+  const kind = unitless ? PACK_NAME[0] : PACK_NAME.find(([re]) => re.test(unit));
+  return {
+    pack: kind ? kind[1] : unit.toLowerCase(),
+    qty: r.qty,
+    metres: perUnit != null ? r.qty * perUnit : null,
+  };
+}
+
 export interface LengthTotals {
   /** Coils, rolls… summed per kind, in the order first met. */
   packs: { unit: string; qty: number }[];
@@ -250,41 +284,24 @@ export interface LengthTotals {
  * the coil/roll or by the metre, so a search for cement shows no such line.
  */
 export function lengthTotals(
-  rows: {
-    item: string;
-    basis: MeasureBasis;
-    qty: number | null;
-    unit: string | null;
-    length: number | null;
-  }[],
+  rows: LengthRow[],
 ): LengthTotals | null {
   const packs = new Map<string, { unit: string; qty: number }>();
   let metres = 0;
   let unmeasured = 0;
   let any = false;
   for (const r of rows) {
-    if (r.basis !== "qty" || r.qty == null || !(r.qty > 0)) continue;
-    const unit = (r.unit ?? "").trim().replace(/\.$/, "");
-    if (METRE_UNITS.test(unit)) {
-      metres += r.qty;
-      any = true;
+    const len = asLength(r);
+    if (!len) continue;
+    any = true;
+    if (len.pack == null) {
+      metres += len.metres ?? 0;
       continue;
     }
-    // The row's own metres per unit, else the maker's figure in the name —
-    // the same rule the review screen fills the box with. A bill that printed
-    // no unit at all ("Copper Wire-90m Red", qty 2) is still two 90 m coils:
-    // the name says so, and leaving them out would understate the wire bought.
-    const perUnit =
-      r.length != null && r.length > 0 ? r.length : lengthPerUnitFromName(r.item, unit);
-    const unitless = unit === "" && perUnit != null;
-    if (!isLengthPack(unit) && !unitless) continue;
-    any = true;
-    const kind = unitless ? PACK_NAME[0] : PACK_NAME.find(([re]) => re.test(unit));
-    const key = kind ? kind[1] : unit.toLowerCase();
-    const p = packs.get(key) ?? { unit: key, qty: 0 };
-    p.qty += r.qty;
-    packs.set(key, p);
-    if (perUnit != null) metres += r.qty * perUnit;
+    const p = packs.get(len.pack) ?? { unit: len.pack, qty: 0 };
+    p.qty += len.qty;
+    packs.set(len.pack, p);
+    if (len.metres != null) metres += len.metres;
     else unmeasured += 1;
   }
   if (!any) return null;
@@ -295,6 +312,116 @@ export function lengthTotals(
     }),
     metres: round3(metres),
     unmeasured,
+  };
+}
+
+/** A wire's gauge as makers print it: "1MM", "2.5 mm", "4 sqmm", "1.5MM". */
+const GAUGE = /(\d+(?:\.\d+)?)\s*(?:sq\.?\s*)?mm\b/i;
+/** Only wire and cable have a gauge worth tabling — a "300mm" cable tie or a
+ * "25mm" conduit pipe has a size, not a gauge. */
+const WIRE_NAME = /wire|cable/i;
+/** Colours as printed. Green-yellow first: it is the earth, and "green" alone
+ * would otherwise claim it. */
+const COLOURS: [RegExp, string][] = [
+  [/green\s*[-/&]?\s*yellow|yellow\s*[-/&]?\s*green|\bg\s*\/\s*y\b/i, "Green-yellow"],
+  [/\bred\b/i, "Red"],
+  [/\bblack\b/i, "Black"],
+  [/\bblue\b/i, "Blue"],
+  [/\bgreen\b/i, "Green"],
+  [/\byellow\b/i, "Yellow"],
+  [/\bwhite\b/i, "White"],
+  [/\bgr[ae]y\b/i, "Grey"],
+  [/\bbrown\b/i, "Brown"],
+  [/\borange\b/i, "Orange"],
+];
+
+/** The gauge in mm a wire or cable row names, or null when it names none. */
+export function wireGauge(name: string): number | null {
+  if (!WIRE_NAME.test(name)) return null;
+  const m = name.match(GAUGE);
+  if (!m) return null;
+  const v = parseFloat(m[1]);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
+/** The colour a row names, or null when the bill prints none. */
+export function wireColour(name: string): string | null {
+  return COLOURS.find(([re]) => re.test(name))?.[1] ?? null;
+}
+
+export interface WireLine {
+  coils: number;
+  metres: number;
+  /** Coils counted here whose length is on no bill — out of `metres`. */
+  unmeasured: number;
+}
+export interface GaugeRow extends WireLine {
+  gauge: number;
+  /** Coloured breakdown, most coils first; `colour` null = not on the bill. */
+  colours: (WireLine & { colour: string | null })[];
+}
+export interface WireByGauge extends WireLine {
+  gauges: GaugeRow[];
+}
+
+/**
+ * Every wire bought, by gauge — "how many coils of 2.5 mm, and how many
+ * metres" — built from the bill rows themselves, so a wire bill saved, edited
+ * or synced in changes it with nothing stored beside it.
+ *
+ * A row counts when it is wire or cable, names a gauge in mm, and is sold by
+ * the coil or the metre (or prints no unit but names its length — see
+ * `asLength`). A row bought by the metre adds metres and no coils. Cat 6, TV
+ * cable and binding wire name no gauge and stay out; a gauge is never
+ * guessed. Null when no row qualifies, so the card is absent until the first
+ * wire bill.
+ */
+export function wireByGauge(rows: LengthRow[]): WireByGauge | null {
+  const byGauge = new Map<number, GaugeRow>();
+  const add = (into: WireLine, len: { pack: string | null; qty: number; metres: number | null }) => {
+    if (len.pack != null) into.coils += len.qty;
+    if (len.metres != null) into.metres += len.metres;
+    else into.unmeasured += 1;
+  };
+  for (const r of rows) {
+    const gauge = wireGauge(r.item);
+    if (gauge == null) continue;
+    const len = asLength(r);
+    if (!len) continue;
+    const g =
+      byGauge.get(gauge) ?? { gauge, coils: 0, metres: 0, unmeasured: 0, colours: [] };
+    add(g, len);
+    const colour = wireColour(r.item);
+    let c = g.colours.find((x) => x.colour === colour);
+    if (!c) {
+      c = { colour, coils: 0, metres: 0, unmeasured: 0 };
+      g.colours.push(c);
+    }
+    add(c, len);
+    byGauge.set(gauge, g);
+  }
+  if (byGauge.size === 0) return null;
+  const tidy = <T extends WireLine>(l: T): T => ({
+    ...l,
+    coils: round3(l.coils),
+    metres: round3(l.metres),
+  });
+  const gauges = [...byGauge.values()]
+    .sort((a, b) => a.gauge - b.gauge)
+    .map((g) => ({
+      ...tidy(g),
+      // Named colours by coils, "not on the bill" last.
+      colours: g.colours
+        .map(tidy)
+        .sort((a, b) =>
+          a.colour == null ? 1 : b.colour == null ? -1 : b.coils - a.coils || b.metres - a.metres,
+        ),
+    }));
+  return {
+    gauges,
+    coils: round3(gauges.reduce((s, g) => s + g.coils, 0)),
+    metres: round3(gauges.reduce((s, g) => s + g.metres, 0)),
+    unmeasured: gauges.reduce((s, g) => s + g.unmeasured, 0),
   };
 }
 

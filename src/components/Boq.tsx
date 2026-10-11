@@ -27,6 +27,7 @@ import {
 } from "./BillReview";
 import { BillStockPanel } from "./BillStockPanel";
 import { BoqItemResults } from "./BoqItemResults";
+import { WireByGauge } from "./WireByGauge";
 import { BillPaymentPanel } from "./BillPaymentPanel";
 import { DealerAccounts } from "./DealerAccounts";
 import type { BoqItem } from "../types";
@@ -752,6 +753,11 @@ export function Boq({
           )}
         </div>
       )}
+
+      {/* Wire by gauge sits with the coverage table and hides with it while a
+          search runs, for the same reason. It renders nothing until a bill
+          carries wire. */}
+      {!searching && items && <WireByGauge items={items} />}
 
       {/* While a search is running the coverage table is noise — it answers a
           different question and pushes the results the person asked for off

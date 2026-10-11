@@ -212,6 +212,19 @@ signing key before touching anything there.
   coil row with no length anywhere is counted in the coils but named as left
   out of the metres, never guessed. The arithmetic is `lengthTotals` in
   `src/lib/measure.ts`.
+- **Wire by gauge** — a card on the BOQ tab, above the coverage table, tabling
+  every coil of wire bought: gauge · coils · metres, with a total, thinnest
+  gauge first. Tap a gauge for its colours (green-yellow read as one colour,
+  the earth), so a missing earth or neutral shows before the electrician runs
+  short. **Derived, never stored**: it is `wireByGauge` over the live BOQ rows,
+  so a wire bill saved, edited, deleted or synced in moves it at once, and
+  bills entered before it existed are counted. A row counts when its name says
+  wire or cable **and** gives a gauge in mm (`1MM`, `2.5 mm`, `4 sqmm`), and it
+  is sold by the coil or the metre — the same length reading as the search
+  total, unit-less `Wire-90m` rows included. Cat 6, TV cable, binding wire,
+  cable ties and conduit name no gauge (or aren't wire) and stay out; a gauge
+  is never guessed. Hidden while a search runs, absent until the first wire
+  bill.
 - **A bill spread over several photos** — a kaccha bill is a notebook page, and
   a running account routinely covers two or three. Photos accumulate in a tray
   (one shot at a time from the camera, or several at once from the gallery) and

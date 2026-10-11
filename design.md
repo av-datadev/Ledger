@@ -656,6 +656,14 @@ equal-weight buttons, the first in primary.
   `text-ink-soft`. Lines with no metres per unit get a
   `text-ink-soft` note saying they are left out of the metres — the state shown,
   not a figure that quietly reads as the whole purchase.
+- **Wire by gauge** sits above *Coverage: BOQ vs ledger* and is built the same
+  way: eyebrow heading, `card` table at 12px, `divide-rule` rows, figures in
+  `.money` right-aligned, a semibold **Total** row. Each gauge cell is a full
+  button (`min-h-[44px]`, `aria-expanded`) with a 12px `chevron` in
+  `text-ink-faint` that turns 90° when open; colour rows sit under it on
+  `bg-paper-2` in `text-ink-soft`, indented. A gauge reads as printed (`2.5 mm`,
+  not `num()`'s `2.50`). A count with nothing in it shows `—`. Missing lengths
+  get the same `text-ink-soft` note as the search card. Hidden while searching.
 - The review screen's row editor reads Qty · Unit · Rate on one line, then
   Disc · (metres per unit) · **Amount** on the next. Disc and metres carry their
   unit (`%`, `m`) *inside* the box, because once typed into a box loses its
