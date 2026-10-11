@@ -106,9 +106,17 @@ curl -s -X POST "$SUPABASE_URL/functions/v1/<slug>" -H "apikey: $KEY" -d '{}'
 ```
 
 A 400 complaining about the body is the healthy answer — it means the function
-is there and validating. A 404 means the client is calling nothing. Match
-`verify_jwt` to its siblings: the scanners run with it **off**, because the app
-scans before anyone signs in.
+is there and validating. A 404 means the client is calling nothing.
+
+Every function runs with `verify_jwt` **on**, and that does not stop a phone
+that isn't signed in. On this project the gateway accepts the publishable key
+(`sb_publishable_…`, in either the `apikey` or the `Authorization` header) as
+an anonymous caller; it refuses only a request with no key, or a token that
+isn't one. So it keeps drive-by traffic off the scanners and costs a phone
+nothing. It is not real access control — the publishable key ships inside the
+app — so anything that must be limited to signed-in members has to check the
+caller's role in the function itself. Re-check with the curl above after any
+deploy: no key should give a 401, the publishable key a 400.
 
 **Sync pushes whole rows** (`upsert({...obj})` in `src/lib/sync.ts`), so any
 new field on a synced type needs its column added remotely *first*. PostgREST
