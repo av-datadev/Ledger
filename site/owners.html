@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>For owners — Brick Book</title>
+<meta name="description" content="The owner's book: payments by category, mode and payer; bills, stock, people and budget." />
+<meta name="theme-color" content="#0E1922" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2315232E'/%3E%3Crect x='11' y='11' width='10' height='10' rx='1.5' fill='none' stroke='%23C0562F' stroke-width='2.4' transform='rotate(45 16 16)'/%3E%3C/svg%3E" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="For owners — Brick Book" />
+<meta property="og:description" content="The owner's book: payments by category, mode and payer; bills, stock, people and budget." />
+
+<!-- Set before first paint so nothing that starts hidden ever flashes. -->
+<script>document.documentElement.className="js";</script>
+
+<!-- Stylesheets in cascade order: tokens first, motion last — motion.css holds
+     the reveal states and the prefers-reduced-motion overrides, and has to be
+     able to win. No build step: these are plain files, served as written.
+     The ?v= token exists because a file keeps its NAME when its contents
+     change, and a local preview will happily serve you the old one. Bump it
+     when you edit css/ or js/. Vercel revalidates on its own, so this is a
+     convenience for local work rather than something production needs. -->
+<link rel="stylesheet" href="css/tokens.css?v=6" />
+<link rel="stylesheet" href="css/base.css?v=6" />
+<link rel="stylesheet" href="css/home.css?v=6" />
+<link rel="stylesheet" href="css/build.css?v=6" />
+<link rel="stylesheet" href="css/pages.css?v=6" />
+<link rel="stylesheet" href="css/motion.css?v=6" />
+</head>
+
+<body>
+<!-- ================= NAV — duplicated per page on purpose =====================
+     There is no build step, so this block is repeated in each of the seven
+     pages. Change it here and you must change it in all of them; site/README.md
+     says so too. The phone menu is a <details> disclosure so the site stays
+     navigable with JavaScript off. -->
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="index.html" aria-label="Brick Book — home">
+      <span class="brand-mark" aria-hidden="true"><span></span></span>
+      <span class="brand-name">BRICK BOOK</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+        <a href="owners.html" aria-current="page">For owners</a>
+        <a href="contractors.html">For contractors</a>
+        <a href="build.html">The build</a>
+        <a href="reads.html">What it reads</a>
+        <a href="pricing.html">Pricing</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:12px">
+      <a href="#get" class="btn btn-primary nav-cta" style="padding:9px 16px;font-size:14px">Get the app</a>
+      <details class="navmenu">
+        <summary aria-label="Menu"><span></span></summary>
+        <div class="navmenu-panel">
+          <a href="index.html">Home</a>
+          <a href="owners.html" aria-current="page">For owners</a>
+          <a href="contractors.html">For contractors</a>
+          <a href="build.html">The build</a>
+          <a href="reads.html">What it reads</a>
+          <a href="pricing.html">Pricing</a>
+          <a href="privacy-first.html">Offline & private</a>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>
+
+<section class="blk" style="padding-top:64px;padding-bottom:10px">
+  <div class="wrap">
+    <div class="sec-head reveal" style="max-width:54ch">
+      <div class="eyebrow">For owners</div>
+      <h1 style="font-size:clamp(34px,5vw,54px);margin:14px 0 0">Your money, your materials,<br />your people.</h1>
+      <p class="sub" style="font-size:19px;margin-top:18px;max-width:48ch">A household ledger for a house that takes three years and a thousand payments — kept by whoever is on site, readable by everyone who is paying for it.</p>
+    </div>
+  </div>
+</section>
+<!-- ================= WATCH IT WORK — one phone, changing screen ================= -->
+<section class="blk" id="how">
+  <div class="wrap">
+    <div class="sec-head mid reveal">
+      <div class="eyebrow">Watch it work</div>
+      <h2>Three screens do the whole job.</h2>
+    </div>
+
+    <div class="work-in">
+      <div class="pin" aria-hidden="true">
+        <div class="stack">
+          <div class="screen">
+            <img id="sc0" class="on" src="img/boq.webp" width="760" height="1645" loading="lazy" decoding="async" alt="" />
+            <img id="sc1" src="img/dash.webp" width="760" height="1645" loading="lazy" decoding="async" alt="" />
+            <img id="sc2" src="img/ledger.webp" width="760" height="1645" loading="lazy" decoding="async" alt="" />
+          </div>
+        </div>
+      </div>
+
+      <div class="steps">
+        <div class="sstep" data-i="0">
+          <div class="num">01 — BILLS</div>
+          <h3>Photograph the bill.</h3>
+          <p>A GST invoice, a PDF, or a notebook page in Hindi — back as line items you can search.</p>
+          <div class="sshot"><img src="img/boq.webp" width="760" height="620" loading="lazy" decoding="async"
+            alt="The Bills screen, with a search for “tee 1” returning four matching bill lines from different dealers." /></div>
+        </div>
+        <div class="sstep" data-i="1">
+          <div class="num">02 — DASHBOARD</div>
+          <h3>See where it all went.</h3>
+          <p>Every payment by category, mode and payer, against the budget. Tap a figure, see the payments behind it.</p>
+          <div class="sshot"><img src="img/dash.webp" width="760" height="620" loading="lazy" decoding="async"
+            alt="The dashboard: ₹48,62,400 spent across 182 transactions, a budget bar at 81 per cent, and spend by category." /></div>
+        </div>
+        <div class="sstep" data-i="2">
+          <div class="num">03 — PAID VS BILLED</div>
+          <h3>Find the gap.</h3>
+          <p>Money handed over that no bill accounts for yet — per person, per dealer.</p>
+          <div class="sshot"><img src="img/ledger.webp" width="760" height="620" loading="lazy" decoding="async"
+            alt="The Ledger's paid-versus-billed panel: ₹48,62,400 paid, ₹2,17,750 billed, and the gap between them." /></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<div class="strip">
+  <img src="img/photo/sand.webp" width="1600" height="900" loading="lazy" decoding="async" alt="" />
+  <div class="strip-q">
+    <p>By the second year, nobody can say what the plumbing <em>actually cost.</em></p>
+  </div>
+</div>
+<!-- ================= TWO SIDES ================= -->
+<section class="blk" id="sides">
+  <div class="wrap">
+    <div class="sec-head mid reveal" style="max-width:52ch">
+      <div class="eyebrow">Two sides, one app</div>
+      <h2>Whether you're building it, or building&nbsp;for&nbsp;someone.</h2>
+    </div>
+
+    <div class="sides">
+      <div class="side reveal">
+        <div class="tagline">If you're building a home</div>
+        <h3>Your money, your materials, your people.</h3>
+        <p>Your father records a cash payment in the morning; it's on your phone before lunch.</p>
+        <ul>
+          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            <span>Every payment by category, mode and payer</span></li>
+          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            <span>Bills, stock and people — what's owed, what's left, who's been paid</span></li>
+          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            <span>Excel and PDF out, whenever you need it on paper</span></li>
+        </ul>
+        <div class="ledgercard">
+          <div class="lt">Today · shared with the family</div>
+          <div class="lrow"><span><b>Cement — 40 bags</b><i>Dealer 1 · UPI · Payer 1</i></span><span class="money">₹17,200</span></div>
+          <div class="lrow"><span><b>Mistri — 3 days</b><i>Labour · Cash · Payer 2</i></span><span class="money">₹4,500</span></div>
+          <div class="lrow"><span><b>Plumber — advance</b><i>Plumbing · UPI · Payer 1</i></span><span class="money">₹25,000</span></div>
+        </div>
+      </div>
+
+      <div class="side dark reveal d1">
+        <div class="tagline">If you're a contractor</div>
+        <h3>Every site's hisaab, in your pocket.</h3>
+        <p>A book per site: what the owner gave you, what went out, what's in hand. Works signed out.</p>
+        <ul>
+          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            <span>Photograph the bill against the row</span></li>
+          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            <span>“Aaj maalik se pachas hazaar liye” — logged</span></li>
+          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            <span>Share one site with the owner — your other sites stay yours</span></li>
+        </ul>
+        <div class="balcard">
+          <div class="bt">Site · Bungalow, Sector 4</div>
+          <div class="balrow"><span>Received from owner</span><b class="money">₹6,50,000</b></div>
+          <div class="balrow"><span>Spent — material &amp; labour</span><b class="money">₹5,18,300</b></div>
+          <div class="balrow big"><span>In hand</span><b class="money">₹1,31,700</b></div>
+          <div class="balsplit">
+            <div>With a bill<b class="money">₹4,42,000</b></div>
+            <div>Without<b class="money">₹76,300</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section><!-- ================= CTA ================= -->
+<section class="blk cta" id="get">
+  <div class="wrap reveal">
+    <div class="eyebrow">Start your build</div>
+    <h2>Build the house. We'll keep the numbers honest.</h2>
+    <p>Open it, pick your side, record the first payment.</p>
+    <div class="cta-btns">
+      <!-- TODO: swap for the Play Store listing URL once the app is published. -->
+      <a href="https://ledger-nu-ashen.vercel.app" class="btn btn-light">Open Brick Book
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a href="#say" class="btn btn-outline-light">Play the demo again</a>
+    </div>
+    <div class="cta-note">Any Android or iPhone · install it to your home screen · nothing to uninstall</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-in">
+      <a class="brand" href="#top">
+        <div class="brand-mark"><span></span></div>
+        <div class="brand-name">BRICK&nbsp;BOOK</div>
+      </a>
+      <nav class="foot-links">
+        <a href="#how">Watch it work</a>
+        <a href="#sides">Owner &amp; contractor</a>
+        <a href="#pricing">Pricing</a>
+        <!-- These live on the app's own origin; they are the pages the store listing links to. -->
+        <a href="https://ledger-nu-ashen.vercel.app/privacy.html">Privacy</a>
+        <a href="https://ledger-nu-ashen.vercel.app/terms.html">Terms</a>
+        <a href="https://ledger-nu-ashen.vercel.app/delete-account.html">Delete account</a>
+      </nav>
+    </div>
+    <div class="foot-made">The ledger for building a house · works offline · made in India 🇮🇳</div>
+  </div>
+</footer>
+
+<!-- Native ES modules. Deferred by default, so this runs after parse. -->
+<footer class="site">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="index.html">
+          <span class="brand-mark" aria-hidden="true"><span></span></span>
+          <span class="brand-name">BRICK BOOK</span>
+        </a>
+        <p class="foot-blurb">The ledger for building a house. Offline first, shared with
+          the family, and the records stay yours.</p>
+      </div>
+      <div class="foot-col">
+        <h4>The product</h4>
+        <a href="owners.html">For owners</a>
+        <a href="contractors.html">For contractors</a>
+        <a href="reads.html">What it reads</a>
+        <a href="build.html">The build</a>
+      </div>
+      <div class="foot-col">
+        <h4>Decide</h4>
+        <a href="pricing.html">Pricing</a>
+        <a href="privacy-first.html">Offline &amp; private</a>
+        <a href="https://ledger-nu-ashen.vercel.app">Open the app</a>
+      </div>
+      <div class="foot-col">
+        <h4>Legal</h4>
+        <!-- These must keep pointing at the app's own origin: they are the URLs
+             the Play Store listing declares, and the pages live with the app. -->
+        <a href="https://ledger-nu-ashen.vercel.app/privacy.html">Privacy policy</a>
+        <a href="https://ledger-nu-ashen.vercel.app/terms.html">Terms</a>
+        <a href="https://ledger-nu-ashen.vercel.app/delete-account.html">Delete account</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>Built for one house, then shared.</span>
+      <span>Every figure on this site is invented.</span>
+    </div>
+  </div>
+</footer>
+
+<!-- Native ES modules. Deferred by default, so this runs after parse. -->
+<script type="module" src="js/main.js?v=6"></script>
+</body>
+</html>

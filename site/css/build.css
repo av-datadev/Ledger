@@ -1,0 +1,172 @@
+/* ================= The build — a G+1 house that rises as the number does =====
+
+   The one section that stops showing a screen and shows a PROJECT. Three
+   screenshots can say what the app looks like; none of them can say what three
+   years and 182 payments feel like, and that is the thing being sold.
+
+   It is the only dark band on the page, and deliberately so: the app's own
+   chrome is dark in BOTH themes, every phone screenshot on this page is dark,
+   and a drawing reads as a drawing on a drafting table rather than on paper.
+   It is a different room, entered and left.
+
+   Contrast, measured against the #0E1922 ground rather than guessed:
+     off-white #F5F3EC   15.9:1   body and figures
+     muted    62% white   6.5:1   captions
+     accent-lit #D9703F   5.4:1   eyebrow, stage numbers, small text
+     accent   #C0562F     3.9:1   LINES AND RULES ONLY — passes the 3:1 bar for
+                                  graphics, and is never used for text here.
+   ========================================================================== */
+
+.house-sec{
+  /* NO overflow:hidden here. An ancestor with a clip becomes the containing
+     block for position:sticky, and the pinned drawing below silently stops
+     pinning. The grid underlay is absolutely positioned inside this box and
+     masked to an ellipse, so there is nothing to clip anyway. */
+  position:relative;
+  background:var(--ink-deep);color:var(--on-deep);
+  border-top:1px solid rgba(255,255,255,.08);
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+/* The hero's grid motif, reused so the two ends of the page rhyme. Masked to a
+   soft ellipse so it never reads as a tablecloth. */
+.house-grid{
+  position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.5;
+  background-image:
+    linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px);
+  background-size:38px 38px;
+  -webkit-mask-image:radial-gradient(ellipse 72% 58% at 50% 42%,#000,transparent 76%);
+  mask-image:radial-gradient(ellipse 72% 58% at 50% 42%,#000,transparent 76%);
+}
+.house-wrap{position:relative;z-index:1}
+.house-sec .eyebrow{color:var(--accent-lit)}
+.house-sec .sec-head p.sub{color:rgba(245,243,236,.62)}
+
+.house-in{display:grid;grid-template-columns:.95fr 1.05fr;gap:56px;align-items:start;margin-top:56px}
+@media(max-width:940px){.house-in{grid-template-columns:1fr;gap:0;margin-top:30px}}
+
+.house-pin{position:sticky;top:max(86px,calc(50vh - 265px))}
+@media(min-width:941px) and (max-height:820px){.house-pin{top:76px}}
+.house{display:flex;flex-direction:column;align-items:center}
+.house svg{display:block;width:100%;height:auto;max-height:50vh}
+
+/* ---------- How a stage arrives ----------
+   Drawn lines carry pathLength="1", so one rule completes any of them whatever
+   its real length — no measuring, no per-path constants. */
+.hs-draw{stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset 1s var(--ease)}
+.hs-rise{transform:scaleY(0);transform-box:fill-box;transform-origin:50% 100%;
+  transition:transform .85s var(--ease)}
+.hs-fade{opacity:0;transition:opacity .7s var(--ease)}
+.hs-dim{opacity:0;transition:opacity .7s var(--ease)}
+/* A slab arrives from above and settles, because that is how it is placed. */
+.hs-drop{opacity:0;transform:translateY(-18px);transform-box:fill-box;
+  transition:opacity .5s var(--ease),transform .7s var(--ease)}
+
+.hs-g.done .hs-draw, html:not(.js) .hs-draw, .house.settled .hs-draw{stroke-dashoffset:0}
+.hs-g.done .hs-rise, html:not(.js) .hs-rise, .house.settled .hs-rise{transform:scaleY(1)}
+.hs-g.done .hs-fade, html:not(.js) .hs-fade, .house.settled .hs-fade{opacity:1}
+.hs-g.done .hs-dim,  html:not(.js) .hs-dim,  .house.settled .hs-dim{opacity:.55}
+.hs-g.done .hs-drop, html:not(.js) .hs-drop, .house.settled .hs-drop{opacity:1;transform:none}
+
+.hs-g .x1{transition-delay:.06s} .hs-g .x2{transition-delay:.13s}
+.hs-g .x3{transition-delay:.20s} .hs-g .x4{transition-delay:.27s}
+.hs-g .x5{transition-delay:.34s} .hs-g .x6{transition-delay:.41s}
+
+/* ---------- Ink on a dark table ---------- */
+.hs-line{fill:none;stroke:var(--draw);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.hs-faint{fill:none;stroke:rgba(245,243,236,.3);stroke-width:1.4;stroke-linecap:round}
+.hs-acc{fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.hs-body{fill:rgba(245,243,236,.07)}
+.hs-plaster{fill:#2A3540}
+.hs-wood{fill:#8A6A38}
+.hs-glass{fill:#33434E}
+.hs-lit{fill:#E8B45C}
+.hs-tank{fill:#1B2731}
+
+/* ---------- The steps, and the rail that counts them ---------- */
+/* The rail lives on a wrapper rather than inside the <ol>: an <ol> may only
+   contain <li>, and a stray <i> in there is markup a validator is right to
+   complain about. */
+/* The bottom padding is travel room for the pinned drawing. Without it the
+   sticky block runs out of container exactly as the LAST stage centres, and the
+   finished house — the one picture the whole section is built to arrive at —
+   slides up under the nav with its parapet and water tank cut off. */
+.house-track{position:relative;padding-left:30px;padding-bottom:22vh}
+.house-steps{list-style:none}
+/* The track is the full run of the build; the fill is how far through it you
+   are. It is the only progress indicator on the page, and it is real. */
+.house-track::before{content:"";position:absolute;left:5px;top:8px;bottom:8px;width:2px;
+  background:rgba(245,243,236,.14);border-radius:2px}
+.house-rail{position:absolute;left:5px;top:8px;width:2px;height:0;border-radius:2px;
+  background:linear-gradient(180deg,var(--accent) 0%,var(--accent-lit) 100%);
+  transition:height .8s var(--ease)}
+@media(max-width:940px){.house-track{padding-left:24px}}
+
+.hstep{position:relative;border-top:1px solid rgba(255,255,255,.09);padding:24px 0}
+.hstep:first-child{border-top:0;padding-top:4px}
+/* A tick per stage, sitting on the rail. */
+.hstep::before{content:"";position:absolute;left:-30px;top:34px;width:12px;height:12px;
+  border-radius:50%;background:var(--ink-deep);border:2px solid rgba(245,243,236,.22);
+  transition:border-color .45s var(--ease),background .45s var(--ease),transform .45s var(--ease)}
+.hstep.done::before{border-color:var(--accent);background:var(--accent)}
+.hstep.cur::before{border-color:var(--accent-lit);background:var(--accent-lit);transform:scale(1.25)}
+/* With JavaScript off the markup already shows the FINISHED house and the final
+   figure, so the rail and its ticks have to agree. An empty rail beside a
+   completed house is a worse lie than no rail at all. */
+html:not(.js) .house-rail{height:100%}
+html:not(.js) .hstep::before{border-color:var(--accent);background:var(--accent)}
+@media(max-width:940px){.hstep::before{left:-24px;top:28px;width:10px;height:10px}}
+
+@media(min-width:941px){
+  .hstep{min-height:52vh;display:flex;flex-direction:column;justify-content:center;
+    border-top:0;padding:0}
+  .hstep::before{top:calc(50% - 6px)}
+  /* Dimming only once the script is marking a step current, so a broken or
+     skipped script leaves all eight fully legible rather than at 34%. */
+  .js .house-steps.live .hstep{opacity:.34;transition:opacity .45s var(--ease)}
+  .js .house-steps.live .hstep.cur{opacity:1}
+}
+.hstep .num{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
+  color:var(--accent-lit);font-weight:600;text-transform:uppercase}
+.hstep h3{font-size:clamp(22px,2.8vw,31px);margin:11px 0 9px;color:var(--on-deep)}
+.hstep p{color:rgba(245,243,236,.62);font-size:16px;line-height:1.56;max-width:37ch}
+.hstep .run{margin-top:14px;display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;
+  font-size:12.5px;color:rgba(245,243,236,.45)}
+.hstep .run b{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--on-deep);
+  letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+
+/* ---------- The readout under the drawing ---------- */
+.house-read{margin-top:18px;width:100%;
+  background:rgba(245,243,236,.045);border:1px solid rgba(255,255,255,.1);
+  border-radius:14px;padding:16px 18px}
+.hr-k{font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:rgba(245,243,236,.45)}
+.hr-n{font-family:var(--mono);font-size:clamp(27px,3.6vw,37px);font-weight:600;
+  letter-spacing:-.03em;margin-top:5px;font-variant-numeric:tabular-nums;color:var(--on-deep)}
+.hr-bar{height:7px;border-radius:99px;background:rgba(245,243,236,.12);margin-top:13px;overflow:hidden}
+.hr-bar i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--accent) 0%,var(--accent-lit) 100%);
+  transition:width .9s var(--ease)}
+.hr-sub{margin-top:9px;font-size:12.5px;color:rgba(245,243,236,.45)}
+.hr-sub b{color:rgba(245,243,236,.72);font-weight:600}
+
+/* On a phone the drawing still pins, smaller. Unlike the three phone
+   screenshots it cannot be repeated per step — the whole point is watching ONE
+   house rise — so it stays on screen and the steps scroll under it. */
+@media(max-width:940px){
+  .house-pin{top:66px;z-index:3;margin:0 -24px;padding:8px 24px 10px;
+    background:var(--ink-deep);box-shadow:0 16px 20px -14px rgba(0,0,0,.75)}
+  .house svg{max-height:21vh;width:auto;max-width:100%}
+  .house-read{margin-top:8px;padding:9px 12px;display:flex;align-items:center;gap:11px;
+    border-radius:11px}
+  .hr-k{display:none}
+  .hr-n{font-size:20px;margin-top:0;flex:0 0 auto}
+  .hr-bar{flex:1 1 auto;min-width:50px;margin-top:0;height:6px}
+  /* The sentence goes first: the figure and the bar already say it, and a third
+     line here costs a line of the step beside it. */
+  .hr-sub{display:none}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .js .hstep{opacity:1!important}
+}

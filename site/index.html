@@ -4,445 +4,231 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Brick Book — the ledger for building a house</title>
-<meta name="description" content="Track every rupee, every material and every person involved in building a house. Photograph a bill or just say it out loud. Works offline, syncs across the family, and your records stay yours." />
-<meta name="theme-color" content="#F5F3EC" />
+<meta name="description" content="Track every rupee, every material and every person involved in building a house. Photograph the bill or just say it out loud. Works offline, syncs across the family." />
+<meta name="theme-color" content="#0E1922" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2315232E'/%3E%3Crect x='11' y='11' width='10' height='10' rx='1.5' fill='none' stroke='%23C0562F' stroke-width='2.4' transform='rotate(45 16 16)'/%3E%3C/svg%3E" />
-
 <meta property="og:type" content="website" />
 <meta property="og:title" content="Brick Book — the ledger for building a house" />
-<meta property="og:description" content="A house is a thousand payments over several years. Brick Book keeps all of them in one honest, shared ledger — offline, on your phone." />
+<meta property="og:description" content="Track every rupee, every material and every person involved in building a house. Photograph the bill or just say it out loud. Works offline, syncs across the family." />
 
-<!-- Set before first paint so reveal animations never flash. -->
+<!-- Set before first paint so nothing that starts hidden ever flashes. -->
 <script>document.documentElement.className="js";</script>
-<style>
-  :root{
-    --ink:#15232E; --ink-2:#41525E; --ink-3:#6B7A85;
-    --paper:#F5F3EC; --paper-2:#FBFAF4; --surface:#FFFFFF;
-    --line:rgba(21,35,46,.10); --line-2:rgba(21,35,46,.16);
-    --accent:#C0562F; --accent-deep:#A2431F; --accent-soft:#F3E3D8;
-    --brass:#A98544; --moss:#3E6B52;
-    --serif:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;
-    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    --mono:"SF Mono","JetBrains Mono",ui-monospace,"Roboto Mono",Menlo,monospace;
-    --shadow:0 1px 2px rgba(21,35,46,.04),0 8px 24px -12px rgba(21,35,46,.18);
-    --shadow-lg:0 2px 4px rgba(21,35,46,.05),0 30px 60px -25px rgba(21,35,46,.40);
-    --ease:cubic-bezier(.2,.7,.2,1);
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html{scroll-behavior:smooth;scroll-padding-top:80px}
-  body{
-    font-family:var(--sans);color:var(--ink);background:var(--paper);
-    -webkit-font-smoothing:antialiased;line-height:1.5;overflow-x:hidden;
-  }
-  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
-  a{color:inherit;text-decoration:none}
-  ul{list-style:none}
-  .money{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-  .eyebrow{font-size:12px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
-  h1,h2,h3{font-family:var(--serif);font-weight:600;line-height:1.08;letter-spacing:-.01em}
 
-  .btn{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px;
-    padding:13px 22px;border-radius:10px;border:1px solid transparent;cursor:pointer;
-    transition:background .2s var(--ease),border-color .2s var(--ease),transform .2s var(--ease),box-shadow .2s var(--ease)}
-  /* Primary — a real depth press. The solid bar underneath is the button's
-     side, so pressing it travels DOWN by exactly that height and the side
-     disappears. A button that only changes colour on :active feels like a
-     picture of a button; this one reads as a physical control, which suits an
-     app people use standing on a site with one thumb. */
-  .btn-primary{
-    background:var(--accent);color:#fff;
-    box-shadow:0 4px 0 var(--accent-deep), 0 10px 22px -10px rgba(192,86,47,.65);
-    will-change:transform}
-  .btn-primary:hover{background:#C95E36;transform:translateY(-1px);
-    box-shadow:0 5px 0 var(--accent-deep), 0 14px 26px -10px rgba(192,86,47,.7)}
-  .btn-primary:active{transform:translateY(4px);
-    box-shadow:0 0 0 var(--accent-deep), 0 4px 10px -6px rgba(192,86,47,.5)}
-
-  /* Secondary — pearl. A soft top-lit surface rather than a hollow outline,
-     which was the weakest thing on the page: an outline button beside a solid
-     one reads as disabled. */
-  .btn-ghost{
-    background:linear-gradient(180deg,#fff 0%,#F7F5EF 100%);
-    border-color:var(--line-2);color:var(--ink);
-    box-shadow:inset 0 1px 0 #fff, 0 3px 0 rgba(21,35,46,.07), 0 6px 14px -10px rgba(21,35,46,.4)}
-  .btn-ghost:hover{border-color:rgba(21,35,46,.28);transform:translateY(-1px);
-    box-shadow:inset 0 1px 0 #fff, 0 4px 0 rgba(21,35,46,.07), 0 10px 18px -10px rgba(21,35,46,.45)}
-  .btn-ghost:active{transform:translateY(3px);
-    box-shadow:inset 0 1px 0 #fff, 0 0 0 rgba(21,35,46,.07), 0 3px 8px -6px rgba(21,35,46,.35)}
-
-  /* Same two treatments, inverted for the dark bands. */
-  .btn-light{background:linear-gradient(180deg,#fff 0%,#EFEDE6 100%);color:var(--ink);
-    box-shadow:0 4px 0 rgba(0,0,0,.35), 0 10px 22px -12px rgba(0,0,0,.6)}
-  .btn-light:hover{transform:translateY(-1px);box-shadow:0 5px 0 rgba(0,0,0,.35), 0 14px 26px -12px rgba(0,0,0,.65)}
-  .btn-light:active{transform:translateY(4px);box-shadow:0 0 0 rgba(0,0,0,.35), 0 4px 10px -8px rgba(0,0,0,.5)}
-  .btn-outline-light{background:rgba(255,255,255,.04);color:#fff;border-color:rgba(255,255,255,.28);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 3px 0 rgba(0,0,0,.28)}
-  .btn-outline-light:hover{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.08);transform:translateY(-1px)}
-  .btn-outline-light:active{transform:translateY(3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 rgba(0,0,0,.28)}
-
-  /* ---------- Nav ---------- */
-  header.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-    background:rgba(245,243,236,.72);border-bottom:1px solid transparent;
-    transition:background .3s var(--ease),border-color .3s var(--ease)}
-  header.nav.scrolled{background:rgba(245,243,236,.92);border-color:var(--line)}
-  .nav-in{display:flex;align-items:center;justify-content:space-between;height:66px}
-  .brand{display:flex;align-items:center;gap:11px}
-  .brand-mark{width:30px;height:30px;border-radius:7px;background:var(--ink);display:grid;place-items:center;flex:0 0 auto}
-  .brand-mark span{display:block;width:13px;height:13px;border:2px solid var(--accent);border-radius:2px;transform:rotate(45deg)}
-  .brand-name{font-weight:700;letter-spacing:.14em;font-size:14px}
-  .nav-links{display:flex;gap:30px;align-items:center;font-size:14px;color:var(--ink-2);font-weight:500}
-  .nav-links a{position:relative;transition:color .2s var(--ease)}
-  .nav-links a::after{content:"";position:absolute;left:0;right:0;bottom:-6px;height:1.5px;
-    background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .28s var(--ease)}
-  .nav-links a:hover{color:var(--ink)}
-  .nav-links a:hover::after{transform:scaleX(1)}
-  @media(max-width:820px){.nav-links{display:none}}
-
-  /* ---------- Hero ---------- */
-  .hero{position:relative;padding:76px 0 66px;overflow:hidden}
-  .hero-grid{position:absolute;inset:0;z-index:0;opacity:.5;
-    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
-    background-size:34px 34px;
-    -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000,transparent 78%);
-    mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000,transparent 78%)}
-  .hero-in{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
-  @media(max-width:940px){.hero-in{grid-template-columns:1fr;gap:48px}}
-  .hero h1{font-size:clamp(38px,5.4vw,60px);margin:20px 0 0}
-  .hero h1 em{font-style:italic;color:var(--accent)}
-  .hero p.lead{font-size:19px;color:var(--ink-2);margin:20px 0 30px;max-width:26em}
-  .hero-cta{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
-  .hero-note{margin-top:20px;font-size:13px;color:var(--ink-3);display:flex;align-items:center;gap:8px}
-  .dot{width:6px;height:6px;border-radius:50%;background:var(--moss);box-shadow:0 0 0 3px rgba(62,107,82,.15);flex:0 0 auto}
-
-  /* Phone mock — a real screenshot in a frame, not a CSS drawing of one.
-     The drawn phone had to be kept in sync with an app it didn't come from,
-     and it always looked illustrated. This is the actual screen, seeded with
-     invented figures (see site/README.md). */
-  .mock{position:relative;display:flex;justify-content:center;align-items:center;perspective:1400px}
-  .mock::before{content:"";position:absolute;inset:-6% -14%;z-index:0;pointer-events:none;
-    background:radial-gradient(ellipse 58% 48% at 50% 46%, rgba(192,86,47,.20), transparent 70%)}
-  .device{position:relative;z-index:1;width:min(318px,76vw);background:#0A0F14;
-    border-radius:40px;padding:9px;
-    box-shadow:var(--shadow-lg), inset 0 0 0 1px rgba(255,255,255,.09)}
-  .device img{display:block;width:100%;height:auto;border-radius:32px;background:#0E1922}
-
-  /* A single scroll-linked moment, in NATIVE CSS — no library, no main-thread
-     work. The device sits back slightly and rises to flat as it scrolls into
-     place. Wrapped in @supports so browsers without scroll-driven animations
-     simply get the flat, finished state. */
-  @supports (animation-timeline: view()) {
-    @media (prefers-reduced-motion: no-preference) and (min-width:941px) {
-      @keyframes device-settle{
-        from{transform:rotateX(11deg) translateY(14px) scale(.965)}
-        to{transform:rotateX(0deg) translateY(0) scale(1)}
-      }
-      .hero .device{
-        transform-origin:50% 100%;
-        animation:device-settle linear both;
-        animation-timeline:view();
-        animation-range:entry 10% cover 42%;
-      }
-    }
-  }
-
-  /* ---------- Stat band ---------- */
-  .stats{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--paper-2)}
-  .stats-in{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line)}
-  .stat{background:var(--paper-2);padding:26px 24px}
-  @media(max-width:760px){.stats-in{grid-template-columns:repeat(2,1fr)}}
-  .stat .n{font-family:var(--serif);font-size:29px;font-weight:600}
-  .stat .k{font-size:13px;color:var(--ink-3);margin-top:4px;line-height:1.4}
-
-  /* ---------- Sections ---------- */
-  section.blk{padding:88px 0}
-  @media(max-width:700px){section.blk{padding:66px 0}}
-  .sec-head{max-width:46ch}
-  .sec-head.mid{margin:0 auto;text-align:center}
-  .sec-head.mid .eyebrow{display:block}
-  .sec-head h2{font-size:clamp(28px,3.6vw,40px);margin-top:14px}
-  .sec-head p{color:var(--ink-2);font-size:17px;margin-top:14px}
-
-  /* One line, where a whole dark section of prose used to be. */
-  .why{padding:64px 0;text-align:center;border-bottom:1px solid var(--line)}
-  .why p{font-family:var(--serif);font-size:clamp(23px,3.1vw,33px);line-height:1.22;
-    max-width:20ch;margin:0 auto;letter-spacing:-.01em}
-  .why p em{font-style:italic;color:var(--accent)}
-  .why span{display:block;margin-top:16px;font-size:14.5px;color:var(--ink-3)}
-
-  /* ---------- Voice demo (the one thing on this page you can operate) -------
-     The old page had a paragraph claiming the form fills itself from speech.
-     This plays it instead: the words arrive, the fields fill, the row saves.
-     Everything here is HTML the page already has — no video, no library. */
-  .vox{background:var(--ink);color:#EAE7DE}
-  .vox-in{display:grid;grid-template-columns:1.02fr .98fr;gap:56px;align-items:center}
-  @media(max-width:940px){.vox-in{grid-template-columns:1fr;gap:44px}}
-  .vox h2{color:#fff;font-size:clamp(28px,3.6vw,40px);margin-top:14px}
-  .vox .eyebrow{color:#E39A78}
-  .vox p.lead{color:rgba(255,255,255,.72);font-size:17px;margin-top:14px;max-width:32ch}
-
-  .demo{margin-top:30px;background:#0B141B;border:1px solid rgba(255,255,255,.09);
-    border-radius:16px;padding:20px 20px 18px;max-width:430px;
-    box-shadow:0 30px 60px -30px rgba(0,0,0,.9)}
-  .demo-top{display:flex;align-items:flex-start;gap:14px}
-  .mic{width:46px;height:46px;border-radius:50%;background:var(--accent);color:#fff;
-    display:grid;place-items:center;flex:0 0 auto;position:relative}
-  .mic::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--accent);opacity:0}
-  .demo.listening .mic::after{animation:mic-ring 1.3s var(--ease) infinite}
-  @keyframes mic-ring{from{transform:scale(.92);opacity:.7}to{transform:scale(1.4);opacity:0}}
-  .heard-k{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.42)}
-  .heard{color:#fff;font-size:15.5px;line-height:1.45;margin-top:6px;min-height:2.9em}
-  .heard i{font-style:normal;border-right:2px solid var(--accent);margin-left:1px;opacity:0}
-  .demo.listening .heard i{opacity:1;animation:caret .9s steps(1) infinite}
-  @keyframes caret{50%{opacity:0}}
-
-  .fields{display:grid;gap:7px;margin-top:18px}
-  .f{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
-    padding:11px 13px;border-radius:10px;background:rgba(255,255,255,.035);
-    border:1px solid rgba(255,255,255,.05);
-    opacity:.25;transform:translateY(7px);
-    transition:opacity .45s var(--ease),transform .45s var(--ease),background .45s var(--ease)}
-  .f.on{opacity:1;transform:none;background:rgba(255,255,255,.075)}
-  .f .k{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:rgba(255,255,255,.45);flex:0 0 auto}
-  .f .v{color:#fff;font-weight:600;font-size:15px;text-align:right}
-  .saved{display:flex;align-items:center;gap:9px;margin-top:16px;font-size:13.5px;
-    color:#8FBFA3;opacity:0;transform:translateY(6px);
-    transition:opacity .4s var(--ease),transform .4s var(--ease)}
-  .saved.on{opacity:1;transform:none}
-  .demo-foot{display:flex;align-items:center;gap:14px;margin-top:18px;
-    padding-top:16px;border-top:1px solid rgba(255,255,255,.08);flex-wrap:wrap}
-  .demo-btn{font:inherit;font-size:14px;font-weight:600;color:#fff;cursor:pointer;
-    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);
-    border-radius:9px;padding:9px 15px;display:inline-flex;align-items:center;gap:8px;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.1), 0 3px 0 rgba(0,0,0,.3);
-    transition:background .2s var(--ease),border-color .2s var(--ease),transform .15s var(--ease),box-shadow .15s var(--ease)}
-  .demo-btn:hover{background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.4)}
-  .demo-btn:active{transform:translateY(3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1), 0 0 0 rgba(0,0,0,.3)}
-  .demo-btn[disabled]{opacity:.5;cursor:default;transform:none}
-  .demo-hint{font-size:12.5px;color:rgba(255,255,255,.4)}
-  .vox-proof{display:flex;justify-content:center}
-  .vox-proof .device{width:min(286px,72vw)}
-  .vox-proof .cap{margin-top:16px;font-size:12.5px;color:rgba(255,255,255,.42);text-align:center}
-
-  /* ---------- Watch it work: one phone, pinned, changing screen ---------- */
-  .work-in{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:start;
-    margin:56px auto 0;max-width:940px}
-  @media(max-width:940px){.work-in{grid-template-columns:1fr;gap:0;margin-top:36px}}
-  .pin{position:sticky;top:110px;display:flex;justify-content:center}
-  @media(max-width:940px){.pin{display:none}}
-  .stack{position:relative;width:min(320px,80vw);background:#0A0F14;border-radius:40px;padding:9px;
-    box-shadow:var(--shadow-lg), inset 0 0 0 1px rgba(255,255,255,.09)}
-  /* The frame keeps the height of the tallest screen; the shots cross-fade
-     inside it. aspect-ratio, not a fixed height, so it scales with the width. */
-  .stack .screen{position:relative;border-radius:32px;overflow:hidden;background:#0E1922;aspect-ratio:760/1290}
-  .stack img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center;
-    opacity:0;transform:scale(1.015);
-    transition:opacity .5s var(--ease),transform .7s var(--ease)}
-  .stack img.on{opacity:1;transform:none}
-
-  /* A laptop with a short window: shrink the frame rather than let it run off
-     the bottom of the screen it is pinned to. */
-  @media(min-width:941px) and (max-height:720px){
-    .pin{top:92px}
-    .stack{width:min(258px,80vw)}
-  }
-  .sstep{padding:0 0 30px;border-top:1px solid var(--line);padding-top:30px}
-  .sstep:first-child{border-top:0;padding-top:0}
-  @media(min-width:941px){
-    .sstep{min-height:58vh;display:flex;flex-direction:column;justify-content:center;
-      border-top:0;padding:0}
-    /* Dimming only ever applies once JS has taken over and is marking one step
-       current. If the script never runs, every step stays fully legible. */
-    .js .work-in.live .sstep{opacity:.42;transition:opacity .45s var(--ease)}
-    .js .work-in.live .sstep.cur{opacity:1}
-  }
-  .sstep .num{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--accent);font-weight:600}
-  .sstep h3{font-size:clamp(24px,3vw,32px);margin:12px 0 10px}
-  .sstep p{color:var(--ink-2);font-size:16.5px;line-height:1.55;max-width:34ch}
-  /* On a phone the pinned frame makes no sense — the screen simply sits with
-     its own step instead. Same four files, so nothing extra is downloaded. */
-  .sshot{margin-top:20px;border-radius:14px;overflow:hidden;border:1px solid var(--line-2);
-    box-shadow:0 1px 2px rgba(21,35,46,.06), 0 16px 34px -22px rgba(21,35,46,.55)}
-  .sshot img{display:block;width:100%;height:auto;aspect-ratio:760/620;object-fit:cover;object-position:top center;background:#0E1922}
-  @media(min-width:941px){.sshot{display:none}}
-
-  /* ---------- Chips: what it understands, shown as input → output ---------- */
-  .chip-wrap{background:var(--paper-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-  .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:44px}
-  @media(max-width:940px){.chips{grid-template-columns:repeat(2,1fr)}}
-  /* Two up even on a phone — these are four words each, and eight of them
-     stacked one per screen is a scroll, not a scan. */
-  @media(max-width:560px){.chips{gap:10px}.chip{padding:13px 13px 12px}.chip b{font-size:13.5px}.chip span{font-size:14.5px}}
-  .chip{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 16px 14px;
-    transition:transform .25s var(--ease),box-shadow .25s var(--ease),border-color .25s var(--ease)}
-  .chip:hover{transform:translateY(-2px);border-color:var(--line-2);box-shadow:var(--shadow)}
-  .chip b{display:block;font-weight:600;font-size:14.5px;color:var(--ink-2)}
-  .chip .arw{display:block;color:var(--accent);margin:7px 0 5px;font-size:13px;line-height:1}
-  .chip span{display:block;font-size:15.5px;font-weight:600}
-
-  /* ---------- Two sides ---------- */
-  .sides{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
-    border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-top:48px}
-  @media(max-width:900px){.sides{grid-template-columns:1fr}}
-  .side{background:var(--surface);padding:34px 32px}
-  .side.dark{background:var(--ink);color:#EAE7DE}
-  .side .tagline{font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
-  .side.dark .tagline{color:#E39A78}
-  .side h3{font-size:25px;margin:12px 0 10px}
-  .side.dark h3{color:#fff}
-  .side>p{color:var(--ink-2);font-size:15.5px;line-height:1.6;max-width:36ch}
-  .side.dark>p{color:rgba(255,255,255,.72)}
-  .side ul{margin-top:20px;display:grid;gap:11px}
-  .side li{display:flex;gap:11px;font-size:14.5px;color:var(--ink-2);line-height:1.5}
-  .side.dark li{color:rgba(255,255,255,.8)}
-  .side li svg{flex:0 0 auto;margin-top:3px;color:var(--moss)}
-  .side.dark li svg{color:#8FBFA3}
-
-  /* Live-looking cards: the section shows the two books instead of listing
-     what is in them. */
-  .balcard{margin-top:24px;background:#0B141B;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px}
-  .balcard .bt{color:rgba(255,255,255,.4);font-size:9px;letter-spacing:.14em;text-transform:uppercase}
-  .balrow{display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;font-size:13px;color:rgba(255,255,255,.75);gap:12px}
-  .balrow b{color:#fff;font-weight:600}
-  .balrow.big{margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);font-size:14px}
-  .balrow.big b{font-size:19px}
-  .balsplit{margin-top:12px;display:flex;gap:8px;font-size:11px}
-  .balsplit div{flex:1;background:rgba(255,255,255,.05);border-radius:7px;padding:9px 10px;color:rgba(255,255,255,.55)}
-  .balsplit b{display:block;color:#fff;font-size:13px;margin-top:3px;font-weight:600}
-  .ledgercard{margin-top:24px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px}
-  .ledgercard .lt{color:var(--ink-3);font-size:9px;letter-spacing:.14em;text-transform:uppercase}
-  .lrow{display:flex;justify-content:space-between;align-items:baseline;gap:14px;
-    margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:13px}
-  .lrow:first-of-type{border-top:0;padding-top:0}
-  .lrow b{display:block;font-weight:600;font-size:13.5px}
-  .lrow i{display:block;font-style:normal;color:var(--ink-3);font-size:11.5px;margin-top:2px}
-  .lrow .money{font-weight:600;white-space:nowrap}
-
-  /* ---------- Privacy ---------- */
-  .priv-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
-  @media(max-width:900px){.priv-grid{grid-template-columns:1fr;gap:32px}}
-  .priv-grid h2{font-size:clamp(26px,3vw,34px)}
-  .priv-list{display:grid;gap:16px}
-  .priv-item{display:flex;gap:13px;align-items:flex-start}
-  .priv-item svg{flex:0 0 auto;margin-top:2px;color:var(--moss)}
-  .priv-item b{font-size:15.5px;font-weight:600}
-  .priv-item span{color:var(--ink-2);font-size:15px}
-
-  /* ---------- Pricing ---------- */
-  .price-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:48px;max-width:800px;margin-left:auto;margin-right:auto}
-  @media(max-width:760px){.price-grid{grid-template-columns:1fr}}
-  .plan{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:30px 28px;
-    position:relative;display:flex;flex-direction:column;
-    transition:transform .3s var(--ease),box-shadow .3s var(--ease)}
-  .plan:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
-  .plan.pro{border-color:var(--accent);box-shadow:0 20px 44px -26px rgba(192,86,47,.5)}
-  .plan .tag{position:absolute;top:-11px;left:28px;background:var(--accent);color:#fff;
-    font-size:10px;font-weight:700;letter-spacing:.14em;padding:5px 11px;border-radius:6px}
-  .plan .pn{font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
-  .plan .pp{margin:12px 0 4px;display:flex;align-items:baseline;gap:8px}
-  .plan .pp b{font-size:38px;font-weight:700}
-  .plan .per{color:var(--ink-3);font-size:14px}
-  .plan ul{display:grid;gap:10px;margin:18px 0 24px}
-  .plan li{display:flex;gap:10px;font-size:14.5px;color:var(--ink-2);line-height:1.45}
-  .plan li svg{flex:0 0 auto;margin-top:3px;color:var(--moss)}
-  .plan .btn{width:100%;justify-content:center;margin-top:auto}
-  .price-note{text-align:center;color:var(--ink-3);font-size:13.5px;margin-top:24px}
-
-  /* ---------- CTA + footer ---------- */
-  .cta{background:var(--ink);color:#fff;text-align:center}
-  .cta h2{font-size:clamp(28px,3.8vw,42px);color:#fff;margin-top:14px}
-  .cta p{color:rgba(255,255,255,.7);font-size:17px;margin:16px auto 28px;max-width:38ch}
-  .cta .eyebrow{color:#E39A78}
-  .cta-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-  .cta-note{margin-top:22px;font-size:13px;color:rgba(255,255,255,.45)}
-  footer{padding:40px 0 48px;border-top:1px solid var(--line)}
-  .foot-in{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
-  .foot-links{display:flex;gap:22px;font-size:14px;color:var(--ink-2);flex-wrap:wrap}
-  .foot-links a{transition:color .2s var(--ease)}
-  .foot-links a:hover{color:var(--accent)}
-  .foot-made{margin-top:24px;font-size:13px;color:var(--ink-3)}
-
-  /* ---------- Reveal (only when JS is on, so it degrades to visible) ---------- */
-  .js .reveal{opacity:0;transform:translateY(18px);
-    transition:opacity .7s var(--ease),transform .7s var(--ease)}
-  .js .reveal.in{opacity:1;transform:none}
-  .js .reveal.d1{transition-delay:.08s}
-  .js .reveal.d2{transition-delay:.16s}
-  .js .reveal.d3{transition-delay:.24s}
-
-  @media(prefers-reduced-motion:reduce){
-    html{scroll-behavior:auto}
-    *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;animation-iteration-count:1!important}
-    .js .reveal{opacity:1;transform:none}
-    .js .sstep{opacity:1!important}
-  }
-</style>
+<!-- Stylesheets in cascade order: tokens first, motion last — motion.css holds
+     the reveal states and the prefers-reduced-motion overrides, and has to be
+     able to win. No build step: these are plain files, served as written.
+     The ?v= token exists because a file keeps its NAME when its contents
+     change, and a local preview will happily serve you the old one. Bump it
+     when you edit css/ or js/. Vercel revalidates on its own, so this is a
+     convenience for local work rather than something production needs. -->
+<link rel="stylesheet" href="css/tokens.css?v=6" />
+<link rel="stylesheet" href="css/base.css?v=6" />
+<link rel="stylesheet" href="css/home.css?v=6" />
+<link rel="stylesheet" href="css/build.css?v=6" />
+<link rel="stylesheet" href="css/pages.css?v=6" />
+<link rel="stylesheet" href="css/motion.css?v=6" />
 </head>
-<body>
 
+<body>
+<!-- ================= NAV — duplicated per page on purpose =====================
+     There is no build step, so this block is repeated in each of the seven
+     pages. Change it here and you must change it in all of them; site/README.md
+     says so too. The phone menu is a <details> disclosure so the site stays
+     navigable with JavaScript off. -->
 <header class="nav" id="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="#top" aria-label="Brick Book, back to top">
-      <div class="brand-mark"><span></span></div>
-      <div class="brand-name">BRICK&nbsp;BOOK</div>
+    <a class="brand" href="index.html" aria-label="Brick Book — home">
+      <span class="brand-mark" aria-hidden="true"><span></span></span>
+      <span class="brand-name">BRICK BOOK</span>
     </a>
-    <nav class="nav-links">
-      <a href="#say">Say it</a>
-      <a href="#how">Watch it work</a>
-      <a href="#sides">Owner &amp; contractor</a>
-      <a href="#pricing">Pricing</a>
+    <nav class="nav-links" aria-label="Primary">
+        <a href="owners.html">For owners</a>
+        <a href="contractors.html">For contractors</a>
+        <a href="build.html">The build</a>
+        <a href="reads.html">What it reads</a>
+        <a href="pricing.html">Pricing</a>
     </nav>
-    <a href="#start" class="btn btn-primary" style="padding:10px 18px;font-size:14px">Get the app</a>
+    <div style="display:flex;align-items:center;gap:12px">
+      <a href="#get" class="btn btn-primary nav-cta" style="padding:9px 16px;font-size:14px">Get the app</a>
+      <details class="navmenu">
+        <summary aria-label="Menu"><span></span></summary>
+        <div class="navmenu-panel">
+          <a href="index.html" aria-current="page">Home</a>
+          <a href="owners.html">For owners</a>
+          <a href="contractors.html">For contractors</a>
+          <a href="build.html">The build</a>
+          <a href="reads.html">What it reads</a>
+          <a href="pricing.html">Pricing</a>
+          <a href="privacy-first.html">Offline & private</a>
+        </div>
+      </details>
+    </div>
   </div>
 </header>
 
-<!-- ================= HERO ================= -->
+<!-- ================= HERO — the drafting table ================================
+     A finished house with its cost written onto it. It replaces a headline
+     beside a phone screenshot, which is what every software hero looks like.
+     The real app screenshots did not leave the site; they moved to the bands
+     below, where they are looked at rather than decorated with. -->
 <section class="hero" id="top">
   <div class="hero-grid" aria-hidden="true"></div>
   <div class="wrap hero-in">
-    <div>
-      <div class="eyebrow reveal">The ledger for building a house</div>
-      <h1 class="reveal d1">Every rupee of your house, <em>accounted for.</em></h1>
-      <p class="lead reveal d2">A thousand payments, three years, the whole family — one book.
-        Photograph the bill, or just say it out loud.</p>
-      <div class="hero-cta reveal d3">
-        <a href="#start" class="btn btn-primary">Start your build
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-        </a>
-        <a href="#say" class="btn btn-ghost">Try it, right here</a>
-      </div>
-      <div class="hero-note reveal d3"><span class="dot"></span> Works offline · syncs across your family · your records stay yours</div>
+    <div class="eyebrow reveal">The ledger for building a house</div>
+    <h1 class="reveal d1">Every rupee of your house, <em>accounted for.</em></h1>
+    <p class="lead reveal d2">A thousand payments, three years, the whole family — one book.
+      Photograph the bill, or just say it out loud.</p>
+    <div class="hero-cta reveal d3">
+      <a href="#get" class="btn btn-primary">Start your build <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      <a href="build.html" class="btn btn-outline-light">See three years of one</a>
     </div>
+    <div class="hero-note reveal d3"><span class="dot"></span>
+      Works offline · syncs across your family · your records stay yours</div>
+  </div>
+  <div class="hero-draw">
+      <svg viewBox="0 0 1000 600" role="img"
+           aria-label="A two-storey house drawn in elevation with its costs annotated: preliminaries six lakh fifteen thousand, frame and brickwork eighteen lakh forty thousand, plumbing and wiring seven lakh eighty thousand five hundred, and finishes fourteen lakh forty-five thousand — forty-eight lakh sixty-two thousand four hundred in all.">
+        <!-- ground -->
+        <path d="M120 440H880" pathLength="1" class="hd-line hd-draw hd-d1" />
+        <path d="M150 424V456M850 424V456" pathLength="1" class="hd-faint hd-draw hd-d1" />
 
-    <div class="mock reveal d2">
-      <div class="device">
-        <img src="img/dash.webp" width="760" height="1645"
-             fetchpriority="high" decoding="async"
-             alt="The Brick Book dashboard: total spent ₹48,62,400 across 182 transactions, a budget bar at 81%, and spend broken down by category." />
-      </div>
-    </div>
+        <!-- footings and plinth -->
+        <g class="hd-in hd-d2">
+          <path d="M332.5 478H380.5L367.5 440H345.5Z" class="hd-line hd-body" />
+          <path d="M430.5 478H478.5L465.5 440H443.5Z" class="hd-line hd-body" />
+          <path d="M528.5 478H576.5L563.5 440H541.5Z" class="hd-line hd-body" />
+          <path d="M626.5 478H674.5L661.5 440H639.5Z" class="hd-line hd-body" />
+          <rect x="340" y="418" width="327" height="22" class="hd-line hd-body" />
+        </g>
+
+        <!-- ground floor -->
+        <g class="hd-in hd-d3">
+          <rect x="350" y="300" width="13" height="118" class="hd-line hd-body" />
+          <rect x="448" y="300" width="13" height="118" class="hd-line hd-body" />
+          <rect x="546" y="300" width="13" height="118" class="hd-line hd-body" />
+          <rect x="644" y="300" width="13" height="118" class="hd-line hd-body" />
+          <rect x="336" y="282" width="335" height="18" class="hd-line hd-body" />
+        </g>
+
+        <!-- first floor -->
+        <g class="hd-in hd-d4">
+          <rect x="350" y="154" width="13" height="128" class="hd-line hd-body" />
+          <rect x="448" y="154" width="13" height="128" class="hd-line hd-body" />
+          <rect x="546" y="154" width="13" height="128" class="hd-line hd-body" />
+          <rect x="644" y="154" width="13" height="128" class="hd-line hd-body" />
+          <rect x="336" y="136" width="335" height="18" class="hd-line hd-body" />
+        </g>
+
+        <!-- parapet, stair head, tank -->
+        <g class="hd-in hd-d5">
+          <rect x="336" y="106" width="335" height="30" class="hd-line" />
+          <path d="M330 106H677" pathLength="1" class="hd-line" />
+          <rect x="600" y="82" width="48" height="24" rx="5" class="hd-line hd-body" />
+        </g>
+
+        <!-- openings, balcony -->
+        <g class="hd-in hd-d6">
+          <rect x="384" y="330" width="42" height="40" class="hd-line hd-glass" />
+          <rect x="580" y="330" width="42" height="40" class="hd-line hd-glass" />
+          <rect x="482" y="338" width="44" height="80" class="hd-line hd-wood" />
+          <rect x="384" y="182" width="42" height="40" class="hd-line hd-glass" />
+          <rect x="580" y="182" width="42" height="40" class="hd-line hd-glass" />
+          <rect x="482" y="186" width="44" height="64" class="hd-line hd-glass" />
+          <rect x="466" y="272" width="76" height="10" class="hd-line hd-body" />
+          <path d="M470 244H538M476 244V272M490 244V272M504 244V272M518 244V272M532 244V272"
+                pathLength="1" class="hd-faint" />
+        </g>
+
+        <!-- callouts: two left, two right -->
+        <g class="hd-in hd-d7">
+          <circle cx="350" cy="196" r="4" class="hd-dot" />
+          <path d="M350 196H312" pathLength="1" class="hd-lead" />
+          <text x="300" y="192" text-anchor="end" class="hd-label">Frame &amp; brickwork</text>
+          <text x="300" y="212" text-anchor="end" class="hd-cost">&#8377;18,40,000</text>
+
+          <!-- Points at a footing rather than the plinth: the ground line runs
+               the full width here, and a label beside the plinth sat straight
+               on top of it. -->
+          <circle cx="345" cy="462" r="4" class="hd-dot" />
+          <path d="M345 462H312" pathLength="1" class="hd-lead" />
+          <text x="300" y="458" text-anchor="end" class="hd-label">Land, drawings, approvals</text>
+          <text x="300" y="478" text-anchor="end" class="hd-cost">&#8377;6,15,000</text>
+
+          <circle cx="657" cy="291" r="4" class="hd-dot" />
+          <path d="M657 291H694" pathLength="1" class="hd-lead" />
+          <text x="706" y="287" class="hd-label">Plumbing &amp; wiring</text>
+          <text x="706" y="307" class="hd-cost">&#8377;7,80,500</text>
+
+          <circle cx="667" cy="408" r="4" class="hd-dot" />
+          <path d="M667 408H694" pathLength="1" class="hd-lead" />
+          <text x="706" y="404" class="hd-label">Flooring, wood &amp; marble</text>
+          <text x="706" y="424" class="hd-cost">&#8377;14,45,000</text>
+        </g>
+
+        <!-- the total, dimensioned like a drawing -->
+        <g class="hd-in hd-d8">
+          <path d="M350 508H657M350 500V516M657 500V516" pathLength="1" class="hd-faint" />
+          <text x="503" y="556" text-anchor="middle" class="hd-total">&#8377;48,62,400</text>
+          <text x="503" y="582" text-anchor="middle" class="hd-note">182 payments &#183; 3 years &#183; one book</text>
+        </g>
+      </svg>
   </div>
 </section>
 
-<!-- ================= STATS ================= -->
-<div class="stats">
-  <div class="wrap">
-    <div class="stats-in">
-      <div class="stat reveal"><div class="n money">₹0</div><div class="k">to open it — no account, no card</div></div>
-      <div class="stat reveal d1"><div class="n">2</div><div class="k">sides — the owner's book and the contractor's</div></div>
-      <div class="stat reveal d2"><div class="n">100%</div><div class="k">of it works in airplane mode</div></div>
-      <div class="stat reveal d3"><div class="n">0</div><div class="k">ads, trackers or data brokers</div></div>
-    </div>
+<div class="facts">
+  <div class="fact reveal"><div class="n money">&#8377;0</div><div class="k">to open it — no account, no card</div></div>
+  <div class="fact reveal d1"><div class="n">2</div><div class="k">sides — the owner's book and the contractor's</div></div>
+  <div class="fact reveal d2"><div class="n">100%</div><div class="k">of it works in airplane mode</div></div>
+  <div class="fact reveal d3"><div class="n">0</div><div class="k">ads, trackers or data brokers</div></div>
+</div>
+
+<div class="strip">
+  <img src="img/photo/sand.webp" width="1600" height="900" loading="lazy" decoding="async" alt="" />
+  <div class="strip-q">
+    <p>By the second year, nobody can say what the plumbing <em>actually cost.</em></p>
   </div>
 </div>
 
-<!-- ================= WHY (one line, not a section of prose) ================= -->
-<section class="why">
-  <div class="wrap reveal">
-    <p>By the second year, nobody can say what the plumbing <em>actually cost.</em></p>
-    <span>Cash, UPI and cheques, paid by four people, against half-printed bills.</span>
+<section class="blk">
+  <div class="wrap">
+    <div class="sec-head mid reveal">
+      <div class="eyebrow">Where to start</div>
+      <h2>Two books, and the house they add up&nbsp;to.</h2>
+    </div>
+    <div class="doors">
+      <a class="door reveal" href="owners.html">
+        <img src="img/photo/brick.webp" width="1200" height="1500" loading="lazy" decoding="async" alt="" />
+        <span class="door-in">
+          <span class="num">For owners</span>
+          <h3>Your money, your materials, your people.</h3>
+          <p>Payments by category, mode and payer. Bills, stock and what each
+             person is still owed — shared with the family, not with us.</p>
+          <span class="go">See the owner's book <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </span>
+      </a>
+      <a class="door reveal d1" href="contractors.html">
+        <img src="img/photo/coils.webp" width="1200" height="1500" loading="lazy" decoding="async" alt="" />
+        <span class="door-in">
+          <span class="num">For contractors</span>
+          <h3>Every site's hisaab, in your pocket.</h3>
+          <p>A book per site: what the owner gave you, what went out, what is in
+             hand. Share one site and keep the others to yourself.</p>
+          <span class="go">See the site book <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </span>
+      </a>
+      <a class="door reveal d2" href="build.html">
+        <img src="img/photo/grid.webp" width="1600" height="900" loading="lazy" decoding="async" alt="" />
+        <span class="door-in">
+          <span class="num">The build</span>
+          <h3>What three years actually looks like.</h3>
+          <p>Eight stages of a ground-plus-one, drawn, with what the book said
+             at the end of each one.</p>
+          <span class="go">Watch it go up <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </span>
+      </a>
+    </div>
   </div>
 </section>
-
 <!-- ================= SAY IT — the playable demo ================= -->
 <section class="blk vox" id="say">
   <div class="wrap vox-in">
@@ -491,161 +277,37 @@
     </div>
   </div>
 </section>
-
-<!-- ================= WATCH IT WORK — one phone, changing screen ================= -->
-<section class="blk" id="how">
-  <div class="wrap">
-    <div class="sec-head mid reveal">
-      <div class="eyebrow">Watch it work</div>
-      <h2>Three screens do the whole job.</h2>
-    </div>
-
-    <div class="work-in">
-      <div class="pin" aria-hidden="true">
-        <div class="stack">
-          <div class="screen">
-            <img id="sc0" class="on" src="img/boq.webp" width="760" height="1645" loading="lazy" decoding="async" alt="" />
-            <img id="sc1" src="img/dash.webp" width="760" height="1645" loading="lazy" decoding="async" alt="" />
-            <img id="sc2" src="img/ledger.webp" width="760" height="1645" loading="lazy" decoding="async" alt="" />
-          </div>
-        </div>
-      </div>
-
-      <div class="steps">
-        <div class="sstep" data-i="0">
-          <div class="num">01 — BILLS</div>
-          <h3>Photograph the bill.</h3>
-          <p>A GST invoice, a PDF, or a notebook page in Hindi — back as line items you can search.</p>
-          <div class="sshot"><img src="img/boq.webp" width="760" height="620" loading="lazy" decoding="async"
-            alt="The Bills screen, with a search for “tee 1” returning four matching bill lines from different dealers." /></div>
-        </div>
-        <div class="sstep" data-i="1">
-          <div class="num">02 — DASHBOARD</div>
-          <h3>See where it all went.</h3>
-          <p>Every payment by category, mode and payer, against the budget. Tap a figure, see the payments behind it.</p>
-          <div class="sshot"><img src="img/dash.webp" width="760" height="620" loading="lazy" decoding="async"
-            alt="The dashboard: ₹48,62,400 spent across 182 transactions, a budget bar at 81 per cent, and spend by category." /></div>
-        </div>
-        <div class="sstep" data-i="2">
-          <div class="num">03 — PAID VS BILLED</div>
-          <h3>Find the gap.</h3>
-          <p>Money handed over that no bill accounts for yet — per person, per dealer.</p>
-          <div class="sshot"><img src="img/ledger.webp" width="760" height="620" loading="lazy" decoding="async"
-            alt="The Ledger's paid-versus-billed panel: ₹48,62,400 paid, ₹2,17,750 billed, and the gap between them." /></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ================= WHAT IT UNDERSTANDS — shown as in → out ================= -->
-<div class="chip-wrap">
-<section class="blk" id="features">
-  <div class="wrap">
-    <div class="sec-head mid reveal">
-      <div class="eyebrow">Built for how India builds</div>
-      <h2>It already speaks the site's language.</h2>
-    </div>
-    <ul class="chips">
-      <li class="chip reveal"><b>“dedh lakh”</b><span class="arw">↓</span><span class="money">₹1,50,000</span></li>
-      <li class="chip reveal"><b>“paune do lakh”</b><span class="arw">↓</span><span class="money">₹1,75,000</span></li>
-      <li class="chip reveal d1"><b>“saadhe teen hazaar”</b><span class="arw">↓</span><span class="money">₹3,500</span></li>
-      <li class="chip reveal d1"><b>4862400</b><span class="arw">↓</span><span class="money">₹48,62,400</span></li>
-      <li class="chip reveal"><b>जमा 5,000 · शेष 12,000</b><span class="arw">↓</span><span>A payment and a bill</span></li>
-      <li class="chip reveal"><b>“tee 1”</b><span class="arw">↓</span><span>Brass Tee 1&Prime;, not 1½&Prime;</span></li>
-      <li class="chip reveal d1"><b>8¼ft × 9in × 8in × 3</b><span class="arw">↓</span><span>12.375 cft</span></li>
-      <li class="chip reveal d1"><b>A payee's UPI QR</b><span class="arw">↓</span><span>Account number &amp; IFSC</span></li>
-    </ul>
-  </div>
-</section>
-</div>
-
-<!-- ================= TWO SIDES ================= -->
-<section class="blk" id="sides">
-  <div class="wrap">
-    <div class="sec-head mid reveal" style="max-width:52ch">
-      <div class="eyebrow">Two sides, one app</div>
-      <h2>Whether you're building it, or building&nbsp;for&nbsp;someone.</h2>
-    </div>
-
-    <div class="sides">
-      <div class="side reveal">
-        <div class="tagline">If you're building a home</div>
-        <h3>Your money, your materials, your people.</h3>
-        <p>Your father records a cash payment in the morning; it's on your phone before lunch.</p>
-        <ul>
-          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-            <span>Every payment by category, mode and payer</span></li>
-          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-            <span>Bills, stock and people — what's owed, what's left, who's been paid</span></li>
-          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-            <span>Excel and PDF out, whenever you need it on paper</span></li>
-        </ul>
-        <div class="ledgercard">
-          <div class="lt">Today · shared with the family</div>
-          <div class="lrow"><span><b>Cement — 40 bags</b><i>Verma Traders · UPI · Payer 1</i></span><span class="money">₹17,200</span></div>
-          <div class="lrow"><span><b>Mistri — 3 days</b><i>Labour · Cash · Payer 2</i></span><span class="money">₹4,500</span></div>
-          <div class="lrow"><span><b>Plumber — advance</b><i>Plumbing · UPI · Payer 1</i></span><span class="money">₹25,000</span></div>
-        </div>
-      </div>
-
-      <div class="side dark reveal d1">
-        <div class="tagline">If you're a contractor</div>
-        <h3>Every site's hisaab, in your pocket.</h3>
-        <p>A book per site: what the owner gave you, what went out, what's in hand. Works signed out.</p>
-        <ul>
-          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-            <span>Photograph the bill against the row</span></li>
-          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-            <span>“Aaj maalik se pachas hazaar liye” — logged</span></li>
-          <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-            <span>Share one site with the owner — your other sites stay yours</span></li>
-        </ul>
-        <div class="balcard">
-          <div class="bt">Site · Bungalow, Sector 4</div>
-          <div class="balrow"><span>Received from owner</span><b class="money">₹6,50,000</b></div>
-          <div class="balrow"><span>Spent — material &amp; labour</span><b class="money">₹5,18,300</b></div>
-          <div class="balrow big"><span>In hand</span><b class="money">₹1,31,700</b></div>
-          <div class="balsplit">
-            <div>With a bill<b class="money">₹4,42,000</b></div>
-            <div>Without<b class="money">₹76,300</b></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ================= PRIVACY ================= -->
-<section class="blk" id="privacy" style="background:var(--paper-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
-  <div class="wrap priv-grid">
+<section class="blk">
+  <div class="wrap teaser">
     <div class="reveal">
-      <div class="eyebrow">Privacy</div>
-      <h2>It stays on your phone unless you say so.</h2>
+      <div class="eyebrow">Built for how India builds</div>
+      <h2>It already speaks the site&rsquo;s language.</h2>
+      <p>&ldquo;Dedh lakh&rdquo; is &#8377;1,50,000. &ldquo;Tee 1&rdquo; is a brass tee of one inch, not one and a half. A payee&rsquo;s UPI QR gives up an account number and an IFSC. Eight things it reads without being taught.</p>
+      <a class="link-on" href="reads.html">See what it reads <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </div>
-    <div class="priv-list reveal d1">
-      <div class="priv-item">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-        <div><b>Offline first.</b> <span>Nothing is uploaded until you choose to share the book.</span></div>
-      </div>
-      <div class="priv-item">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-        <div><b>The AI reader is opt-in.</b> <span>One photo, one recording, nothing stored. Off in a tap.</span></div>
-      </div>
-      <div class="priv-item">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
-        <div><b>No ads, no analytics, no trackers.</b> <span>Your records are never sold or profiled.</span></div>
-      </div>
-      <div class="priv-item">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"/></svg>
-        <div><b>Delete everything, from inside the app.</b> <span>One control, and it's gone from the cloud.</span></div>
-      </div>
+    <div class="teaser-art reveal d1">
+      <img src="img/voice.webp" width="760" height="620" loading="lazy" decoding="async" alt="The entry screen with a spoken phrase turned into a filled-in payment row."
+           style="aspect-ratio:760/620;object-fit:cover;object-position:top center;background:#0E1922" />
     </div>
   </div>
 </section>
 
+<section class="blk">
+  <div class="wrap teaser flip">
+    <div class="reveal">
+      <div class="eyebrow">Yours, and nobody else&rsquo;s</div>
+      <h2>It stays on your phone unless you say&nbsp;so.</h2>
+      <p>Every screen works in airplane mode, because a basement with no signal is where half of this gets recorded. No ads, no trackers, no data brokers, and an export you can take with you whenever you like.</p>
+      <a class="link-on" href="privacy-first.html">How the data works <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    </div>
+    <div class="teaser-art reveal d1">
+      <img src="img/ledger.webp" width="760" height="620" loading="lazy" decoding="async" alt="The ledger screen showing paid against billed."
+           style="aspect-ratio:760/620;object-fit:cover;object-position:top center;background:#0E1922" />
+    </div>
+  </div>
+</section>
 <!-- ================= PRICING ================= -->
-<section class="blk" id="pricing">
+<section class="blk" id="pricing-teaser">
   <div class="wrap">
     <div class="sec-head mid reveal">
       <div class="eyebrow">Pricing</div>
@@ -678,10 +340,8 @@
     </div>
     <p class="price-note reveal">No card to begin. The free side stays free whether or not you ever upgrade.</p>
   </div>
-</section>
-
-<!-- ================= CTA ================= -->
-<section class="blk cta" id="start">
+</section><!-- ================= CTA ================= -->
+<section class="blk cta" id="get">
   <div class="wrap reveal">
     <div class="eyebrow">Start your build</div>
     <h2>Build the house. We'll keep the numbers honest.</h2>
@@ -718,162 +378,48 @@
   </div>
 </footer>
 
-<script>
-(function(){
-  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+<!-- Native ES modules. Deferred by default, so this runs after parse. -->
+<footer class="site">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="index.html">
+          <span class="brand-mark" aria-hidden="true"><span></span></span>
+          <span class="brand-name">BRICK BOOK</span>
+        </a>
+        <p class="foot-blurb">The ledger for building a house. Offline first, shared with
+          the family, and the records stay yours.</p>
+      </div>
+      <div class="foot-col">
+        <h4>The product</h4>
+        <a href="owners.html">For owners</a>
+        <a href="contractors.html">For contractors</a>
+        <a href="reads.html">What it reads</a>
+        <a href="build.html">The build</a>
+      </div>
+      <div class="foot-col">
+        <h4>Decide</h4>
+        <a href="pricing.html">Pricing</a>
+        <a href="privacy-first.html">Offline &amp; private</a>
+        <a href="https://ledger-nu-ashen.vercel.app">Open the app</a>
+      </div>
+      <div class="foot-col">
+        <h4>Legal</h4>
+        <!-- These must keep pointing at the app's own origin: they are the URLs
+             the Play Store listing declares, and the pages live with the app. -->
+        <a href="https://ledger-nu-ashen.vercel.app/privacy.html">Privacy policy</a>
+        <a href="https://ledger-nu-ashen.vercel.app/terms.html">Terms</a>
+        <a href="https://ledger-nu-ashen.vercel.app/delete-account.html">Delete account</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>Built for one house, then shared.</span>
+      <span>Every figure on this site is invented.</span>
+    </div>
+  </div>
+</footer>
 
-  // Sticky nav gains its hairline only once you've moved off the top.
-  var nav = document.getElementById('nav');
-  addEventListener('scroll', function(){ nav.classList.toggle('scrolled', scrollY > 10); }, {passive:true});
-
-  // ---- Scroll reveal. Elements start hidden ONLY because .js is on the html
-  // element, so with JavaScript off the page is simply fully visible.
-  var io = new IntersectionObserver(function(entries){
-    entries.forEach(function(e){
-      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
-    });
-  }, {threshold:.12, rootMargin:'0px 0px -40px 0px'});
-  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
-
-  // Two safety nets. Content that never reveals is content nobody can read,
-  // which is a worse failure than an animation that doesn't play.
-  function showVisible(margin){
-    document.querySelectorAll('.reveal:not(.in)').forEach(function(el){
-      if (el.getBoundingClientRect().top < innerHeight * margin) el.classList.add('in');
-    });
-  }
-  addEventListener('load', function(){ showVisible(1.1); });
-  setTimeout(function(){ showVisible(1); }, 1400);
-
-  // ---- The pinned phone. Whichever step is crossing the middle of the screen
-  // decides which screenshot is showing. No library: one observer, one class.
-  var shots = [].slice.call(document.querySelectorAll('.stack img'));
-  var steps = [].slice.call(document.querySelectorAll('.sstep'));
-  // No width gate here: the observer is cheap, and gating it at load meant a
-  // window resized (or a tablet rotated) into the wide layout got a phone stuck
-  // on the first screen and three permanently dimmed steps.
-  if (shots.length && steps.length){
-    // Whichever entry fires, we re-measure and pick the step nearest the middle
-    // of the screen. Trusting the entry itself gets it wrong on a fast scroll:
-    // three steps cross the band in one batch and the last one processed wins,
-    // which is not the one you're looking at.
-    var pickStep = function(){
-      var mid = innerHeight / 2, best = 0, bestD = Infinity;
-      steps.forEach(function(st, n){
-        var r = st.getBoundingClientRect();
-        var d = Math.abs(r.top + r.height / 2 - mid);
-        if (d < bestD) { bestD = d; best = n; }
-      });
-      shots.forEach(function(img, n){ img.classList.toggle('on', n === best); });
-      steps.forEach(function(st, n){ st.classList.toggle('cur', n === best); });
-    };
-    var sio = new IntersectionObserver(pickStep, {rootMargin:'-45% 0px -45% 0px', threshold:0});
-    steps.forEach(function(st){ sio.observe(st); });
-    addEventListener('resize', pickStep, {passive:true});
-    document.querySelector('.work-in').classList.add('live');
-    pickStep();
-  }
-
-  // ---- The voice demo. Two real phrases, played out the way the app plays
-  // them: the words arrive first, then the fields fill, then it saves. The
-  // second take is the point of the whole feature — "saadhe teen hazaar" is
-  // ₹3,500, and no keyboard was involved.
-  var TAKES = [
-    { say:'2000 ka cement Gopal se liya',
-      fields:[['Item','Cement'],['Dealer','Gopal'],['Amount','₹2,000']] },
-    { say:'saadhe teen hazaar plumber ko diye',
-      fields:[['Item','Plumbing'],['Person','Plumber'],['Amount','₹3,500']] }
-  ];
-  var demo = document.getElementById('demo');
-  if (demo) {
-    var heard = document.getElementById('heard-text'),
-        fieldBox = document.getElementById('fields'),
-        saved = document.getElementById('saved'),
-        btn = document.getElementById('demo-btn'),
-        btnLabel = document.getElementById('demo-btn-label'),
-        // Under prefers-reduced-motion nothing animates, so the first press
-        // should at least land on the *other* phrase — otherwise it repaints
-        // exactly what is already on screen and reads as a dead button.
-        take = reduced ? 1 : 0, timers = [], playing = false;
-
-    function later(fn, ms){ timers.push(setTimeout(fn, ms)); }
-    function clearAll(){ timers.forEach(clearTimeout); timers = []; }
-
-    function paintFields(t, on){
-      fieldBox.innerHTML = '';
-      t.fields.forEach(function(f){
-        var row = document.createElement('div');
-        row.className = 'f' + (on ? ' on' : '');
-        var k = document.createElement('span'); k.className = 'k'; k.textContent = f[0];
-        var v = document.createElement('span');
-        v.className = 'v' + (f[1].charAt(0) === '₹' ? ' money' : '');
-        v.textContent = f[1];
-        row.appendChild(k); row.appendChild(v); fieldBox.appendChild(row);
-      });
-    }
-
-    function finish(t){
-      playing = false;
-      demo.classList.remove('listening');
-      heard.textContent = t.say;
-      paintFields(t, true);
-      saved.classList.add('on');
-      btn.disabled = false;
-      btnLabel.textContent = 'Say another';
-    }
-
-    function play(){
-      clearAll();
-      var t = TAKES[take];
-      take = (take + 1) % TAKES.length;
-      saved.classList.remove('on');
-      if (reduced) { finish(t); return; }
-
-      playing = true;
-      btn.disabled = true;
-      btnLabel.textContent = 'Listening…';
-      demo.classList.add('listening');
-      heard.textContent = '';
-      paintFields(t, false);
-
-      // The words, one at a time — a transcript arriving, not a label appearing.
-      var i = 0;
-      (function type(){
-        heard.textContent = t.say.slice(0, ++i);
-        if (i < t.say.length) later(type, 34);
-        else later(fill, 420);
-      })();
-
-      // Then the form fills itself, top to bottom.
-      function fill(){
-        demo.classList.remove('listening');
-        var rows = fieldBox.querySelectorAll('.f');
-        rows.forEach(function(r, n){ later(function(){ r.classList.add('on'); }, n * 300); });
-        later(function(){ finish(t); }, rows.length * 300 + 350);
-      }
-    }
-
-    btn.addEventListener('click', play);
-
-    // The two buttons that promise the demo actually start it, once the smooth
-    // scroll has landed. A link that says "play it again" and then plays
-    // nothing is worse than no link.
-    document.querySelectorAll('a[href="#say"]').forEach(function(a){
-      a.addEventListener('click', function(){ later(play, 700); });
-    });
-
-    // Play once, unprompted, the first time it scrolls into view — the page
-    // should demonstrate itself before anyone decides to press anything.
-    if (!reduced) {
-      var vio = new IntersectionObserver(function(entries){
-        entries.forEach(function(e){
-          if (e.isIntersecting && !playing) { vio.disconnect(); play(); }
-        });
-      }, {threshold:.3});
-      vio.observe(demo);
-    }
-  }
-})();
-</script>
+<!-- Native ES modules. Deferred by default, so this runs after parse. -->
+<script type="module" src="js/main.js?v=6"></script>
 </body>
 </html>

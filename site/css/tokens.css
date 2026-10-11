@@ -1,0 +1,23 @@
+:root{
+  --ink:#15232E; --ink-2:#41525E; --ink-3:#6B7A85;
+  --paper:#F5F3EC; --paper-2:#FBFAF4; --surface:#FFFFFF;
+  --line:rgba(21,35,46,.10); --line-2:rgba(21,35,46,.16);
+  --accent:#C0562F; --accent-deep:#A2431F; --accent-soft:#F3E3D8;
+  --brass:#A98544; --moss:#3E6B52;
+
+  /* The dark band. The app's chrome is dark in BOTH themes and every phone
+     screenshot here is dark, so this is the product's own ground, not a
+     stylistic detour. Ratios against #0E1922 are measured in build.css.
+       --accent      lines and rules only, 3.9:1  (graphics bar is 3:1)
+       --accent-lit  anything that is TEXT on the dark ground, 5.4:1
+     Swapping one for the other is the same mistake as using the app's
+     `crimson` as a button fill. */
+  --ink-deep:#0E1922; --on-deep:#F5F3EC;
+  --draw:rgba(245,243,236,.86); --accent-lit:#D9703F;
+  --serif:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"SF Mono","JetBrains Mono",ui-monospace,"Roboto Mono",Menlo,monospace;
+  --shadow:0 1px 2px rgba(21,35,46,.04),0 8px 24px -12px rgba(21,35,46,.18);
+  --shadow-lg:0 2px 4px rgba(21,35,46,.05),0 30px 60px -25px rgba(21,35,46,.40);
+  --ease:cubic-bezier(.2,.7,.2,1);
+}

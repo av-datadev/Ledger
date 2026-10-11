@@ -17,6 +17,8 @@
         "-m",
         "http.server",
         "4321",
+        "--protocol",
+        "HTTP/1.1",
         "--directory",
         "site"
       ],

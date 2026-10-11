@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Offline and private — Brick Book</title>
+<meta name="description" content="Works in airplane mode. No ads, no trackers, no data brokers. Export your records whenever you like." />
+<meta name="theme-color" content="#0E1922" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2315232E'/%3E%3Crect x='11' y='11' width='10' height='10' rx='1.5' fill='none' stroke='%23C0562F' stroke-width='2.4' transform='rotate(45 16 16)'/%3E%3C/svg%3E" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Offline and private — Brick Book" />
+<meta property="og:description" content="Works in airplane mode. No ads, no trackers, no data brokers. Export your records whenever you like." />
+
+<!-- Set before first paint so nothing that starts hidden ever flashes. -->
+<script>document.documentElement.className="js";</script>
+
+<!-- Stylesheets in cascade order: tokens first, motion last — motion.css holds
+     the reveal states and the prefers-reduced-motion overrides, and has to be
+     able to win. No build step: these are plain files, served as written.
+     The ?v= token exists because a file keeps its NAME when its contents
+     change, and a local preview will happily serve you the old one. Bump it
+     when you edit css/ or js/. Vercel revalidates on its own, so this is a
+     convenience for local work rather than something production needs. -->
+<link rel="stylesheet" href="css/tokens.css?v=6" />
+<link rel="stylesheet" href="css/base.css?v=6" />
+<link rel="stylesheet" href="css/home.css?v=6" />
+<link rel="stylesheet" href="css/build.css?v=6" />
+<link rel="stylesheet" href="css/pages.css?v=6" />
+<link rel="stylesheet" href="css/motion.css?v=6" />
+</head>
+
+<body>
+<!-- ================= NAV — duplicated per page on purpose =====================
+     There is no build step, so this block is repeated in each of the seven
+     pages. Change it here and you must change it in all of them; site/README.md
+     says so too. The phone menu is a <details> disclosure so the site stays
+     navigable with JavaScript off. -->
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="index.html" aria-label="Brick Book — home">
+      <span class="brand-mark" aria-hidden="true"><span></span></span>
+      <span class="brand-name">BRICK BOOK</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+        <a href="owners.html">For owners</a>
+        <a href="contractors.html">For contractors</a>
+        <a href="build.html">The build</a>
+        <a href="reads.html">What it reads</a>
+        <a href="pricing.html">Pricing</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:12px">
+      <a href="#get" class="btn btn-primary nav-cta" style="padding:9px 16px;font-size:14px">Get the app</a>
+      <details class="navmenu">
+        <summary aria-label="Menu"><span></span></summary>
+        <div class="navmenu-panel">
+          <a href="index.html">Home</a>
+          <a href="owners.html">For owners</a>
+          <a href="contractors.html">For contractors</a>
+          <a href="build.html">The build</a>
+          <a href="reads.html">What it reads</a>
+          <a href="pricing.html">Pricing</a>
+          <a href="privacy-first.html" aria-current="page">Offline & private</a>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>
+
+<section class="blk" style="padding-top:64px;padding-bottom:10px">
+  <div class="wrap">
+    <div class="sec-head reveal" style="max-width:54ch">
+      <div class="eyebrow">Offline &amp; private</div>
+      <h1 style="font-size:clamp(34px,5vw,54px);margin:14px 0 0">It stays on your phone<br />unless you say&nbsp;so.</h1>
+      <p class="sub" style="font-size:19px;margin-top:18px;max-width:48ch">A basement with no signal is where half of this gets recorded. So the app does not wait for a network, and nothing about your house is anybody else&rsquo;s business.</p>
+    </div>
+  </div>
+</section>
+<!-- ================= PRIVACY ================= -->
+<section class="blk" id="privacy" style="background:var(--paper-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap priv-grid">
+    <div class="reveal">
+      <div class="eyebrow">Privacy</div>
+      <h2>It stays on your phone unless you say so.</h2>
+    </div>
+    <div class="priv-list reveal d1">
+      <div class="priv-item">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <div><b>Offline first.</b> <span>Nothing is uploaded until you choose to share the book.</span></div>
+      </div>
+      <div class="priv-item">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+        <div><b>The AI reader is opt-in.</b> <span>One photo, one recording, nothing stored. Off in a tap.</span></div>
+      </div>
+      <div class="priv-item">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        <div><b>No ads, no analytics, no trackers.</b> <span>Your records are never sold or profiled.</span></div>
+      </div>
+      <div class="priv-item">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"/></svg>
+        <div><b>Delete everything, from inside the app.</b> <span>One control, and it's gone from the cloud.</span></div>
+      </div>
+    </div>
+  </div>
+</section><!-- ================= CTA ================= -->
+<section class="blk cta" id="get">
+  <div class="wrap reveal">
+    <div class="eyebrow">Start your build</div>
+    <h2>Build the house. We'll keep the numbers honest.</h2>
+    <p>Open it, pick your side, record the first payment.</p>
+    <div class="cta-btns">
+      <!-- TODO: swap for the Play Store listing URL once the app is published. -->
+      <a href="https://ledger-nu-ashen.vercel.app" class="btn btn-light">Open Brick Book
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a href="#say" class="btn btn-outline-light">Play the demo again</a>
+    </div>
+    <div class="cta-note">Any Android or iPhone · install it to your home screen · nothing to uninstall</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-in">
+      <a class="brand" href="#top">
+        <div class="brand-mark"><span></span></div>
+        <div class="brand-name">BRICK&nbsp;BOOK</div>
+      </a>
+      <nav class="foot-links">
+        <a href="#how">Watch it work</a>
+        <a href="#sides">Owner &amp; contractor</a>
+        <a href="#pricing">Pricing</a>
+        <!-- These live on the app's own origin; they are the pages the store listing links to. -->
+        <a href="https://ledger-nu-ashen.vercel.app/privacy.html">Privacy</a>
+        <a href="https://ledger-nu-ashen.vercel.app/terms.html">Terms</a>
+        <a href="https://ledger-nu-ashen.vercel.app/delete-account.html">Delete account</a>
+      </nav>
+    </div>
+    <div class="foot-made">The ledger for building a house · works offline · made in India 🇮🇳</div>
+  </div>
+</footer>
+
+<!-- Native ES modules. Deferred by default, so this runs after parse. -->
+<footer class="site">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="index.html">
+          <span class="brand-mark" aria-hidden="true"><span></span></span>
+          <span class="brand-name">BRICK BOOK</span>
+        </a>
+        <p class="foot-blurb">The ledger for building a house. Offline first, shared with
+          the family, and the records stay yours.</p>
+      </div>
+      <div class="foot-col">
+        <h4>The product</h4>
+        <a href="owners.html">For owners</a>
+        <a href="contractors.html">For contractors</a>
+        <a href="reads.html">What it reads</a>
+        <a href="build.html">The build</a>
+      </div>
+      <div class="foot-col">
+        <h4>Decide</h4>
+        <a href="pricing.html">Pricing</a>
+        <a href="privacy-first.html">Offline &amp; private</a>
+        <a href="https://ledger-nu-ashen.vercel.app">Open the app</a>
+      </div>
+      <div class="foot-col">
+        <h4>Legal</h4>
+        <!-- These must keep pointing at the app's own origin: they are the URLs
+             the Play Store listing declares, and the pages live with the app. -->
+        <a href="https://ledger-nu-ashen.vercel.app/privacy.html">Privacy policy</a>
+        <a href="https://ledger-nu-ashen.vercel.app/terms.html">Terms</a>
+        <a href="https://ledger-nu-ashen.vercel.app/delete-account.html">Delete account</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>Built for one house, then shared.</span>
+      <span>Every figure on this site is invented.</span>
+    </div>
+  </div>
+</footer>
+
+<!-- Native ES modules. Deferred by default, so this runs after parse. -->
+<script type="module" src="js/main.js?v=6"></script>
+</body>
+</html>

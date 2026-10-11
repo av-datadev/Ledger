@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The build — Brick Book</title>
+<meta name="description" content="Eight stages of a ground-plus-one house, drawn, and what the book said at the end of each one." />
+<meta name="theme-color" content="#0E1922" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2315232E'/%3E%3Crect x='11' y='11' width='10' height='10' rx='1.5' fill='none' stroke='%23C0562F' stroke-width='2.4' transform='rotate(45 16 16)'/%3E%3C/svg%3E" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="The build — Brick Book" />
+<meta property="og:description" content="Eight stages of a ground-plus-one house, drawn, and what the book said at the end of each one." />
+
+<!-- Set before first paint so nothing that starts hidden ever flashes. -->
+<script>document.documentElement.className="js";</script>
+
+<!-- Stylesheets in cascade order: tokens first, motion last — motion.css holds
+     the reveal states and the prefers-reduced-motion overrides, and has to be
+     able to win. No build step: these are plain files, served as written.
+     The ?v= token exists because a file keeps its NAME when its contents
+     change, and a local preview will happily serve you the old one. Bump it
+     when you edit css/ or js/. Vercel revalidates on its own, so this is a
+     convenience for local work rather than something production needs. -->
+<link rel="stylesheet" href="css/tokens.css?v=6" />
+<link rel="stylesheet" href="css/base.css?v=6" />
+<link rel="stylesheet" href="css/home.css?v=6" />
+<link rel="stylesheet" href="css/build.css?v=6" />
+<link rel="stylesheet" href="css/pages.css?v=6" />
+<link rel="stylesheet" href="css/motion.css?v=6" />
+</head>
+
+<body>
+<!-- ================= NAV — duplicated per page on purpose =====================
+     There is no build step, so this block is repeated in each of the seven
+     pages. Change it here and you must change it in all of them; site/README.md
+     says so too. The phone menu is a <details> disclosure so the site stays
+     navigable with JavaScript off. -->
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="index.html" aria-label="Brick Book — home">
+      <span class="brand-mark" aria-hidden="true"><span></span></span>
+      <span class="brand-name">BRICK BOOK</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+        <a href="owners.html">For owners</a>
+        <a href="contractors.html">For contractors</a>
+        <a href="build.html" aria-current="page">The build</a>
+        <a href="reads.html">What it reads</a>
+        <a href="pricing.html">Pricing</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:12px">
+      <a href="#get" class="btn btn-primary nav-cta" style="padding:9px 16px;font-size:14px">Get the app</a>
+      <details class="navmenu">
+        <summary aria-label="Menu"><span></span></summary>
+        <div class="navmenu-panel">
+          <a href="index.html">Home</a>
+          <a href="owners.html">For owners</a>
+          <a href="contractors.html">For contractors</a>
+          <a href="build.html" aria-current="page">The build</a>
+          <a href="reads.html">What it reads</a>
+          <a href="pricing.html">Pricing</a>
+          <a href="privacy-first.html">Offline & private</a>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>
+<!-- ================= THE BUILD — a G+1 house, and the number, rising together ===
+     Stage figures are the hero screenshot's own categories, re-cut by stage.
+     Stages 2–5 split the Contractor's ₹18,40,000 across foundation, both
+     frames and brickwork. The eight total ₹48,62,400 against ₹60,00,000 —
+     the same two numbers the hero screenshot shows, and the ₹11,37,600 and
+     "182 payments" the copy quotes. See site/README.md for the full table;
+     re-seed the app and every figure here moves with it. -->
+<section class="blk house-sec" id="build">
+  <div class="house-grid" aria-hidden="true"></div>
+  <div class="wrap house-wrap">
+    <div class="sec-head mid reveal">
+      <div class="eyebrow">Three years on one page</div>
+      <h1>The house goes up.<br />So does the&nbsp;number.</h1>
+      <p class="sub">Eight stages of a ground-plus-one, and what the book said at the end of each.</p>
+    </div>
+
+    <div class="house-in">
+      <div class="house-pin">
+        <div class="house" id="house">
+          <svg viewBox="0 0 560 660" role="img"
+               aria-label="A two-storey house drawn in section and built stage by stage: the plot and its setbacks, footings and plinth, the ground-floor frame, the first-floor frame with parapet and stair head, brickwork, plumbing and wiring runs, flooring, joinery, balcony and water tank, and finally plaster, paint and lit windows.">
+            <defs>
+              <!-- Coursing only. The wall body is a solid rect underneath, so the
+                   masonry can RISE without the bricks squashing as it scales. -->
+              <pattern id="hs-brick" width="42" height="20" patternUnits="userSpaceOnUse">
+                <path d="M0 10H42M0 20H42M21 0V10M0 10V20M42 10V20"
+                      fill="none" stroke="rgba(245,243,236,.17)" stroke-width="1" />
+              </pattern>
+              <pattern id="hs-earth" width="11" height="11" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <path d="M0 0V11" stroke="rgba(245,243,236,.16)" stroke-width="1" />
+              </pattern>
+              <!-- Six real holes, so every later stage (services, joinery, paint)
+                   lands AROUND the openings instead of over them. Pinned to user
+                   space: the default mask region tracks the masked element's
+                   bounding box, which moves while the walls are mid-rise. -->
+              <mask id="hs-wall" maskUnits="userSpaceOnUse" x="0" y="0" width="560" height="660">
+                <rect width="560" height="660" fill="#fff" />
+                <rect x="152" y="224" width="54" height="54"  fill="#000" />
+                <rect x="275" y="228" width="52" height="120" fill="#000" />
+                <rect x="396" y="224" width="54" height="54"  fill="#000" />
+                <rect x="152" y="400" width="54" height="54"  fill="#000" />
+                <rect x="275" y="406" width="52" height="118" fill="#000" />
+                <rect x="396" y="400" width="54" height="54"  fill="#000" />
+              </mask>
+            </defs>
+
+            <!-- 1 · Land, drawings, approvals. Months of money, nothing to see. -->
+            <g class="hs-g" data-stage="1">
+              <rect x="38" y="546" width="484" height="90" fill="url(#hs-earth)" class="hs-fade x3" />
+              <path d="M38 546H522" pathLength="1" class="hs-line hs-draw" />
+              <path d="M62 528V566"  pathLength="1" class="hs-faint hs-draw x1" />
+              <path d="M498 528V566" pathLength="1" class="hs-faint hs-draw x2" />
+              <path d="M62 578H498"  pathLength="1" class="hs-faint hs-draw x3" />
+            </g>
+
+            <!-- 2 · Foundation & plinth -->
+            <g class="hs-g" data-stage="2">
+              <path d="M90 606H146L133 546H103Z"   pathLength="1" class="hs-line hs-body hs-rise" />
+              <path d="M212 606H268L255 546H225Z"  pathLength="1" class="hs-line hs-body hs-rise x1" />
+              <path d="M334 606H390L377 546H347Z"  pathLength="1" class="hs-line hs-body hs-rise x2" />
+              <path d="M456 606H512L499 546H469Z"  pathLength="1" class="hs-line hs-body hs-rise x3" />
+              <rect x="98" y="524" width="396" height="22" class="hs-line hs-body hs-rise x4" />
+            </g>
+
+            <!-- 3 · Ground floor frame -->
+            <g class="hs-g" data-stage="3">
+              <rect x="110" y="366" width="16" height="158" class="hs-line hs-body hs-rise" />
+              <rect x="232" y="366" width="16" height="158" class="hs-line hs-body hs-rise x1" />
+              <rect x="354" y="366" width="16" height="158" class="hs-line hs-body hs-rise x2" />
+              <rect x="476" y="366" width="16" height="158" class="hs-line hs-body hs-rise x3" />
+              <rect x="92" y="348" width="418" height="18" class="hs-line hs-body hs-drop x4" />
+            </g>
+
+            <!-- 4 · First floor frame, parapet and stair head -->
+            <g class="hs-g" data-stage="4">
+              <rect x="110" y="190" width="16" height="158" class="hs-line hs-body hs-rise" />
+              <rect x="232" y="190" width="16" height="158" class="hs-line hs-body hs-rise x1" />
+              <rect x="354" y="190" width="16" height="158" class="hs-line hs-body hs-rise x2" />
+              <rect x="476" y="190" width="16" height="158" class="hs-line hs-body hs-rise x3" />
+              <rect x="92" y="172" width="418" height="18" class="hs-line hs-body hs-drop x4" />
+              <rect x="92" y="134" width="418" height="38" class="hs-line hs-drop x5" />
+              <path d="M86 134H516" pathLength="1" class="hs-line hs-draw x5" />
+              <!-- The stair head room. Every G+1 on that street has one. -->
+              <rect x="398" y="86" width="80" height="48" class="hs-line hs-body hs-rise x6" />
+            </g>
+
+            <!-- 5 · Brickwork & plaster -->
+            <g class="hs-g" data-stage="5">
+              <g mask="url(#hs-wall)">
+                <rect x="126" y="190" width="106" height="158" class="hs-body hs-rise" />
+                <rect x="248" y="190" width="106" height="158" class="hs-body hs-rise x1" />
+                <rect x="370" y="190" width="106" height="158" class="hs-body hs-rise x2" />
+                <rect x="126" y="366" width="106" height="158" class="hs-body hs-rise x1" />
+                <rect x="248" y="366" width="106" height="158" class="hs-body hs-rise x2" />
+                <rect x="370" y="366" width="106" height="158" class="hs-body hs-rise x3" />
+                <rect x="126" y="190" width="350" height="158" fill="url(#hs-brick)" class="hs-fade x4" />
+                <rect x="126" y="366" width="350" height="158" fill="url(#hs-brick)" class="hs-fade x5" />
+              </g>
+              <rect x="152" y="224" width="54" height="54"  class="hs-line hs-fade x5" />
+              <rect x="396" y="224" width="54" height="54"  class="hs-line hs-fade x5" />
+              <rect x="275" y="228" width="52" height="120" class="hs-line hs-fade x6" />
+              <rect x="152" y="400" width="54" height="54"  class="hs-line hs-fade x5" />
+              <rect x="396" y="400" width="54" height="54"  class="hs-line hs-fade x5" />
+              <rect x="275" y="406" width="52" height="118" class="hs-line hs-fade x6" />
+            </g>
+
+            <!-- 6 · Plumbing & wiring. Risers on both floors, off one spine. -->
+            <g class="hs-g" data-stage="6">
+              <path d="M138 208H464" pathLength="1" class="hs-acc hs-draw" />
+              <path d="M138 208V500" pathLength="1" class="hs-acc hs-draw x1" />
+              <path d="M464 208V500" pathLength="1" class="hs-acc hs-draw x2" />
+              <path d="M138 384H464" pathLength="1" class="hs-acc hs-draw x3" />
+              <path d="M344 384V448" pathLength="1" class="hs-acc hs-draw x4" />
+              <path d="M344 208V272" pathLength="1" class="hs-acc hs-draw x4" />
+              <circle cx="138" cy="500" r="5" fill="var(--accent)" class="hs-fade x5" />
+              <circle cx="464" cy="500" r="5" fill="var(--accent)" class="hs-fade x5" />
+              <circle cx="344" cy="448" r="5" fill="var(--accent)" class="hs-fade x6" />
+              <circle cx="344" cy="272" r="5" fill="var(--accent)" class="hs-fade x6" />
+            </g>
+
+            <!-- 7 · Flooring, wood & marble. The balcony and the tank go up with
+                 them, because they are the two things that make it somebody's
+                 house rather than a frame. -->
+            <g class="hs-g" data-stage="7">
+              <rect x="126" y="510" width="350" height="14" class="hs-line hs-body hs-rise" />
+              <rect x="126" y="334" width="350" height="14" class="hs-line hs-body hs-rise x1" />
+              <path d="M214 510V524M302 510V524M390 510V524M214 334V348M302 334V348M390 334V348"
+                    pathLength="1" class="hs-faint hs-draw x2" />
+              <rect x="275" y="406" width="52" height="118" class="hs-wood hs-rise x2" />
+              <path d="M284 416H318M284 514H318M301 416V514" pathLength="1"
+                    fill="none" stroke="rgba(14,25,34,.5)" stroke-width="1.4" class="hs-draw x3" />
+              <rect x="275" y="228" width="52" height="120" class="hs-glass hs-fade x2" />
+              <rect x="152" y="224" width="54" height="54" class="hs-glass hs-fade x2" />
+              <rect x="396" y="224" width="54" height="54" class="hs-glass hs-fade x2" />
+              <rect x="152" y="400" width="54" height="54" class="hs-glass hs-fade x2" />
+              <rect x="396" y="400" width="54" height="54" class="hs-glass hs-fade x2" />
+              <path d="M179 224V278M152 251H206M423 224V278M396 251H450M179 400V454M152 427H206M423 400V454M396 427H450"
+                    pathLength="1" class="hs-faint hs-draw x3" />
+              <!-- Balcony: slab, then railing. -->
+              <rect x="238" y="340" width="126" height="11" class="hs-line hs-body hs-fade x4" />
+              <path d="M242 300H360" pathLength="1" class="hs-line hs-draw x5" />
+              <path d="M250 300V340M268 300V340M286 300V340M304 300V340M322 300V340M340 300V340M356 300V340"
+                    pathLength="1" class="hs-faint hs-draw x6" />
+              <!-- The black water tank. Nothing else says "Indian rooftop" faster. -->
+              <rect x="128" y="96" width="66" height="38" rx="7" class="hs-tank hs-line hs-rise x5" />
+              <path d="M140 96V86M182 96V86" pathLength="1" class="hs-faint hs-draw x6" />
+            </g>
+
+            <!-- 8 · Paint, and the keys. One sheet of plaster across columns and
+                 bays alike — bay-shaped patches leave the wiring showing through
+                 the column strips, which reads as a drawing mistake rather than
+                 as a service run. Plaster buries all of it, which is also what
+                 plaster does. -->
+            <g class="hs-g" data-stage="8">
+              <g mask="url(#hs-wall)">
+                <rect x="110" y="190" width="382" height="144" class="hs-plaster hs-fade" />
+                <rect x="110" y="366" width="382" height="144" class="hs-plaster hs-fade x1" />
+              </g>
+              <path d="M118 190V334M240 190V334M362 190V334M484 190V334M118 366V510M240 366V510M362 366V510M484 366V510"
+                    fill="none" stroke="rgba(245,243,236,.16)" stroke-width="1.4" class="hs-fade x2" />
+              <rect x="152" y="224" width="54" height="54"  class="hs-lit hs-dim x3" />
+              <rect x="396" y="224" width="54" height="54"  class="hs-lit hs-dim x3" />
+              <rect x="275" y="228" width="52" height="120" class="hs-lit hs-dim x4" />
+              <rect x="152" y="400" width="54" height="54"  class="hs-lit hs-dim x4" />
+              <rect x="396" y="400" width="54" height="54"  class="hs-lit hs-dim x4" />
+              <path d="M179 224V278M152 251H206M423 224V278M396 251H450M179 400V454M152 427H206M423 400V454M396 427H450"
+                    fill="none" stroke="rgba(14,25,34,.45)" stroke-width="1.4" class="hs-fade x5" />
+              <rect x="152" y="224" width="54" height="54"  class="hs-line hs-fade x5" />
+              <rect x="396" y="224" width="54" height="54"  class="hs-line hs-fade x5" />
+              <rect x="275" y="228" width="52" height="120" class="hs-line hs-fade x5" />
+              <rect x="152" y="400" width="54" height="54"  class="hs-line hs-fade x5" />
+              <rect x="396" y="400" width="54" height="54"  class="hs-line hs-fade x5" />
+              <rect x="275" y="406" width="52" height="118" class="hs-line hs-fade x5" />
+            </g>
+          </svg>
+
+          <div class="house-read">
+            <div class="hr-k">Spent by this stage</div>
+            <div class="hr-n" id="hs-total">₹48,62,400</div>
+            <div class="hr-bar"><i id="hs-bar" style="width:81%"></i></div>
+            <div class="hr-sub"><b id="hs-pct">81</b>% of the ₹60,00,000 budget set at the start</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="house-track">
+        <i class="house-rail" id="hs-rail" aria-hidden="true"></i>
+        <ol class="house-steps" id="hsteps">
+        <li class="hstep reveal" data-total="615000">
+          <div class="num">Stage 01</div>
+          <h3>Land, drawings, approvals.</h3>
+          <p>Months of spending before a single brick is laid — the architect, the chalan,
+             the levelling. Nothing to photograph, and the easiest money in the whole
+             project to forget you spent.</p>
+          <div class="run"><b>₹6,15,000</b><span>by the end of it · ₹6,15,000 this stage</span></div>
+        </li>
+        <li class="hstep reveal" data-total="1075000">
+          <div class="num">Stage 02</div>
+          <h3>Foundation and plinth.</h3>
+          <p>Steel and cement bought by the trip and paid for on the spot, mostly in cash.
+             This is the stage where “where has it all gone?” gets asked for the first time.</p>
+          <div class="run"><b>₹10,75,000</b><span>by the end of it · ₹4,60,000 this stage</span></div>
+        </li>
+        <li class="hstep reveal" data-total="1615000">
+          <div class="num">Stage 03</div>
+          <h3>The ground floor frame.</h3>
+          <p>Columns up, slab poured. The contractor’s running account overtakes every
+             other line in the book this month, and never gives the position back.</p>
+          <div class="run"><b>₹16,15,000</b><span>by the end of it · ₹5,40,000 this stage</span></div>
+        </li>
+        <li class="hstep reveal" data-total="2155000">
+          <div class="num">Stage 04</div>
+          <h3>Another floor, and the stair head.</h3>
+          <p>The same frame again, one level up. Identical work, identical cost — which you
+             only know for certain because the first one was written down properly.</p>
+          <div class="run"><b>₹21,55,000</b><span>by the end of it · ₹5,40,000 this stage</span></div>
+        </li>
+        <li class="hstep reveal" data-total="2455000">
+          <div class="num">Stage 05</div>
+          <h3>Brickwork, both floors.</h3>
+          <p>Six bays of masonry and the openings left in them. Forty-six payments to the
+             contractor so far, every one of them against a name and a date.</p>
+          <div class="run"><b>₹24,55,000</b><span>by the end of it · ₹3,00,000 this stage</span></div>
+        </li>
+        <li class="hstep reveal" data-total="3235500">
+          <div class="num">Stage 06</div>
+          <h3>Plumbing and wiring.</h3>
+          <p>Thirty-one plumbing payments and twenty-seven electrical, to four different
+             people, across two floors. Two years from now, when a tap leaks, you will
+             want that list.</p>
+          <div class="run"><b>₹32,35,500</b><span>by the end of it · ₹7,80,500 this stage</span></div>
+        </li>
+        <li class="hstep reveal" data-total="4680500">
+          <div class="num">Stage 07</div>
+          <h3>Flooring, wood and marble.</h3>
+          <p>The stage that quietly doubles. Each slab photographed with its rate, so what
+             arrives on site can be checked against what was agreed at the shop.</p>
+          <div class="run"><b>₹46,80,500</b><span>by the end of it · ₹14,45,000 this stage</span></div>
+        </li>
+        <li class="hstep reveal" data-total="4862400">
+          <div class="num">Stage 08</div>
+          <h3>Paint, and the keys.</h3>
+          <p>₹11,37,600 under the budget set three years earlier — and you can say so with
+             certainty, because all 182 payments are in one book.</p>
+          <div class="run"><b>₹48,62,400</b><span>by the end of it · ₹1,81,900 this stage</span></div>
+        </li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section><!-- ================= CTA ================= -->
+<section class="blk cta" id="get">
+  <div class="wrap reveal">
+    <div class="eyebrow">Start your build</div>
+    <h2>Build the house. We'll keep the numbers honest.</h2>
+    <p>Open it, pick your side, record the first payment.</p>
+    <div class="cta-btns">
+      <!-- TODO: swap for the Play Store listing URL once the app is published. -->
+      <a href="https://ledger-nu-ashen.vercel.app" class="btn btn-light">Open Brick Book
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a href="#say" class="btn btn-outline-light">Play the demo again</a>
+    </div>
+    <div class="cta-note">Any Android or iPhone · install it to your home screen · nothing to uninstall</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-in">
+      <a class="brand" href="#top">
+        <div class="brand-mark"><span></span></div>
+        <div class="brand-name">BRICK&nbsp;BOOK</div>
+      </a>
+      <nav class="foot-links">
+        <a href="#how">Watch it work</a>
+        <a href="#sides">Owner &amp; contractor</a>
+        <a href="#pricing">Pricing</a>
+        <!-- These live on the app's own origin; they are the pages the store listing links to. -->
+        <a href="https://ledger-nu-ashen.vercel.app/privacy.html">Privacy</a>
+        <a href="https://ledger-nu-ashen.vercel.app/terms.html">Terms</a>
+        <a href="https://ledger-nu-ashen.vercel.app/delete-account.html">Delete account</a>
+      </nav>
+    </div>
+    <div class="foot-made">The ledger for building a house · works offline · made in India 🇮🇳</div>
+  </div>
+</footer>
+
+<!-- Native ES modules. Deferred by default, so this runs after parse. -->
+<footer class="site">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="index.html">
+          <span class="brand-mark" aria-hidden="true"><span></span></span>
+          <span class="brand-name">BRICK BOOK</span>
+        </a>
+        <p class="foot-blurb">The ledger for building a house. Offline first, shared with
+          the family, and the records stay yours.</p>
+      </div>
+      <div class="foot-col">
+        <h4>The product</h4>
+        <a href="owners.html">For owners</a>
+        <a href="contractors.html">For contractors</a>
+        <a href="reads.html">What it reads</a>
+        <a href="build.html">The build</a>
+      </div>
+      <div class="foot-col">
+        <h4>Decide</h4>
+        <a href="pricing.html">Pricing</a>
+        <a href="privacy-first.html">Offline &amp; private</a>
+        <a href="https://ledger-nu-ashen.vercel.app">Open the app</a>
+      </div>
+      <div class="foot-col">
+        <h4>Legal</h4>
+        <!-- These must keep pointing at the app's own origin: they are the URLs
+             the Play Store listing declares, and the pages live with the app. -->
+        <a href="https://ledger-nu-ashen.vercel.app/privacy.html">Privacy policy</a>
+        <a href="https://ledger-nu-ashen.vercel.app/terms.html">Terms</a>
+        <a href="https://ledger-nu-ashen.vercel.app/delete-account.html">Delete account</a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>Built for one house, then shared.</span>
+      <span>Every figure on this site is invented.</span>
+    </div>
+  </div>
+</footer>
+
+<!-- Native ES modules. Deferred by default, so this runs after parse. -->
+<script type="module" src="js/main.js?v=6"></script>
+</body>
+</html>
